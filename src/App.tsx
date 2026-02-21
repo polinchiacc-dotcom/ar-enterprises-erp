@@ -187,7 +187,7 @@ function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
 // ============================================================
 // MAIN APP
 // ============================================================
-export function App() {
+export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [page, setPage] = useState("dashboard");
   const [vendors, setVendors] = useState<Vendor[]>(INIT_VENDORS);

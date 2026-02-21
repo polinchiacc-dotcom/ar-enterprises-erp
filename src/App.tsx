@@ -418,6 +418,8 @@ export default function App() {
             districtUsers={managedUsers}
             onAddUser={(u) => setManagedUsers(prev => [...prev, u])}
             onToggleUser={(id) => setManagedUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u))}
+            onDeleteUser={(id) => setManagedUsers(prev => prev.filter(u => u.id !== id))}
+            onEditUser={(updated) => setManagedUsers(prev => prev.map(u => u.id === updated.id ? updated : u))}
           />
         )}
         {page === "sheets" && isAdmin && (
@@ -1636,14 +1638,18 @@ function DistrictManagementPage({ districtUsers, onAddUser, onToggleUser }:
 // ============================================================
 // USER MANAGEMENT PAGE (Admin Only)
 // ============================================================
-function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
-  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; }) {
+function UserManagementPage({ districtUsers, onAddUser, onToggleUser, onDeleteUser, onEditUser }:
+  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; onDeleteUser: (id: string) => void; onEditUser: (u: ManagedUser) => void; }) {
   const [showForm, setShowForm] = useState(false);
   const [uname, setUname] = useState("");
   const [pass, setPass] = useState("");
   const [dist, setDist] = useState("");
   const [search, setSearch] = useState("");
   const [showPass, setShowPass] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<ManagedUser | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const filtered = districtUsers.filter(u =>
     u.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -1656,18 +1662,30 @@ function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
     setUname(""); setPass(""); setDist(""); setShowForm(false);
   };
 
+  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const selectAll = () => setSelectedIds(filtered.map(u => u.id));
+  const clearSelect = () => setSelectedIds([]);
+
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-800">👥 User Management</h1>
-          <p className="text-xs text-gray-400 mt-0.5">District user accounts — Activate / Deactivate</p>
+          <p className="text-xs text-gray-400 mt-0.5">District user accounts — Edit / Delete / Bulk operations</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-          + New User
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          {selectedIds.length > 0 && (
+            <button onClick={() => setConfirmBulkDelete(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
+              🗑️ Delete Selected ({selectedIds.length})
+            </button>
+          )}
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+            + New User
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -1712,6 +1730,9 @@ function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
+                <th className="px-4 py-3">
+                  <input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelect()} className="rounded" />
+                </th>
                 {["#", "Username", "District", "Password", "Status", "Created At", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
                 ))}
@@ -1719,7 +1740,11 @@ function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((u, i) => (
-                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "bg-red-50/30" : ""}`}>
+                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "bg-red-50/30" : ""} ${selectedIds.includes(u.id) ? "bg-blue-50" : ""}`}>
+                  <td className="px-4 py-3">
+                    <input type="checkbox" checked={selectedIds.includes(u.id)} onChange={() => toggleSelect(u.id)}
+                      className="rounded" />
+                  </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
                   <td className="px-4 py-3 font-mono font-medium text-blue-700">{u.username}</td>
                   <td className="px-4 py-3 text-gray-700">🏛️ {u.district}</td>
@@ -1742,11 +1767,17 @@ function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{u.createdAt}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => onToggleUser(u.id)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold text-white
-                        ${u.active ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}`}>
-                      {u.active ? "🔴 Deactivate" : "🟢 Activate"}
-                    </button>
+                    <div className="flex gap-1 flex-wrap">
+                      <button onClick={() => { setEditUser({...u}); }}
+                        className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">✏️</button>
+                      <button onClick={() => onToggleUser(u.id)}
+                        className={`px-2 py-1 rounded text-xs font-semibold text-white
+                          ${u.active ? "bg-orange-400 hover:bg-orange-500" : "bg-green-500 hover:bg-green-600"}`}>
+                        {u.active ? "🔴" : "🟢"}
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(u.id)}
+                        className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1755,6 +1786,81 @@ function UserManagementPage({ districtUsers, onAddUser, onToggleUser }:
           {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No users found</p>}
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {editUser && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800">✏️ User Edit</h3>
+              <button onClick={() => setEditUser(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Username</label>
+                <input value={editUser.username} onChange={e => setEditUser({...editUser, username: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Password</label>
+                <input type="text" value={editUser.password} onChange={e => setEditUser({...editUser, password: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">District</label>
+                <select value={editUser.district} onChange={e => setEditUser({...editUser, district: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
+                  {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { onEditUser(editUser); setEditUser(null); }}
+                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
+                  💾 Save
+                </button>
+                <button onClick={() => setEditUser(null)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Delete உறுதிப்படுத்தல்</h3>
+            <p className="text-sm text-gray-600 mb-4">இந்த user-ஐ delete செய்கிறீர்களா? மீட்டெடுக்க முடியாது!</p>
+            <div className="flex gap-2">
+              <button onClick={() => { onDeleteUser(confirmDeleteId); setConfirmDeleteId(null); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
+              <button onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirm */}
+      {confirmBulkDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedIds.length} Users</h3>
+            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedIds.length} users-ஐ delete செய்கிறீர்களா?</p>
+            <div className="flex gap-2">
+              <button onClick={() => {
+                selectedIds.forEach(id => onDeleteUser(id));
+                setSelectedIds([]); setConfirmBulkDelete(false);
+              }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
+              <button onClick={() => setConfirmBulkDelete(false)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

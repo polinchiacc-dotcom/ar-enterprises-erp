@@ -32,19 +32,8 @@ interface ManagedUser {
 }
 
 // ============================================================
-// CONSTANTS — 🔒 LOCKED
+// CONSTANTS
 // ============================================================
-// 🔒 AR_BILL_CALC_FINAL_LOCKED
-// GST Amount = Bill Amount × GST%
-// Total Amount = Bill Amount × 1.18 (FIXED 18%)
-// 🔒 AR_TRANSACTION_CALC_FINAL_LOCKED
-// GST Amount = Expected Amount × GST%
-// Remaining = Expected - Sum(Bill Amount × 1.18)
-// 🔒 AR_WALLET_CALC_FINAL_LOCKED
-// Advance → Debit immediately
-// District Close → GST Balance Debit + Red Alert
-// Admin Confirm → 8% Profit Credit
-
 const DISTRICTS = [
   "Ariyalur","Chengalpattu","Chennai","Coimbatore","Cuddalore","Dharmapuri",
   "Dindigul","Erode","Kallakurichi","Kanchipuram","Kanniyakumari","Karur",
@@ -81,7 +70,7 @@ const genVendorCode = (district: string, bizType: string, year: string, existing
   return `${d}${y}${b}${String(count).padStart(3,"0")}`;
 };
 const PROFIT_RATE = 0.08;
-const BILL_TOTAL_RATE = 1.18; // 🔒 LOCKED
+const BILL_TOTAL_RATE = 1.18;
 
 const USERS: User[] = [
   { id: "U001", username: "admin", password: "Admin@123", role: "admin" },
@@ -91,17 +80,11 @@ const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDi
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const genId = (prefix: string) => prefix + Math.random().toString(36).substr(2,7).toUpperCase();
 
-// ============================================================
-// INITIAL DATA
-// ============================================================
 const INIT_VENDORS: Vendor[] = [];
 const INIT_WALLET: WalletEntry[] = [];
 const INIT_TRANSACTIONS: Transaction[] = [];
 const INIT_BILLS: Bill[] = [];
 
-// ============================================================
-// LOCAL STORAGE HELPERS — Auto Save & Load
-// ============================================================
 const LS_KEY = "AR_ERP_V3_DATA";
 
 const saveToStorage = (data: {
@@ -130,10 +113,8 @@ function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; mana
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    // Check admin first
     const adminUser = USERS.find(u => u.username === username && u.password === password);
     if (adminUser) { setError(""); onLogin(adminUser); return; }
-    // Check managed district users
     const distUser = managedUsers.find(u => u.username === username && u.password === password && u.active);
     if (distUser) {
       setError("");
@@ -187,8 +168,9 @@ function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; mana
 // ============================================================
 export default function App() {
   const saved = loadFromStorage();
+  
   const [user, setUser] = useState<User | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true); // 🆕
+  const [isInitializing, setIsInitializing] = useState(true);
   const [page, setPage] = useState("dashboard");
   const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || INIT_VENDORS);
   const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || INIT_TRANSACTIONS);
@@ -197,7 +179,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(saved?.managedUsers || []);
 
-  // 🆕 Google Sheets Initial Load + Auto-Sync
+  // Google Sheets Initial Load + Auto-Sync
   useEffect(() => {
     async function initialize() {
       try {
@@ -216,27 +198,19 @@ export default function App() {
       }
       
       setIsInitializing(false);
-      startAutoSync(5); // Auto-sync every 5 minutes
+      startAutoSync(5);
     }
     
     initialize();
   }, []);
-  const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || INIT_VENDORS);
-  const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || INIT_TRANSACTIONS);
-  const [bills, setBills] = useState<Bill[]>(saved?.bills || INIT_BILLS);
-  const [wallet, setWallet] = useState<WalletEntry[]>(saved?.wallet || INIT_WALLET);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(saved?.managedUsers || []);
 
-  // Auto-save to LocalStorage whenever data changes
   const saveData = useCallback((
-  v: Vendor[], t: Transaction[], b: Bill[], w: WalletEntry[], u: ManagedUser[]
-) => {
-  saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u });
-  // 🆕 Background sync to Google Sheets
-  saveToSheets().catch(err => console.log('Background sync failed:', err));
-}, []);
-  // Wallet helpers
+    v: Vendor[], t: Transaction[], b: Bill[], w: WalletEntry[], u: ManagedUser[]
+  ) => {
+    saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u });
+    saveToSheets().catch(err => console.log('Background sync failed:', err));
+  }, []);
+
   const getWalletBalance = useCallback(() => {
     if (wallet.length === 0) return 0;
     return wallet[wallet.length - 1].balance;
@@ -254,7 +228,6 @@ export default function App() {
         description, txnId, debit, credit, balance: newBal, type
       };
       const nw = [...prev, entry];
-      // save wallet immediately
       const saved2 = loadFromStorage();
       saveToStorage({
         vendors: saved2?.vendors || [],
@@ -267,22 +240,22 @@ export default function App() {
     });
   }, []);
 
- // 🆕 Loading screen during initialization
-if (isInitializing) {
-  return (
-    <div className="min-h-screen flex items-center justify-center" 
-      style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
-      <div className="text-center">
-        <div className="w-16 h-16 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
-          style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
-        <p className="text-white font-semibold text-lg">Google Sheets-லிருந்து தரவு ஏற்றப்படுகிறது...</p>
-        <p className="text-gray-400 text-sm mt-2">சிறிது காத்திருக்கவும்</p>
+  // Loading screen
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" 
+        style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
+            style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
+          <p className="text-white font-semibold text-lg">Google Sheets-லிருந்து தரவு ஏற்றப்படுகிறது...</p>
+          <p className="text-gray-400 text-sm mt-2">சிறிது காத்திருக்கவும்</p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} managedUsers={managedUsers} />;
+  if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} managedUsers={managedUsers} />;
 
   const district = user.role === "district" ? user.district! : "";
   const isAdmin = user.role === "admin";
@@ -290,8 +263,6 @@ if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }
   const myVendors = isAdmin ? vendors : vendors.filter(v => v.district === district);
   const myTxns = isAdmin ? transactions : transactions.filter(t => t.district === district);
   const myBills = isAdmin ? bills : bills.filter(b => b.district === district);
-
-  // Pending close alerts for admin
   const pendingClose = transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
 
   const navItems = isAdmin
@@ -369,8 +340,6 @@ if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }
             onConfirmClose={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
               if (!txn) return;
-              // 🔒 AR_WALLET_CALC_FINAL_LOCKED
-              // Step 3: Admin Confirm → 8% Profit Credit
               const profit = round2(txn.expectedAmount * PROFIT_RATE);
               addWalletEntry(`8% Profit Credit — ${txn.vendorName} (${txnId})`, 0, profit, "profit", txnId);
               setTransactions(prev => prev.map(t => t.txnId === txnId
@@ -496,9 +465,8 @@ if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }
     </div>
   );
 }
-
 // ============================================================
-// DASHBOARD
+// DASHBOARD PAGE
 // ============================================================
 function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet, walletBalance, pendingClose, onConfirmClose }:
   { isAdmin: boolean; district: string; transactions: Transaction[]; vendors: Vendor[]; bills: Bill[]; wallet: WalletEntry[]; walletBalance: number; pendingClose: Transaction[]; onConfirmClose: (id: string) => void; }) {
@@ -526,7 +494,6 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
         <p className="text-sm text-gray-500">AR Enterprises — Multi District ERP V3.0</p>
       </div>
 
-      {/* 🔴 PENDING CLOSE ALERTS — Admin only */}
       {isAdmin && pendingClose.length > 0 && (
         <div className="rounded-xl p-4 border" style={{ background: "#fff5f5", borderColor: "#fca5a5" }}>
           <h2 className="font-bold text-red-700 mb-3">🔴 Pending Admin Confirmation ({pendingClose.length})</h2>
@@ -551,7 +518,6 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
         </div>
       )}
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card label="Total Vendors" value={vendors.length.toString()} color="#1a2f5e" />
         <Card label="Total Transactions" value={transactions.length.toString()} color="#0369a1" sub={`Open: ${openTxns} | Closed: ${closedTxns}`} />
@@ -567,7 +533,6 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
         </div>
       )}
 
-      {/* Recent Transactions */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-800">Recent Transactions</h2>
@@ -603,7 +568,6 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
         </div>
       </div>
 
-      {/* Wallet Summary — Admin */}
       {isAdmin && wallet.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -644,11 +608,6 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
 function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
   { isAdmin: boolean; district: string; vendors: Vendor[]; onAdd: (v: Vendor) => void; onDelete: (id: string) => void; }) {
   const [showForm, setShowForm] = useState(false);
-  const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
-  const [editVendor, setEditVendor] = useState<Vendor | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [name, setName] = useState("");
   const [dist, setDist] = useState(isAdmin ? "" : district);
   const [mobile, setMobile] = useState("");
@@ -664,18 +623,12 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
     (v.mobile || "").includes(search)
   );
 
-  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const selectAll = () => setSelectedIds(filtered.map(v => v.id));
-  const clearSelect = () => setSelectedIds([]);
-
-  // Auto-generate smart vendor code
   const autoCode = dist && bizType && regYear ? genVendorCode(dist, bizType, regYear, vendors) : "";
 
   const handleAdd = () => {
     if (!name || !dist || !mobile) return;
-    const code = autoCode;
     onAdd({
-      id: genId("V"), vendorCode: code, vendorName: name, district: dist,
+      id: genId("V"), vendorCode: autoCode, vendorName: name, district: dist,
       mobile, businessType: bizType, address, gstNo, regYear
     });
     setName(""); setMobile(""); setAddress(""); setGstNo("");
@@ -686,27 +639,17 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold text-gray-800">🏢 Vendor Management</h1>
-        <div className="flex gap-2 flex-wrap">
-          {selectedIds.length > 0 && (
-            <button onClick={() => setConfirmBulkDelete(true)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
-              🗑️ Delete Selected ({selectedIds.length})
-            </button>
-          )}
-          <button onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-            + New Vendor
-          </button>
-        </div>
+        <button onClick={() => setShowForm(!showForm)}
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+          + New Vendor
+        </button>
       </div>
 
       {showForm && (
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-4">
           <h2 className="font-bold text-gray-800">புதிய Vendor சேர்</h2>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Row 1 */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Vendor Name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="Sri Balaji Hardwares"
@@ -724,8 +667,6 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
                 {BUSINESS_TYPES.map(b => <option key={b}>{b}</option>)}
               </select>
             </div>
-
-            {/* Row 2 */}
             <div>
               {isAdmin
                 ? <><label className="text-xs text-gray-500 mb-1 block">District *</label>
@@ -748,24 +689,18 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
               <input value={gstNo} onChange={e => setGstNo(e.target.value)} placeholder="33AAAAA0000A1Z5"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
             </div>
-
-            {/* Row 3 */}
             <div className="md:col-span-3">
               <label className="text-xs text-gray-500 mb-1 block">Address</label>
               <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Shop No, Street, City, Pincode"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
             </div>
           </div>
-
-          {/* Auto-generated Vendor Code Preview */}
           {autoCode && (
             <div className="p-3 rounded-lg flex items-center gap-3" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
               <span className="text-xs text-blue-600">🔑 Auto-Generated Vendor Code:</span>
               <span className="font-bold text-blue-800 font-mono text-sm">{autoCode}</span>
-              <span className="text-xs text-gray-400">({DIST_SHORT[dist] || dist}+{regYear.slice(-2)}+{BIZ_SHORT[bizType] || bizType.slice(0,2)}+Serial)</span>
             </div>
           )}
-
           <div className="flex gap-2">
             <button onClick={handleAdd}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
@@ -784,9 +719,6 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
-                <th className="px-3 py-3">
-                  <input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelect()} className="rounded" />
-                </th>
                 {["Vendor Code","Vendor Name","Mobile","Business","District","GST No","Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
@@ -794,10 +726,7 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(v => (
-                <tr key={v.id} className={`hover:bg-gray-50 ${selectedIds.includes(v.id) ? "bg-blue-50" : ""}`}>
-                  <td className="px-3 py-3">
-                    <input type="checkbox" checked={selectedIds.includes(v.id)} onChange={() => toggleSelect(v.id)} className="rounded" />
-                  </td>
+                <tr key={v.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono text-xs text-blue-700 whitespace-nowrap">{v.vendorCode}</td>
                   <td className="px-4 py-3 font-medium text-gray-800">{v.vendorName}</td>
                   <td className="px-4 py-3 text-gray-600">{v.mobile || "—"}</td>
@@ -809,11 +738,7 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
                   <td className="px-4 py-3 text-gray-600">{v.district}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{v.gstNo || "—"}</td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <button onClick={() => setViewVendor(v)} className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">👁️</button>
-                      <button onClick={() => setEditVendor({...v})} className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
-                      <button onClick={() => setConfirmDeleteId(v.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
-                    </div>
+                    <button onClick={() => onDelete(v.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -822,109 +747,6 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
           {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No vendors found</p>}
         </div>
       </div>
-
-      {/* View Vendor Modal */}
-      {viewVendor && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">🏢 Vendor விவரம்</h3>
-              <button onClick={() => setViewVendor(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-2 text-sm">
-              {[
-                ["Vendor Code", viewVendor.vendorCode],
-                ["Vendor Name", viewVendor.vendorName],
-                ["Mobile", viewVendor.mobile || "—"],
-                ["Business Type", viewVendor.businessType || "—"],
-                ["District", viewVendor.district],
-                ["GST Number", viewVendor.gstNo || "—"],
-                ["Reg. Year", viewVendor.regYear || "—"],
-                ["Address", viewVendor.address || "—"],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between py-1.5 border-b border-gray-50">
-                  <span className="text-gray-500">{k}</span>
-                  <span className="font-medium text-gray-800 text-right max-w-xs">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Vendor Modal */}
-      {editVendor && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">✏️ Vendor Edit</h3>
-              <button onClick={() => setEditVendor(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-3">
-              {[
-                ["Vendor Name", "vendorName", "text"],
-                ["Mobile", "mobile", "text"],
-                ["GST Number", "gstNo", "text"],
-                ["Address", "address", "text"],
-              ].map(([label, field, type]) => (
-                <div key={field}>
-                  <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-                  <input type={type} value={(editVendor as unknown as Record<string,string>)[field] || ""}
-                    onChange={e => setEditVendor({...editVendor, [field as keyof Vendor]: e.target.value} as Vendor)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-                </div>
-              ))}
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Business Type</label>
-                <select value={editVendor.businessType || ""} onChange={e => setEditVendor({...editVendor, businessType: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
-                  {BUSINESS_TYPES.map(b => <option key={b}>{b}</option>)}
-                </select>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => { onDelete(editVendor.id); onAdd({...editVendor, id: genId("V")}); setEditVendor(null); }}
-                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
-                  💾 Save
-                </button>
-                <button onClick={() => setEditVendor(null)}
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirm */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Delete உறுதிப்படுத்தல்</h3>
-            <p className="text-sm text-gray-600 mb-4">இந்த Vendor-ஐ delete செய்கிறீர்களா?</p>
-            <div className="flex gap-2">
-              <button onClick={() => { onDelete(confirmDeleteId); setConfirmDeleteId(null); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
-              <button onClick={() => setConfirmDeleteId(null)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Delete Confirm */}
-      {confirmBulkDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedIds.length} Vendors</h3>
-            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedIds.length} vendors-ஐ delete செய்கிறீர்களா?</p>
-            <div className="flex gap-2">
-              <button onClick={() => { selectedIds.forEach(id => onDelete(id)); setSelectedIds([]); setConfirmBulkDelete(false); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
-              <button onClick={() => setConfirmBulkDelete(false)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -935,7 +757,6 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
 function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onAdd, onClose, onEdit, onDeleteTxn }:
   { isAdmin: boolean; district: string; transactions: Transaction[]; vendors: Vendor[]; bills: Bill[]; onAdd: (t: Transaction, advance: number) => void; onClose: (id: string) => void; onEdit: (t: Transaction) => void; onDeleteTxn: (id: string) => void; }) {
   const [showForm, setShowForm] = useState(false);
-  const [viewTxn, setViewTxn] = useState<Transaction | null>(null);
   const [vendorCode, setVendorCode] = useState("");
   const [fy, setFy] = useState("2025-26");
   const [month, setMonth] = useState("April");
@@ -944,10 +765,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
   const [gstPct, setGstPct] = useState(4);
   const [search, setSearch] = useState("");
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
-  const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
-  const [confirmBulkDeleteTxn, setConfirmBulkDeleteTxn] = useState(false);
-  const [editTxn, setEditTxn] = useState<Transaction | null>(null);
-  const [confirmDeleteTxnId, setConfirmDeleteTxnId] = useState<string | null>(null);
 
   const myVendors = isAdmin ? vendors : vendors.filter(v => v.district === district);
   const filtered = transactions.filter(t =>
@@ -962,7 +779,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
     if (!vendor || !expectedAmt) return;
     const expected = parseFloat(expectedAmt);
     const advance = parseFloat(advanceAmt) || 0;
-    // 🔒 AR_TRANSACTION_CALC_FINAL_LOCKED
     const gstAmt = round2(expected * gstPct / 100);
     const gstBal = round2(gstAmt - advance);
     const txnId = genId("TXN-");
@@ -986,21 +802,13 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold text-gray-800">📋 Monthly Transactions</h1>
-        <div className="flex gap-2 flex-wrap">
-          {selectedTxnIds.length > 0 && isAdmin && (
-            <button onClick={() => setConfirmBulkDeleteTxn(true)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
-              🗑️ Delete Selected ({selectedTxnIds.length})
-            </button>
-          )}
-          {!isAdmin && (
-            <button onClick={() => setShowForm(!showForm)}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-              + New Transaction
-            </button>
-          )}
-        </div>
+        {!isAdmin && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+            + New Transaction
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -1051,10 +859,8 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
           </div>
           {expectedAmt && (
             <div className="p-3 rounded-lg text-sm space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
-              <p className="font-medium text-blue-800">🔒 கணக்கு Preview (AR_TRANSACTION_CALC_FINAL_LOCKED)</p>
               <p className="text-blue-700">GST Amount: {fmt(parseFloat(expectedAmt))} × {gstPct}% = <strong>{fmt(previewGST)}</strong></p>
               <p className="text-blue-700">GST Balance: {fmt(previewGST)} − {fmt(parseFloat(advanceAmt)||0)} = <strong>{fmt(previewBalance)}</strong></p>
-              <p className="text-orange-700">⚠️ Advance ₹{advanceAmt||0} → Wallet-லிருந்து உடனே கழிக்கப்படும்</p>
             </div>
           )}
           <div className="flex gap-2">
@@ -1070,7 +876,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search transactions..."
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 bg-white" />
 
-      {/* Confirm Close Modal */}
       {confirmClose && (
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
@@ -1083,8 +888,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
                   <p>Vendor: <strong>{txn.vendorName}</strong></p>
                   <p>GST Balance Debit: <strong className="text-red-600">{fmt(gstBal)}</strong></p>
-                  <p>Remaining → Force: <strong>₹0</strong></p>
-                  <p className="text-xs text-gray-400">Admin confirmation-க்கு 🔴 Alert போகும். Admin confirm செய்தால் 8% profit wallet-ல் credit ஆகும்.</p>
                 </div>
               );
             })()}
@@ -1107,8 +910,7 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
-                {isAdmin && <th className="px-3 py-3"><input type="checkbox" onChange={e => e.target.checked ? setSelectedTxnIds(filtered.map(t=>t.txnId)) : setSelectedTxnIds([])} className="rounded" /></th>}
-                {["TXN ID","Vendor","Month","Expected ₹",`${4}% GST Amt`,"Advance","Bills Received","Remaining ₹","GST Balance","Status","Actions"].map(h => (
+                {["TXN ID","Vendor","Month","Expected ₹","GST Amt","Advance","Bills","Remaining","Status","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1116,17 +918,14 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
             <tbody className="divide-y divide-gray-50">
               {filtered.map(t => {
                 const txnBills = getTxnBills(t.txnId);
-                // 🔒 AR_TRANSACTION_CALC_FINAL_LOCKED
                 const gstAmt = round2(t.expectedAmount * t.gstPercent / 100);
-                const gstBal = round2(gstAmt - t.advanceAmount);
                 const sumTotals = txnBills.reduce((s, b) => s + round2(b.billAmount * BILL_TOTAL_RATE), 0);
                 const remaining = round2(Math.max(0, t.expectedAmount - sumTotals));
                 const billsTotal = txnBills.reduce((s, b) => s + b.billAmount, 0);
                 const canClose = remaining <= 0 && t.status === "Open";
 
                 return (
-                  <tr key={t.txnId} className={`hover:bg-gray-50 ${selectedTxnIds.includes(t.txnId) ? "bg-blue-50" : t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
-                    {isAdmin && <td className="px-3 py-3"><input type="checkbox" checked={selectedTxnIds.includes(t.txnId)} onChange={() => setSelectedTxnIds(prev => prev.includes(t.txnId) ? prev.filter(x=>x!==t.txnId) : [...prev, t.txnId])} className="rounded" /></td>}
+                  <tr key={t.txnId} className={`hover:bg-gray-50 ${t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
                     <td className="px-3 py-3 font-mono text-xs text-blue-700 whitespace-nowrap">{t.txnId}</td>
                     <td className="px-3 py-3">
                       <p className="font-medium text-gray-800">{t.vendorName}</p>
@@ -1134,21 +933,14 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                     </td>
                     <td className="px-3 py-3 text-xs text-gray-600">{t.month}<br />{t.financialYear}</td>
                     <td className="px-3 py-3 font-semibold text-gray-800">{fmt(t.expectedAmount)}</td>
-                    <td className="px-3 py-3 text-purple-700 font-semibold">
-                      {fmt(gstAmt)}
-                      <p className="text-xs text-gray-400">{t.expectedAmount} × {t.gstPercent}%</p>
-                    </td>
-                    <td className="px-3 py-3 text-orange-600">{fmt(t.advanceAmount)}<br /><span className="text-xs text-gray-400">GST Only</span></td>
-                    <td className="px-3 py-3 text-green-700">
-                      {fmt(billsTotal)}
-                      <p className="text-xs text-gray-400">{txnBills.length} bills</p>
-                    </td>
+                    <td className="px-3 py-3 text-purple-700 font-semibold">{fmt(gstAmt)}</td>
+                    <td className="px-3 py-3 text-orange-600">{fmt(t.advanceAmount)}</td>
+                    <td className="px-3 py-3 text-green-700">{fmt(billsTotal)}</td>
                     <td className="px-3 py-3">
                       <span className={`font-bold ${remaining <= 0 ? "text-green-600" : "text-orange-600"}`}>
                         {remaining <= 0 ? "₹0 ✅" : fmt(remaining)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-red-600 font-semibold">{fmt(gstBal)}</td>
                     <td className="px-3 py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap
                         ${t.status === "Closed" ? "bg-green-100 text-green-700" :
@@ -1159,13 +951,7 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex gap-1 flex-wrap">
-                        <button onClick={() => setViewTxn(t)}
-                          className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">👁️</button>
-                        {t.status === "Open" && (
-                          <button onClick={() => setEditTxn({...t})}
-                            className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
-                        )}
-                        <button onClick={() => setConfirmDeleteTxnId(t.txnId)}
+                        <button onClick={() => onDeleteTxn(t.txnId)}
                           className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
                         {!isAdmin && t.status === "Open" && (
                           <button onClick={() => setConfirmClose(t.txnId)}
@@ -1180,206 +966,21 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                 );
               })}
             </tbody>
-            {/* 🔒 FOOTER TOTALS */}
-            {filtered.length > 0 && (
-              <tfoot style={{ background: "#1a2f5e" }}>
-                <tr>
-                  <td colSpan={3} className="px-3 py-3 font-bold text-yellow-300 text-xs">
-                    மொத்தம் ({filtered.length} rows)
-                  </td>
-                  <td className="px-3 py-3 font-bold text-yellow-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => s + t.expectedAmount, 0))}
-                  </td>
-                  <td className="px-3 py-3 font-bold text-purple-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => s + round2(t.expectedAmount * t.gstPercent / 100), 0))}
-                  </td>
-                  <td className="px-3 py-3 font-bold text-orange-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => s + t.advanceAmount, 0))}
-                  </td>
-                  <td className="px-3 py-3 font-bold text-green-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => s + bills.filter(b => b.txnId === t.txnId).reduce((s2, b) => s2 + b.billAmount, 0), 0))}
-                  </td>
-                  <td className="px-3 py-3 font-bold text-red-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => {
-                      const sumTot = bills.filter(b => b.txnId === t.txnId).reduce((s2, b) => s2 + round2(b.billAmount * BILL_TOTAL_RATE), 0);
-                      return s + round2(Math.max(0, t.expectedAmount - sumTot));
-                    }, 0))}
-                  </td>
-                  <td className="px-3 py-3 font-bold text-red-300 text-sm">
-                    {fmt(filtered.reduce((s, t) => s + round2(round2(t.expectedAmount * t.gstPercent / 100) - t.advanceAmount), 0))}
-                  </td>
-                  <td colSpan={2} className="px-3 py-3"></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No transactions found</p>}
         </div>
       </div>
-
-      {/* Bulk Delete Transaction Modal */}
-      {confirmBulkDeleteTxn && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedTxnIds.length} Transactions</h3>
-            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedTxnIds.length} transactions-ஐ delete செய்கிறீர்களா?</p>
-            <div className="flex gap-2">
-              <button onClick={() => { setConfirmBulkDeleteTxn(false); setSelectedTxnIds([]); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
-              <button onClick={() => setConfirmBulkDeleteTxn(false)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Transaction Modal */}
-      {editTxn && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">✏️ Transaction Edit</h3>
-              <button onClick={() => setEditTxn(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Expected Amount (₹)</label>
-                  <input type="number" value={editTxn.expectedAmount}
-                    onChange={e => {
-                      const exp = parseFloat(e.target.value) || 0;
-                      const gstAmt = round2(exp * editTxn.gstPercent / 100);
-                      const gstBal = round2(gstAmt - editTxn.advanceAmount);
-                      setEditTxn({...editTxn, expectedAmount: exp, gstAmount: gstAmt, gstBalance: gstBal, remainingExpected: exp});
-                    }}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Advance Amount (₹)</label>
-                  <input type="number" value={editTxn.advanceAmount}
-                    onChange={e => {
-                      const adv = parseFloat(e.target.value) || 0;
-                      const gstBal = round2(editTxn.gstAmount - adv);
-                      setEditTxn({...editTxn, advanceAmount: adv, gstBalance: gstBal});
-                    }}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">GST %</label>
-                  <select value={editTxn.gstPercent}
-                    onChange={e => {
-                      const pct = parseFloat(e.target.value);
-                      const gstAmt = round2(editTxn.expectedAmount * pct / 100);
-                      const gstBal = round2(gstAmt - editTxn.advanceAmount);
-                      setEditTxn({...editTxn, gstPercent: pct, gstAmount: gstAmt, gstBalance: gstBal});
-                    }}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
-                    {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Month</label>
-                  <select value={editTxn.month} onChange={e => setEditTxn({...editTxn, month: e.target.value})}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
-                    {MONTHS.map(m => <option key={m}>{m}</option>)}
-                  </select>
-                </div>
-              </div>
-              {/* 🔒 Preview */}
-              <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
-                <p className="font-bold text-blue-800">🔒 AR_TRANSACTION_CALC_FINAL_LOCKED</p>
-                <p className="text-blue-700">GST: {fmt(editTxn.expectedAmount)} × {editTxn.gstPercent}% = <strong>{fmt(editTxn.gstAmount)}</strong></p>
-                <p className="text-blue-700">GST Balance: {fmt(editTxn.gstAmount)} − {fmt(editTxn.advanceAmount)} = <strong>{fmt(editTxn.gstBalance)}</strong></p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => {
-                  onEdit(editTxn);
-                  setEditTxn(null);
-                }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
-                  💾 Save
-                </button>
-                <button onClick={() => setEditTxn(null)}
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Transaction Confirm */}
-      {confirmDeleteTxnId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Transaction Delete</h3>
-            <p className="text-sm text-gray-600 mb-4">இந்த Transaction-ஐ delete செய்கிறீர்களா? அதன் Bills-உம் affected ஆகும்.</p>
-            <div className="flex gap-2">
-              <button onClick={() => {
-                onDeleteTxn(confirmDeleteTxnId!);
-                setConfirmDeleteTxnId(null);
-              }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
-              <button onClick={() => setConfirmDeleteTxnId(null)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Transaction Modal */}
-      {viewTxn && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-screen overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">📋 Transaction விவரம்</h3>
-              <button onClick={() => setViewTxn(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-2 text-sm">
-              {[
-                ["TXN ID", viewTxn.txnId], ["Vendor", viewTxn.vendorName], ["District", viewTxn.district],
-                ["FY", viewTxn.financialYear], ["Month", viewTxn.month], ["Status", viewTxn.status],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between py-1 border-b border-gray-50">
-                  <span className="text-gray-500">{k}</span><span className="font-medium text-gray-800">{v}</span>
-                </div>
-              ))}
-              <div className="mt-3 p-3 rounded-lg space-y-1" style={{ background: "#f0f7ff" }}>
-                <p className="font-bold text-blue-800 text-xs mb-2">💰 கணக்கு சுருக்கம்</p>
-                {[
-                  ["Expected (Principal)", fmt(viewTxn.expectedAmount)],
-                  ["Bills Received", fmt(viewTxn.billsReceived)],
-                  ["Remaining Expected", fmt(viewTxn.remainingExpected)],
-                  ["Advance (GST only)", fmt(viewTxn.advanceAmount)],
-                  [`GST (${viewTxn.gstPercent}%)`, fmt(viewTxn.gstAmount)],
-                  ["GST Balance", fmt(viewTxn.gstBalance)],
-                  ["Total Bill", fmt(viewTxn.expectedAmount)],
-                  ["8% Profit", viewTxn.profit > 0 ? fmt(viewTxn.profit) : "(On Close)"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between text-xs">
-                    <span className="text-gray-600">{k}</span><span className="font-semibold text-gray-800">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ============================================================
-// BILLS PAGE — 🔒 AR_BILL_CALC_FINAL_LOCKED
-// GST Amount = Bill Amount × GST%
-// Total Amount = Bill Amount × 1.18 (FIXED)
+// BILLS PAGE
 // ============================================================
 function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, onAdd, onDelete, onEditBill }:
   { isAdmin: boolean; district: string; bills: Bill[]; transactions: Transaction[]; vendors: Vendor[]; onAdd: (b: Bill) => void; onDelete: (id: string) => void; onEditBill: (b: Bill) => void; }) {
   void _vendors;
   const [showForm, setShowForm] = useState(false);
-  const [viewBill, setViewBill] = useState<Bill | null>(null);
-  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
-  const [confirmBulkDeleteBill, setConfirmBulkDeleteBill] = useState(false);
-  const [confirmDeleteBillId, setConfirmDeleteBillId] = useState<string | null>(null);
-  const [editBill, setEditBill] = useState<Bill | null>(null);
   const [txnId, setTxnId] = useState("");
   const [billNo, setBillNo] = useState("");
   const [billDate, setBillDate] = useState(new Date().toISOString().split("T")[0]);
@@ -1395,19 +996,15 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
     b.txnId.toLowerCase().includes(search.toLowerCase())
   );
 
-  const selectedTxn = transactions.find(t => t.txnId === txnId);
-
-  // 🔒 AR_BILL_CALC_FINAL_LOCKED
   const previewBillAmt = parseFloat(billAmt) || 0;
-  const previewGST = round2(previewBillAmt * gstPct / 100);           // Bill Amount × GST%
-  const previewTotal = round2(previewBillAmt * BILL_TOTAL_RATE);       // Bill Amount × 1.18 FIXED
+  const previewGST = round2(previewBillAmt * gstPct / 100);
+  const previewTotal = round2(previewBillAmt * BILL_TOTAL_RATE);
 
   const handleAdd = () => {
     if (!txnId || !billAmt || !billNo) return;
     const txn = transactions.find(t => t.txnId === txnId);
     if (!txn) return;
     const amt = parseFloat(billAmt);
-    // 🔒 AR_BILL_CALC_FINAL_LOCKED
     const gstAmt = round2(amt * gstPct / 100);
     const total = round2(amt * BILL_TOTAL_RATE);
     const bill: Bill = {
@@ -1426,25 +1023,14 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">🧾 Bill Management</h1>
-          <p className="text-xs text-gray-400 mt-0.5">🔒 GST = Bill×GST% | Total = Bill×1.18 (FIXED)</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {selectedBillIds.length > 0 && (
-            <button onClick={() => setConfirmBulkDeleteBill(true)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
-              🗑️ Delete Selected ({selectedBillIds.length})
-            </button>
-          )}
-          {!isAdmin && (
-            <button onClick={() => setShowForm(!showForm)}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-              + புதிய Bill
-            </button>
-          )}
-        </div>
+        <h1 className="text-xl font-bold text-gray-800">🧾 Bill Management</h1>
+        {!isAdmin && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+            + புதிய Bill
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -1482,33 +1068,12 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
               </select>
             </div>
           </div>
-
-          {/* 🔒 AR_BILL_CALC_FINAL_LOCKED — Preview */}
           {billAmt && (
-            <div className="p-4 rounded-xl space-y-2" style={{ background: "linear-gradient(135deg, #f0f7ff, #e8f4fd)", border: "1px solid #bfdbfe" }}>
-              <p className="font-bold text-blue-800 text-sm">🔒 Bill கணக்கு Preview (AR_BILL_CALC_FINAL_LOCKED)</p>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">GST தொகை</p>
-                  <p className="font-bold text-purple-700">{fmt(previewGST)}</p>
-                  <p className="text-xs text-gray-400">{fmt(previewBillAmt)} × {gstPct}%</p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Total Amount</p>
-                  <p className="font-bold text-green-700">{fmt(previewTotal)}</p>
-                  <p className="text-xs text-gray-400">{fmt(previewBillAmt)} × 18%</p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Remaining பிறகு</p>
-                  <p className="font-bold text-orange-600">
-                    {selectedTxn ? fmt(Math.max(0, selectedTxn.remainingExpected - previewTotal)) : "—"}
-                  </p>
-                  <p className="text-xs text-gray-400">Expected − Total</p>
-                </div>
-              </div>
+            <div className="p-3 rounded-lg text-sm space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
+              <p className="text-blue-700">GST தொகை: {fmt(previewBillAmt)} × {gstPct}% = <strong>{fmt(previewGST)}</strong></p>
+              <p className="text-blue-700">Total Amount: {fmt(previewBillAmt)} × 18% = <strong>{fmt(previewTotal)}</strong></p>
             </div>
           )}
-
           <div className="flex gap-2">
             <button onClick={handleAdd}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
@@ -1527,22 +1092,17 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
-                <th className="px-3 py-3"><input type="checkbox" onChange={e => e.target.checked ? setSelectedBillIds(filtered.map(b=>b.id)) : setSelectedBillIds([])} className="rounded" /></th>
-                {["Bill ID","TXN ID","Vendor","Bill Number","Bill Date","Bill Amount","GST%","GST தொகை","Total Amount","Actions"].map(h => (
+                {["Bill ID","TXN ID","Vendor","Bill Number","Date","Bill Amount","GST%","GST தொகை","Total","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(b => (
-                <tr key={b.id} className={`hover:bg-gray-50 ${selectedBillIds.includes(b.id) ? "bg-blue-50" : ""}`}>
-                  <td className="px-3 py-3"><input type="checkbox" checked={selectedBillIds.includes(b.id)} onChange={() => setSelectedBillIds(prev => prev.includes(b.id) ? prev.filter(x=>x!==b.id) : [...prev, b.id])} className="rounded" /></td>
+                <tr key={b.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 font-mono text-xs text-blue-700">{b.id}</td>
                   <td className="px-3 py-3 font-mono text-xs text-gray-600">{b.txnId}</td>
-                  <td className="px-3 py-3">
-                    <p className="font-medium text-gray-800">{b.vendorName}</p>
-                    <p className="text-xs text-gray-400">{b.vendorCode}</p>
-                  </td>
+                  <td className="px-3 py-3 font-medium text-gray-800">{b.vendorName}</td>
                   <td className="px-3 py-3 text-gray-800">{b.billNumber}</td>
                   <td className="px-3 py-3 text-gray-600">{b.billDate}</td>
                   <td className="px-3 py-3 font-semibold text-gray-800">{fmt(b.billAmount)}</td>
@@ -1550,11 +1110,7 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
                   <td className="px-3 py-3 text-purple-700 font-semibold">{fmt(b.gstAmount)}</td>
                   <td className="px-3 py-3 text-green-700 font-semibold">{fmt(b.totalAmount)}</td>
                   <td className="px-3 py-3">
-                    <div className="flex gap-1">
-                      <button onClick={() => setViewBill(b)} className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700">👁️</button>
-                      <button onClick={() => setEditBill({...b})} className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
-                      <button onClick={() => setConfirmDeleteBillId(b.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600">🗑️</button>
-                    </div>
+                    <button onClick={() => onDelete(b.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600">🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -1575,136 +1131,11 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
           {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No bills found</p>}
         </div>
       </div>
-
-      {/* Delete Bill Confirm */}
-      {confirmDeleteBillId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bill Delete உறுதிப்படுத்தல்</h3>
-            <p className="text-sm text-gray-600 mb-4">இந்த Bill-ஐ delete செய்கிறீர்களா? Transaction recalculate ஆகும்.</p>
-            <div className="flex gap-2">
-              <button onClick={() => { onDelete(confirmDeleteBillId); setConfirmDeleteBillId(null); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
-              <button onClick={() => setConfirmDeleteBillId(null)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Delete Bills */}
-      {confirmBulkDeleteBill && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedBillIds.length} Bills</h3>
-            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedBillIds.length} bills-ஐ delete செய்கிறீர்களா?</p>
-            <div className="flex gap-2">
-              <button onClick={() => { selectedBillIds.forEach(id => onDelete(id)); setSelectedBillIds([]); setConfirmBulkDeleteBill(false); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
-              <button onClick={() => setConfirmBulkDeleteBill(false)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Bill Modal — 🔒 AR_BILL_CALC_FINAL_LOCKED */}
-      {editBill && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">✏️ Bill Edit</h3>
-              <button onClick={() => setEditBill(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Bill Number</label>
-                <input value={editBill.billNumber} onChange={e => setEditBill({...editBill, billNumber: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Bill Date</label>
-                <input type="date" value={editBill.billDate} onChange={e => setEditBill({...editBill, billDate: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Bill Amount (Taxable ₹)</label>
-                <input type="number" value={editBill.billAmount}
-                  onChange={e => {
-                    const amt = parseFloat(e.target.value) || 0;
-                    // 🔒 AR_BILL_CALC_FINAL_LOCKED
-                    const gstAmt = round2(amt * editBill.gstPercent / 100);
-                    const total = round2(amt * BILL_TOTAL_RATE);
-                    setEditBill({...editBill, billAmount: amt, gstAmount: gstAmt, totalAmount: total});
-                  }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">GST %</label>
-                <select value={editBill.gstPercent}
-                  onChange={e => {
-                    const pct = parseFloat(e.target.value);
-                    const gstAmt = round2(editBill.billAmount * pct / 100);
-                    setEditBill({...editBill, gstPercent: pct, gstAmount: gstAmt});
-                  }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
-                  {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
-                </select>
-              </div>
-              {/* 🔒 Preview */}
-              <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
-                <p className="font-bold text-blue-800">🔒 AR_BILL_CALC_FINAL_LOCKED</p>
-                <p className="text-blue-700">GST: {fmt(editBill.billAmount)} × {editBill.gstPercent}% = <strong>{fmt(editBill.gstAmount)}</strong></p>
-                <p className="text-blue-700">Total: {fmt(editBill.billAmount)} × 18% = <strong>{fmt(editBill.totalAmount)}</strong></p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { onEditBill(editBill); setEditBill(null); }}
-                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
-                  💾 Save
-                </button>
-                <button onClick={() => setEditBill(null)}
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Bill Modal */}
-      {viewBill && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">🧾 Bill விவரம்</h3>
-              <button onClick={() => setViewBill(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-2 text-sm">
-              {[
-                ["Bill ID", viewBill.id], ["TXN ID", viewBill.txnId],
-                ["Bill Number", viewBill.billNumber], ["Bill Date", viewBill.billDate],
-                ["Vendor Code", viewBill.vendorCode], ["District", viewBill.district],
-                ["Bill Amount", fmt(viewBill.billAmount)],
-                ["GST %", viewBill.gstPercent + "%"],
-                // 🔒 GST = Bill × GST%
-                ["GST Amount", fmt(viewBill.gstAmount) + ` (${viewBill.billAmount} × ${viewBill.gstPercent}%)`],
-                // 🔒 Total = Bill × 1.18
-                ["Total Amount", fmt(viewBill.totalAmount) + ` (${viewBill.billAmount} × 18%)`],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between py-1.5 border-b border-gray-50">
-                  <span className="text-gray-500">{k}</span>
-                  <span className="font-medium text-gray-800 text-right">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
 // ============================================================
-// WALLET PAGE — 🔒 AR_WALLET_CALC_FINAL_LOCKED
+// WALLET PAGE
 // ============================================================
 function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
   { wallet: WalletEntry[]; balance: number; onManualEntry: (desc: string, debit: number, credit: number) => void; onSetBalance: (n: number) => void; }) {
@@ -1721,8 +1152,6 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
   const totalAdvance = wallet.filter(w => w.type === "advance").reduce((s, w) => s + w.debit, 0);
   const totalGST = wallet.filter(w => w.type === "gst").reduce((s, w) => s + w.debit, 0);
 
-  const typeColor = (t: WalletEntry["type"]) =>
-    t === "profit" ? "text-green-600" : t === "advance" ? "text-orange-600" : t === "gst" ? "text-red-600" : "text-gray-600";
   const typeBadge = (t: WalletEntry["type"]) =>
     t === "profit" ? "bg-green-100 text-green-700" : t === "advance" ? "bg-orange-100 text-orange-700" : t === "gst" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700";
 
@@ -1737,7 +1166,6 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
         </button>
       </div>
 
-      {/* Wallet Balance Card */}
       <div className="rounded-xl p-6 text-white" style={{ background: "linear-gradient(135deg, #0a1628, #1a2f5e)" }}>
         <p className="text-sm text-gray-300">Current Wallet Balance</p>
         <p className="text-4xl font-bold mt-1" style={{ color: "#f0d060" }}>{fmt(balance)}</p>
@@ -1757,7 +1185,6 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500">Advance Paid</p>
@@ -1777,7 +1204,6 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
         </div>
       </div>
 
-      {/* Edit Panel */}
       {showEdit && (
         <div className="bg-white rounded-xl p-5 shadow-sm border border-amber-200 space-y-4">
           <h2 className="font-bold text-gray-800">✏️ Wallet Edit / Manual Entry</h2>
@@ -1799,7 +1225,6 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
               <input type="number" value={newBal} onChange={e => setNewBal(e.target.value)}
                 placeholder="New balance amount"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              {newBal && <p className="text-sm text-blue-700">New Balance: <strong>{fmt(parseFloat(newBal))}</strong></p>}
               <button onClick={() => { if (newBal) { onSetBalance(parseFloat(newBal)); setNewBal(""); setShowEdit(false); } }}
                 className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                 style={{ background: "#16a34a" }}>Update Balance</button>
@@ -1826,11 +1251,9 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
         </div>
       )}
 
-      {/* Wallet Ledger */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-800">📒 Wallet Ledger</h2>
-          <p className="text-xs text-gray-400 mt-0.5">🔒 AR_WALLET_CALC_FINAL_LOCKED</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1851,7 +1274,7 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
                       {w.type}
                     </span>
                   </td>
-                  <td className={`px-4 py-3 font-semibold ${typeColor(w.type)}`}>
+                  <td className="px-4 py-3 font-semibold text-red-600">
                     {w.debit > 0 ? fmt(w.debit) : "—"}
                   </td>
                   <td className="px-4 py-3 font-semibold text-green-600">
@@ -1870,1016 +1293,9 @@ function WalletPage({ wallet, balance, onManualEntry, onSetBalance }:
               </tr>
             </tfoot>
           </table>
+          {wallet.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No wallet entries</p>}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ============================================================
-// DISTRICT MANAGEMENT PAGE (Admin Only)
-// ============================================================
-function DistrictManagementPage({ districtUsers, onAddUser, onToggleUser }:
-  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; }) {
-  const [showForm, setShowForm] = useState(false);
-  const [uname, setUname] = useState("");
-  const [pass, setPass] = useState("");
-  const [dist, setDist] = useState("");
-  const [search, setSearch] = useState("");
-
-  const filtered = districtUsers.filter(u =>
-    u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.district.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleAdd = () => {
-    if (!uname || !pass || !dist) return;
-    const newUser: ManagedUser = {
-      id: genId("U"), username: uname, password: pass,
-      district: dist, active: true, createdAt: new Date().toISOString().split("T")[0]
-    };
-    onAddUser(newUser);
-    setUname(""); setPass(""); setDist(""); setShowForm(false);
-  };
-
-  return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">🏛️ District Management</h1>
-          <p className="text-xs text-gray-400 mt-0.5">38 Tamil Nadu Districts — User Access Control</p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-          + Add District User
-        </button>
-      </div>
-
-      {/* District Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          ["Total Districts", DISTRICTS.length.toString(), "#1a2f5e"],
-          ["Active Users", districtUsers.filter(u => u.active).length.toString(), "#16a34a"],
-          ["Inactive Users", districtUsers.filter(u => !u.active).length.toString(), "#dc2626"],
-          ["Unassigned", (DISTRICTS.length - districtUsers.length).toString(), "#b45309"],
-        ].map(([l, v, c]) => (
-          <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">{l}</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: c }}>{v}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Add Form */}
-      {showForm && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-800">புதிய District User சேர்</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">District</label>
-              <select value={dist} onChange={e => setDist(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
-                <option value="">Select District</option>
-                {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Username</label>
-              <input value={uname} onChange={e => setUname(e.target.value)} placeholder="chennai_user"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Password</label>
-              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password"
-                autoComplete="new-password"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "#16a34a" }}>Save</button>
-            <button onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search district or user..."
-        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 bg-white" />
-
-      {/* District Users Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: "#0a1628" }}>
-              <tr>
-                {["District", "Username", "Password", "Status", "Created", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map(u => (
-                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "opacity-60" : ""}`}>
-                  <td className="px-4 py-3 font-medium text-gray-800">🏛️ {u.district}</td>
-                  <td className="px-4 py-3 font-mono text-blue-700">{u.username}</td>
-                  <td className="px-4 py-3 text-gray-400 font-mono">{"•".repeat(u.password.length)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {u.active ? "✅ Active" : "❌ Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{u.createdAt}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => onToggleUser(u.id)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold text-white ${u.active ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}`}>
-                      {u.active ? "Deactivate" : "Activate"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No district users found</p>}
-        </div>
-      </div>
-
-      {/* All 38 Districts Grid */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h2 className="font-bold text-gray-800 mb-3">📍 All 38 Tamil Nadu Districts</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {DISTRICTS.map(d => {
-            const hasUser = districtUsers.some(u => u.district === d);
-            const isActive = districtUsers.some(u => u.district === d && u.active);
-            return (
-              <div key={d} className={`px-3 py-2 rounded-lg text-xs font-medium text-center border
-                ${isActive ? "bg-green-50 border-green-200 text-green-700" :
-                  hasUser ? "bg-red-50 border-red-200 text-red-600" :
-                  "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                {isActive ? "✅" : hasUser ? "❌" : "⬜"} {d}
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex gap-4 mt-3 text-xs text-gray-500">
-          <span>✅ Active User</span>
-          <span>❌ Inactive User</span>
-          <span>⬜ No User</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// USER MANAGEMENT PAGE (Admin Only)
-// ============================================================
-function UserManagementPage({ districtUsers, onAddUser, onToggleUser, onDeleteUser, onEditUser }:
-  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; onDeleteUser: (id: string) => void; onEditUser: (u: ManagedUser) => void; }) {
-  const [showForm, setShowForm] = useState(false);
-  const [uname, setUname] = useState("");
-  const [pass, setPass] = useState("");
-  const [dist, setDist] = useState("");
-  const [search, setSearch] = useState("");
-  const [showPass, setShowPass] = useState<string | null>(null);
-  const [editUser, setEditUser] = useState<ManagedUser | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
-
-  const filtered = districtUsers.filter(u =>
-    u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.district.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleAdd = () => {
-    if (!uname || !pass || !dist) return;
-    onAddUser({ id: genId("U"), username: uname, password: pass, district: dist, active: true, createdAt: new Date().toISOString().split("T")[0] });
-    setUname(""); setPass(""); setDist(""); setShowForm(false);
-  };
-
-  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const selectAll = () => setSelectedIds(filtered.map(u => u.id));
-  const clearSelect = () => setSelectedIds([]);
-
-  return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">👥 User Management</h1>
-          <p className="text-xs text-gray-400 mt-0.5">District user accounts — Edit / Delete / Bulk operations</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {selectedIds.length > 0 && (
-            <button onClick={() => setConfirmBulkDelete(true)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
-              🗑️ Delete Selected ({selectedIds.length})
-            </button>
-          )}
-          <button onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-            + New User
-          </button>
-        </div>
-      </div>
-
-      {showForm && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-800">புதிய User சேர்</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">District</label>
-              <select value={dist} onChange={e => setDist(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
-                <option value="">Select District</option>
-                {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Username</label>
-              <input value={uname} onChange={e => setUname(e.target.value)} placeholder="district_user"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Password</label>
-              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password"
-                autoComplete="new-password"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "#16a34a" }}>Create User</button>
-            <button onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search users..."
-        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 bg-white" />
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: "#0a1628" }}>
-              <tr>
-                <th className="px-4 py-3">
-                  <input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelect()} className="rounded" />
-                </th>
-                {["#", "Username", "District", "Password", "Status", "Created At", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((u, i) => (
-                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "bg-red-50/30" : ""} ${selectedIds.includes(u.id) ? "bg-blue-50" : ""}`}>
-                  <td className="px-4 py-3">
-                    <input type="checkbox" checked={selectedIds.includes(u.id)} onChange={() => toggleSelect(u.id)}
-                      className="rounded" />
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
-                  <td className="px-4 py-3 font-mono font-medium text-blue-700">{u.username}</td>
-                  <td className="px-4 py-3 text-gray-700">🏛️ {u.district}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-gray-400">
-                        {showPass === u.id ? u.password : "••••••••"}
-                      </span>
-                      <button onClick={() => setShowPass(showPass === u.id ? null : u.id)}
-                        className="text-xs text-gray-400 hover:text-gray-600">
-                        {showPass === u.id ? "🙈" : "👁️"}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold
-                      ${u.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {u.active ? "✅ Active" : "❌ Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{u.createdAt}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      <button onClick={() => { setEditUser({...u}); }}
-                        className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">✏️</button>
-                      <button onClick={() => onToggleUser(u.id)}
-                        className={`px-2 py-1 rounded text-xs font-semibold text-white
-                          ${u.active ? "bg-orange-400 hover:bg-orange-500" : "bg-green-500 hover:bg-green-600"}`}>
-                        {u.active ? "🔴" : "🟢"}
-                      </button>
-                      <button onClick={() => setConfirmDeleteId(u.id)}
-                        className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No users found</p>}
-        </div>
-      </div>
-
-      {/* Edit User Modal */}
-      {editUser && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">✏️ User Edit</h3>
-              <button onClick={() => setEditUser(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Username</label>
-                <input value={editUser.username} onChange={e => setEditUser({...editUser, username: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Password</label>
-                <input type="text" value={editUser.password} onChange={e => setEditUser({...editUser, password: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">District</label>
-                <select value={editUser.district} onChange={e => setEditUser({...editUser, district: e.target.value})}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
-                  {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { onEditUser(editUser); setEditUser(null); }}
-                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
-                  💾 Save
-                </button>
-                <button onClick={() => setEditUser(null)}
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirm Modal */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Delete உறுதிப்படுத்தல்</h3>
-            <p className="text-sm text-gray-600 mb-4">இந்த user-ஐ delete செய்கிறீர்களா? மீட்டெடுக்க முடியாது!</p>
-            <div className="flex gap-2">
-              <button onClick={() => { onDeleteUser(confirmDeleteId); setConfirmDeleteId(null); }}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
-              <button onClick={() => setConfirmDeleteId(null)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Delete Confirm */}
-      {confirmBulkDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedIds.length} Users</h3>
-            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedIds.length} users-ஐ delete செய்கிறீர்களா?</p>
-            <div className="flex gap-2">
-              <button onClick={() => {
-                selectedIds.forEach(id => onDeleteUser(id));
-                setSelectedIds([]); setConfirmBulkDelete(false);
-              }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
-              <button onClick={() => setConfirmBulkDelete(false)}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// ANALYTICS REPORTS PAGE (Admin Only)
-// ============================================================
-function AnalyticsPage({ transactions, bills, vendors, wallet }:
-  { transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; wallet: WalletEntry[]; }) {
-  const [tab, setTab] = useState("overview");
-
-  const totalExpected = transactions.reduce((s, t) => s + t.expectedAmount, 0);
-  const totalBillsAmt = bills.reduce((s, b) => s + b.billAmount, 0);
-  const totalGST = transactions.reduce((s, t) => s + t.gstAmount, 0);
-  const totalProfit = transactions.reduce((s, t) => s + t.profit, 0);
-  const totalAdvance = wallet.filter(w => w.type === "advance").reduce((s, w) => s + w.debit, 0);
-  const walletBalance = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
-
-  // District-wise summary
-  const districtSummary = DISTRICTS.map(d => {
-    const dTxns = transactions.filter(t => t.district === d);
-    const dBills = bills.filter(b => b.district === d);
-    return {
-      district: d,
-      txnCount: dTxns.length,
-      expected: dTxns.reduce((s, t) => s + t.expectedAmount, 0),
-      gst: dTxns.reduce((s, t) => s + t.gstAmount, 0),
-      bills: dBills.reduce((s, b) => s + b.billAmount, 0),
-      profit: dTxns.reduce((s, t) => s + t.profit, 0),
-      closed: dTxns.filter(t => t.status === "Closed").length,
-    };
-  }).filter(d => d.txnCount > 0).sort((a, b) => b.expected - a.expected);
-
-  // GST Rate wise
-  const gstRateSummary = GST_RATES.map(r => ({
-    rate: r,
-    count: transactions.filter(t => t.gstPercent === r).length,
-    amount: transactions.filter(t => t.gstPercent === r).reduce((s, t) => s + t.gstAmount, 0),
-  })).filter(r => r.count > 0);
-
-  const exportCSV = () => {
-    const rows = [
-      ["TXN ID", "District", "Vendor", "Month", "FY", "Expected", "Advance", "GST%", "GST Amt", "Bills", "Remaining", "Profit", "Status"],
-      ...transactions.map(t => [t.txnId, t.district, t.vendorName, t.month, t.financialYear,
-        t.expectedAmount, t.advanceAmount, t.gstPercent + "%", t.gstAmount,
-        t.billsReceived, t.remainingExpected, t.profit, t.status])
-    ];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "AR_ERP_Transactions.csv"; a.click();
-  };
-
-  const exportBillsCSV = () => {
-    const rows = [
-      ["Bill ID", "TXN ID", "District", "Vendor", "Bill No", "Date", "Bill Amount", "GST%", "GST Amt", "Total (18%)"],
-      ...bills.map(b => [b.id, b.txnId, b.district, b.vendorName, b.billNumber, b.billDate,
-        b.billAmount, b.gstPercent + "%", b.gstAmount, b.totalAmount])
-    ];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "AR_ERP_Bills.csv"; a.click();
-  };
-
-  const exportWalletCSV = () => {
-    const rows = [
-      ["Entry ID", "Date", "Description", "Type", "Debit", "Credit", "Balance"],
-      ...wallet.map(w => [w.id, w.date, w.description, w.type, w.debit, w.credit, w.balance])
-    ];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "AR_ERP_Wallet.csv"; a.click();
-  };
-
-  return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">📈 Reports & Analytics</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Master financial overview — All districts</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={exportCSV}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-            style={{ background: "#1a2f5e" }}>📥 Txn CSV</button>
-          <button onClick={exportBillsCSV}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-            style={{ background: "#7c3aed" }}>📥 Bills CSV</button>
-          <button onClick={exportWalletCSV}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-            style={{ background: "#b45309" }}>📥 Wallet CSV</button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {["overview", "district-wise", "gst-analysis", "wallet-analysis"].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize ${tab === t ? "text-white" : "text-gray-600 bg-white border border-gray-200"}`}
-            style={tab === t ? { background: "#1a2f5e" } : {}}>
-            {t.replace("-", " ")}
-          </button>
-        ))}
-      </div>
-
-      {/* OVERVIEW */}
-      {tab === "overview" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              ["Total Expected", fmt(totalExpected), "#1a2f5e"],
-              ["Bills Received", fmt(totalBillsAmt), "#15803d"],
-              ["Total GST", fmt(totalGST), "#7c3aed"],
-              ["8% Profit Earned", fmt(totalProfit), "#b45309"],
-              ["Total Advance", fmt(totalAdvance), "#0369a1"],
-              ["Wallet Balance", fmt(walletBalance), "#c9a227"],
-              ["Total Vendors", vendors.length.toString(), "#374151"],
-              ["Total Bills", bills.length.toString(), "#374151"],
-            ].map(([l, v, c]) => (
-              <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                <p className="text-xs text-gray-500">{l}</p>
-                <p className="text-xl font-bold mt-1" style={{ color: c }}>{v}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Status Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">Transaction Status</h2>
-              {[
-                ["Open", transactions.filter(t => t.status === "Open").length, "#2563eb", "bg-blue-100"],
-                ["Pending Close 🔴", transactions.filter(t => t.status === "PendingClose").length, "#dc2626", "bg-red-100"],
-                ["Closed ✅", transactions.filter(t => t.status === "Closed").length, "#16a34a", "bg-green-100"],
-              ].map(([l, v, c, bg]) => (
-                <div key={l as string} className="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ background: c as string }}></div>
-                    <span className="text-sm text-gray-700">{l as string}</span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${bg as string}`} style={{ color: c as string }}>
-                    {v as number}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">Financial Summary</h2>
-              {[
-                ["Expected Amount", fmt(totalExpected)],
-                ["Bills Received (Taxable)", fmt(totalBillsAmt)],
-                ["Total GST Collected", fmt(totalGST)],
-                ["Total Advance Paid", fmt(totalAdvance)],
-                ["8% Service Profit", fmt(totalProfit)],
-                ["Net Wallet Position", fmt(walletBalance)],
-              ].map(([l, v]) => (
-                <div key={l} className="flex justify-between py-2 border-b border-gray-50 last:border-0 text-sm">
-                  <span className="text-gray-500">{l}</span>
-                  <span className="font-semibold text-gray-800">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DISTRICT WISE */}
-      {tab === "district-wise" && (
-        <div className="space-y-4">
-          {districtSummary.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center text-gray-400">No district data available</div>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="font-bold text-gray-800">District-wise Financial Summary (Top Districts)</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead style={{ background: "#0a1628" }}>
-                    <tr>
-                      {["#", "District", "Transactions", "Expected ₹", "GST Amt", "Bills ₹", "Profit", "Closed"].map(h => (
-                        <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {districtSummary.map((d, i) => (
-                      <tr key={d.district} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 text-gray-400 font-bold">{i + 1}</td>
-                        <td className="px-3 py-3 font-medium text-gray-800">🏛️ {d.district}</td>
-                        <td className="px-3 py-3 text-center">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{d.txnCount}</span>
-                        </td>
-                        <td className="px-3 py-3 font-semibold text-gray-800">{fmt(d.expected)}</td>
-                        <td className="px-3 py-3 text-purple-700">{fmt(d.gst)}</td>
-                        <td className="px-3 py-3 text-green-700">{fmt(d.bills)}</td>
-                        <td className="px-3 py-3 text-amber-600 font-semibold">{d.profit > 0 ? fmt(d.profit) : "—"}</td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${d.closed > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                            {d.closed}/{d.txnCount}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot style={{ background: "#f8fafc" }}>
-                    <tr>
-                      <td colSpan={3} className="px-3 py-3 font-bold text-gray-800 text-xs">மொத்தம்</td>
-                      <td className="px-3 py-3 font-bold text-gray-800">{fmt(districtSummary.reduce((s, d) => s + d.expected, 0))}</td>
-                      <td className="px-3 py-3 font-bold text-purple-700">{fmt(districtSummary.reduce((s, d) => s + d.gst, 0))}</td>
-                      <td className="px-3 py-3 font-bold text-green-700">{fmt(districtSummary.reduce((s, d) => s + d.bills, 0))}</td>
-                      <td className="px-3 py-3 font-bold text-amber-600">{fmt(districtSummary.reduce((s, d) => s + d.profit, 0))}</td>
-                      <td className="px-3 py-3"></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* GST ANALYSIS */}
-      {tab === "gst-analysis" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">GST Rate-wise Breakdown</h2>
-              {gstRateSummary.length === 0
-                ? <p className="text-gray-400 text-sm text-center py-4">No GST data</p>
-                : gstRateSummary.map(r => (
-                  <div key={r.rate} className="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">{r.rate}%</span>
-                      <span className="text-sm text-gray-600">{r.count} transactions</span>
-                    </div>
-                    <span className="font-bold text-gray-800">{fmt(r.amount)}</span>
-                  </div>
-                ))}
-              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
-                <span className="font-bold text-gray-700">Total GST</span>
-                <span className="font-bold text-purple-700">{fmt(totalGST)}</span>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">GST vs Advance Analysis</h2>
-              {[
-                ["Total GST Payable", fmt(totalGST), "#7c3aed"],
-                ["Advance Paid", fmt(totalAdvance), "#ea580c"],
-                ["GST Balance Paid", fmt(totalGST - totalAdvance), "#dc2626"],
-                ["GST Recovery %", totalGST > 0 ? ((totalGST - totalAdvance) / totalGST * 100).toFixed(1) + "%" : "0%", "#16a34a"],
-              ].map(([l, v, c]) => (
-                <div key={l} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0 text-sm">
-                  <span className="text-gray-500">{l}</span>
-                  <span className="font-bold" style={{ color: c }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Vendor-wise GST */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-800">Vendor-wise GST Summary</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead style={{ background: "#0a1628" }}>
-                  <tr>
-                    {["Vendor", "District", "Transactions", "Expected ₹", "GST %", "GST Amount", "Advance", "GST Balance"].map(h => (
-                      <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {vendors.map(v => {
-                    const vTxns = transactions.filter(t => t.vendorCode === v.vendorCode);
-                    if (vTxns.length === 0) return null;
-                    const vExpected = vTxns.reduce((s, t) => s + t.expectedAmount, 0);
-                    const vGST = vTxns.reduce((s, t) => s + t.gstAmount, 0);
-                    const vAdvance = vTxns.reduce((s, t) => s + t.advanceAmount, 0);
-                    const vBalance = vTxns.reduce((s, t) => s + t.gstBalance, 0);
-                    const gstPcts = [...new Set(vTxns.map(t => t.gstPercent))].join(", ");
-                    return (
-                      <tr key={v.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 font-medium text-gray-800">{v.vendorName}</td>
-                        <td className="px-3 py-3 text-gray-600">{v.district}</td>
-                        <td className="px-3 py-3 text-center font-bold text-blue-700">{vTxns.length}</td>
-                        <td className="px-3 py-3">{fmt(vExpected)}</td>
-                        <td className="px-3 py-3 text-purple-700">{gstPcts}%</td>
-                        <td className="px-3 py-3 font-semibold text-purple-700">{fmt(vGST)}</td>
-                        <td className="px-3 py-3 text-orange-600">{fmt(vAdvance)}</td>
-                        <td className="px-3 py-3 text-red-600 font-semibold">{fmt(vBalance)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WALLET ANALYSIS */}
-      {tab === "wallet-analysis" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              ["Wallet Balance", fmt(walletBalance), "#c9a227"],
-              ["Total Invested", fmt(wallet.filter(w => w.type === "manual" && w.credit > 0).reduce((s, w) => s + w.credit, 0)), "#1a2f5e"],
-              ["Total Advance Debited", fmt(wallet.filter(w => w.type === "advance").reduce((s, w) => s + w.debit, 0)), "#ea580c"],
-              ["Total GST Debited", fmt(wallet.filter(w => w.type === "gst").reduce((s, w) => s + w.debit, 0)), "#dc2626"],
-              ["Total Profit Credited", fmt(wallet.filter(w => w.type === "profit").reduce((s, w) => s + w.credit, 0)), "#16a34a"],
-              ["Total Entries", wallet.length.toString(), "#374151"],
-              ["Profit ROI", walletBalance > 0 && totalProfit > 0 ? (totalProfit / 500000 * 100).toFixed(2) + "%" : "0%", "#7c3aed"],
-              ["Efficiency", transactions.length > 0 ? (transactions.filter(t => t.status === "Closed").length / transactions.length * 100).toFixed(0) + "%" : "0%", "#0369a1"],
-            ].map(([l, v, c]) => (
-              <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                <p className="text-xs text-gray-500">{l}</p>
-                <p className="text-xl font-bold mt-1" style={{ color: c }}>{v}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Wallet Entry Type Breakdown */}
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-3">Wallet Movement Breakdown</h2>
-            <div className="space-y-3">
-              {[
-                { type: "manual", label: "💼 Manual/Investment", color: "#1a2f5e", bg: "#eff6ff" },
-                { type: "advance", label: "💸 Advance Payments", color: "#ea580c", bg: "#fff7ed" },
-                { type: "gst", label: "🏛️ GST Settlements", color: "#dc2626", bg: "#fef2f2" },
-                { type: "profit", label: "📈 8% Profit Credits", color: "#16a34a", bg: "#f0fdf4" },
-              ].map(({ type, label, color, bg }) => {
-                const entries = wallet.filter(w => w.type === type as WalletEntry["type"]);
-                const debit = entries.reduce((s, w) => s + w.debit, 0);
-                const credit = entries.reduce((s, w) => s + w.credit, 0);
-                return (
-                  <div key={type} className="flex items-center justify-between p-3 rounded-lg" style={{ background: bg }}>
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color }}>{label}</p>
-                      <p className="text-xs text-gray-500">{entries.length} entries</p>
-                    </div>
-                    <div className="text-right">
-                      {debit > 0 && <p className="text-sm font-bold text-red-600">−{fmt(debit)}</p>}
-                      {credit > 0 && <p className="text-sm font-bold text-green-600">+{fmt(credit)}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// GOOGLE SHEETS SYNC PAGE (Admin Only)
-// ============================================================
-function GoogleSheetsSyncPage({ transactions, bills, vendors, wallet }:
-  { transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; wallet: WalletEntry[]; }) {
-  const [tab, setTab] = useState("guide");
-  const [sheetUrls, setSheetUrls] = useState<Record<string, string>>({});
-  const [syncLog, setSyncLog] = useState<{ time: string; msg: string; type: "success" | "error" | "info" }[]>([]);
-  const [syncing, setSyncing] = useState(false);
-
-  const addLog = (msg: string, type: "success" | "error" | "info" = "info") => {
-    setSyncLog(prev => [{ time: new Date().toLocaleTimeString(), msg, type }, ...prev.slice(0, 19)]);
-  };
-
-  const handleSync = (district: string) => {
-    setSyncing(true);
-    addLog(`🔄 Syncing ${district}...`, "info");
-    setTimeout(() => {
-      const url = sheetUrls[district];
-      if (!url) {
-        addLog(`❌ ${district} — No URL configured!`, "error");
-      } else {
-        addLog(`✅ ${district} — Sync successful! (${transactions.filter(t => t.district === district).length} txns, ${bills.filter(b => b.district === district).length} bills)`, "success");
-      }
-      setSyncing(false);
-    }, 1500);
-  };
-
-  const exportJSON = (data: object, filename: string) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-    addLog(`📥 ${filename} downloaded`, "success");
-  };
-
-  const appsScriptCode = `// AR Enterprises ERP — Google Apps Script Integration
-// Copy this code to your Google Sheet's Apps Script Editor
-
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const action = data.action;
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  if (action === 'SYNC_TRANSACTIONS') {
-    const sheet = ss.getSheetByName('Monthly_Transactions') || ss.insertSheet('Monthly_Transactions');
-    sheet.clearContents();
-    sheet.appendRow(['TXN ID','FY','Month','Vendor','Expected','Advance','GST%','GST Amt','Bills','Remaining','Status']);
-    data.transactions.forEach(t => {
-      sheet.appendRow([t.txnId, t.financialYear, t.month, t.vendorName,
-        t.expectedAmount, t.advanceAmount, t.gstPercent+'%', t.gstAmount,
-        t.billsReceived, t.remainingExpected, t.status]);
-    });
-  }
-  
-  if (action === 'SYNC_BILLS') {
-    const sheet = ss.getSheetByName('Bill_Details') || ss.insertSheet('Bill_Details');
-    sheet.clearContents();
-    sheet.appendRow(['Bill ID','TXN ID','Vendor','Bill No','Date','Amount','GST%','GST Amt','Total(18%)']);
-    data.bills.forEach(b => {
-      sheet.appendRow([b.id, b.txnId, b.vendorName, b.billNumber, b.billDate,
-        b.billAmount, b.gstPercent+'%', b.gstAmount, b.totalAmount]);
-    });
-  }
-  
-  if (action === 'SYNC_WALLET') {
-    const sheet = ss.getSheetByName('Admin_Wallet') || ss.insertSheet('Admin_Wallet');
-    sheet.clearContents();
-    sheet.appendRow(['Entry ID','Date','Description','Type','Debit','Credit','Balance']);
-    data.wallet.forEach(w => {
-      sheet.appendRow([w.id, w.date, w.description, w.type, w.debit, w.credit, w.balance]);
-    });
-  }
-  
-  return ContentService.createTextOutput(JSON.stringify({status:'success'}))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
-
-  const activeDistricts = [...new Set(transactions.map(t => t.district))];
-
-  return (
-    <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-gray-800">📊 Google Sheets Sync & Export</h1>
-        <p className="text-xs text-gray-400 mt-0.5">Data backup and Google Sheets integration</p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {["guide", "script", "urls", "sync", "export"].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize ${tab === t ? "text-white" : "text-gray-600 bg-white border border-gray-200"}`}
-            style={tab === t ? { background: "#1a2f5e" } : {}}>
-            {t === "guide" ? "📖 Guide" : t === "script" ? "📝 Script" : t === "urls" ? "⚙️ URLs" : t === "sync" ? "🔄 Sync" : "📥 Export"}
-          </button>
-        ))}
-      </div>
-
-      {tab === "guide" && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-3">📖 Setup Guide — 4 Steps</h2>
-            {[
-              { step: "1", title: "Google Sheet உருவாக்கு", desc: "sheets.google.com → New Sheet → 'AR_ERP_Chennai' என்று பெயர் வை" },
-              { step: "2", title: "Apps Script திற", desc: "Extensions → Apps Script → 'Script' Tab-ல் Script Code paste செய்" },
-              { step: "3", title: "Deploy செய்", desc: "Deploy → New Deployment → Web App → Anyone can access → Deploy → URL Copy" },
-              { step: "4", title: "URL Paste செய்", desc: "URLs tab-ல் District URL paste செய் → Sync button click செய்" },
-            ].map(s => (
-              <div key={s.step} className="flex gap-3 p-3 rounded-lg mb-2" style={{ background: "#f8fafc" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ background: "#1a2f5e" }}>{s.step}</div>
-                <div>
-                  <p className="font-semibold text-gray-800 text-sm">{s.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-3">📊 Data Flow</h2>
-            <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
-              {["AR ERP Web App", "→", "Google Apps Script", "→", "Google Sheets"].map((item, i) => (
-                item === "→"
-                  ? <span key={i} className="text-gray-400 text-xl">→</span>
-                  : <div key={i} className="px-4 py-2 rounded-lg text-white text-xs font-semibold text-center"
-                    style={{ background: "#1a2f5e" }}>{item}</div>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center text-gray-500">
-              <p>Transactions, Bills, Wallet</p>
-              <p>Web App URL (POST)</p>
-              <p>Monthly_Transactions, Bill_Details, Admin_Wallet</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "script" && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="font-bold text-gray-800">📝 Apps Script Code</h2>
-            <button onClick={() => { navigator.clipboard.writeText(appsScriptCode); addLog("✅ Code copied!", "success"); }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-              style={{ background: "#1a2f5e" }}>📋 Copy Code</button>
-          </div>
-          <pre className="text-xs text-gray-700 bg-gray-50 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap border border-gray-200"
-            style={{ fontFamily: "monospace", maxHeight: "400px", overflowY: "auto" }}>
-            {appsScriptCode}
-          </pre>
-        </div>
-      )}
-
-      {tab === "urls" && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-800">⚙️ District Sheet URLs</h2>
-          <p className="text-xs text-gray-500">Google Apps Script Web App URL ஒவ்வொரு District-க்கும் paste செய்யவும்</p>
-          <div className="space-y-2">
-            {activeDistricts.map(d => (
-              <div key={d} className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700 w-32 flex-shrink-0">🏛️ {d}</span>
-                <input
-                  value={sheetUrls[d] || ""}
-                  onChange={e => setSheetUrls(prev => ({ ...prev, [d]: e.target.value }))}
-                  placeholder="https://script.google.com/macros/s/.../exec"
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-400"
-                />
-                <a href={sheetUrls[d] || "#"} target="_blank" rel="noopener noreferrer"
-                  className="px-2 py-1.5 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">
-                  📊 திற
-                </a>
-              </div>
-            ))}
-            {activeDistricts.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-4">No active districts with transactions</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {tab === "sync" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeDistricts.map(d => (
-              <div key={d} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-gray-800">🏛️ {d}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {transactions.filter(t => t.district === d).length} txns |
-                      {bills.filter(b => b.district === d).length} bills
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className={`w-2 h-2 rounded-full mt-1 ${sheetUrls[d] ? "bg-green-500" : "bg-red-400"}`}></span>
-                    <button onClick={() => handleSync(d)} disabled={syncing}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
-                      style={{ background: "#1a2f5e" }}>
-                      {syncing ? "Syncing..." : "🔄 Sync"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Sync Log */}
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-2">📋 Activity Log</h2>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {syncLog.length === 0 && <p className="text-gray-400 text-xs text-center py-4">No sync activity yet</p>}
-              {syncLog.map((l, i) => (
-                <div key={i} className={`flex gap-2 text-xs p-2 rounded ${l.type === "success" ? "bg-green-50 text-green-700" : l.type === "error" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
-                  <span className="text-gray-400">{l.time}</span>
-                  <span>{l.msg}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "export" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { title: "📋 Transactions JSON", desc: `${transactions.length} transactions`, onClick: () => exportJSON(transactions, "AR_Transactions.json"), color: "#1a2f5e" },
-              { title: "🧾 Bills JSON", desc: `${bills.length} bills`, onClick: () => exportJSON(bills, "AR_Bills.json"), color: "#7c3aed" },
-              { title: "🏢 Vendors JSON", desc: `${vendors.length} vendors`, onClick: () => exportJSON(vendors, "AR_Vendors.json"), color: "#0369a1" },
-              { title: "💰 Wallet JSON", desc: `${wallet.length} entries`, onClick: () => exportJSON(wallet, "AR_Wallet.json"), color: "#b45309" },
-              { title: "📦 Full System Backup", desc: "All data combined", onClick: () => exportJSON({ transactions, bills, vendors, wallet, exportDate: new Date().toISOString() }, "AR_ERP_FullBackup.json"), color: "#374151" },
-            ].map(item => (
-              <button key={item.title} onClick={item.onClick}
-                className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-left hover:shadow-md transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg"
-                    style={{ background: item.color }}>
-                    📥
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800">{item.title}</p>
-                    <p className="text-xs text-gray-400">{item.desc}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-          {syncLog.length > 0 && (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-2">📋 Export Log</h2>
-              <div className="space-y-1">
-                {syncLog.map((l, i) => (
-                  <div key={i} className={`flex gap-2 text-xs p-2 rounded ${l.type === "success" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
-                    <span className="text-gray-400">{l.time}</span><span>{l.msg}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -2889,7 +1305,7 @@ function doPost(e) {
 // ============================================================
 function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district: _district }:
   { transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; isAdmin: boolean; district: string; }) {
-  void _isAdmin;
+  void _isAdmin; void _district;
   const [tab, setTab] = useState("summary");
 
   const totalExpected = transactions.reduce((s, t) => s + t.expectedAmount, 0);
@@ -2967,6 +1383,7 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
               })}
             </tbody>
           </table>
+          {vendors.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No vendors</p>}
         </div>
       )}
 
@@ -2976,7 +1393,7 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
             <table className="w-full text-sm">
               <thead style={{ background: "#0a1628" }}>
                 <tr>
-                  {["TXN ID","Vendor","Expected","GST Amt","Bills","Remaining","Profit","Status"].map(h => (
+                  {["TXN ID","Vendor","Expected","GST Amt","Bills","Remaining","Status"].map(h => (
                     <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
                   ))}
                 </tr>
@@ -2990,7 +1407,6 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
                     <td className="px-3 py-3 text-purple-700">{fmt(t.gstAmount)}</td>
                     <td className="px-3 py-3 text-green-700">{fmt(t.billsReceived)}</td>
                     <td className="px-3 py-3 text-orange-600">{fmt(t.remainingExpected)}</td>
-                    <td className="px-3 py-3 text-green-600">{t.profit > 0 ? fmt(t.profit) : "—"}</td>
                     <td className="px-3 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
                         ${t.status === "Closed" ? "bg-green-100 text-green-700" :
@@ -3004,6 +1420,7 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
               </tbody>
             </table>
           </div>
+          {transactions.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No transactions</p>}
         </div>
       )}
 
@@ -3013,7 +1430,7 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
             <table className="w-full text-sm">
               <thead style={{ background: "#0a1628" }}>
                 <tr>
-                  {["Bill No","Vendor","Date","Bill Amount","GST%","GST தொகை","Total (18%)"].map(h => (
+                  {["Bill No","Vendor","Date","Bill Amount","GST%","GST தொகை","Total"].map(h => (
                     <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
                   ))}
                 </tr>
@@ -3033,8 +1450,453 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
               </tbody>
             </table>
           </div>
+          {bills.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No bills</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// ANALYTICS PAGE
+// ============================================================
+function AnalyticsPage({ transactions, bills, vendors, wallet }:
+  { transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; wallet: WalletEntry[]; }) {
+
+  const totalExpected = transactions.reduce((s, t) => s + t.expectedAmount, 0);
+  const totalBillsAmt = bills.reduce((s, b) => s + b.billAmount, 0);
+  const totalGST = transactions.reduce((s, t) => s + t.gstAmount, 0);
+  const totalProfit = transactions.reduce((s, t) => s + t.profit, 0);
+  const walletBalance = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
+
+  const districtSummary = DISTRICTS.map(d => {
+    const dTxns = transactions.filter(t => t.district === d);
+    const dBills = bills.filter(b => b.district === d);
+    return {
+      district: d,
+      txnCount: dTxns.length,
+      expected: dTxns.reduce((s, t) => s + t.expectedAmount, 0),
+      bills: dBills.reduce((s, b) => s + b.billAmount, 0),
+    };
+  }).filter(d => d.txnCount > 0).sort((a, b) => b.expected - a.expected);
+
+  return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-xl font-bold text-gray-800">📈 Reports & Analytics</h1>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          ["Total Expected", fmt(totalExpected), "#1a2f5e"],
+          ["Bills Received", fmt(totalBillsAmt), "#15803d"],
+          ["Total GST", fmt(totalGST), "#7c3aed"],
+          ["8% Profit", fmt(totalProfit), "#b45309"],
+          ["Wallet Balance", fmt(walletBalance), "#c9a227"],
+          ["Total Vendors", vendors.length.toString(), "#374151"],
+          ["Total Bills", bills.length.toString(), "#0369a1"],
+          ["Transactions", transactions.length.toString(), "#374151"],
+        ].map(([l, v, c]) => (
+          <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500">{l}</p>
+            <p className="text-xl font-bold mt-1" style={{ color: c }}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      {districtSummary.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="font-bold text-gray-800">District-wise Summary</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead style={{ background: "#0a1628" }}>
+                <tr>
+                  {["#","District","Transactions","Expected ₹","Bills ₹"].map(h => (
+                    <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {districtSummary.map((d, i) => (
+                  <tr key={d.district} className="hover:bg-gray-50">
+                    <td className="px-3 py-3 text-gray-400 font-bold">{i + 1}</td>
+                    <td className="px-3 py-3 font-medium text-gray-800">🏛️ {d.district}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{d.txnCount}</span>
+                    </td>
+                    <td className="px-3 py-3 font-semibold text-gray-800">{fmt(d.expected)}</td>
+                    <td className="px-3 py-3 text-green-700">{fmt(d.bills)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// DISTRICT MANAGEMENT PAGE
+// ============================================================
+function DistrictManagementPage({ districtUsers, onAddUser, onToggleUser }:
+  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; }) {
+  const [showForm, setShowForm] = useState(false);
+  const [uname, setUname] = useState("");
+  const [pass, setPass] = useState("");
+  const [dist, setDist] = useState("");
+
+  const handleAdd = () => {
+    if (!uname || !pass || !dist) return;
+    onAddUser({
+      id: genId("U"), username: uname, password: pass,
+      district: dist, active: true, createdAt: new Date().toISOString().split("T")[0]
+    });
+    setUname(""); setPass(""); setDist(""); setShowForm(false);
+  };
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-800">🏛️ District Management</h1>
+        <button onClick={() => setShowForm(!showForm)}
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+          + Add District User
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          ["Total Districts", DISTRICTS.length.toString(), "#1a2f5e"],
+          ["Active Users", districtUsers.filter(u => u.active).length.toString(), "#16a34a"],
+          ["Inactive Users", districtUsers.filter(u => !u.active).length.toString(), "#dc2626"],
+          ["Unassigned", (DISTRICTS.length - districtUsers.length).toString(), "#b45309"],
+        ].map(([l, v, c]) => (
+          <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500">{l}</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: c }}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+          <h2 className="font-bold text-gray-800">புதிய District User சேர்</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">District</label>
+              <select value={dist} onChange={e => setDist(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
+                <option value="">Select District</option>
+                {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Username</label>
+              <input value={uname} onChange={e => setUname(e.target.value)} placeholder="chennai_user"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Password</label>
+              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password"
+                autoComplete="new-password"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleAdd}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "#16a34a" }}>Save</button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead style={{ background: "#0a1628" }}>
+              <tr>
+                {["District", "Username", "Status", "Created", "Actions"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {districtUsers.map(u => (
+                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "opacity-60" : ""}`}>
+                  <td className="px-4 py-3 font-medium text-gray-800">🏛️ {u.district}</td>
+                  <td className="px-4 py-3 font-mono text-blue-700">{u.username}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      {u.active ? "✅ Active" : "❌ Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{u.createdAt}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => onToggleUser(u.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold text-white ${u.active ? "bg-red-500" : "bg-green-500"}`}>
+                      {u.active ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {districtUsers.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No district users</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// USER MANAGEMENT PAGE
+// ============================================================
+function UserManagementPage({ districtUsers, onAddUser, onToggleUser, onDeleteUser, onEditUser }:
+  { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; onDeleteUser: (id: string) => void; onEditUser: (u: ManagedUser) => void; }) {
+  const [showForm, setShowForm] = useState(false);
+  const [uname, setUname] = useState("");
+  const [pass, setPass] = useState("");
+  const [dist, setDist] = useState("");
+  const [search, setSearch] = useState("");
+
+  const filtered = districtUsers.filter(u =>
+    u.username.toLowerCase().includes(search.toLowerCase()) ||
+    u.district.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleAdd = () => {
+    if (!uname || !pass || !dist) return;
+    onAddUser({ id: genId("U"), username: uname, password: pass, district: dist, active: true, createdAt: new Date().toISOString().split("T")[0] });
+    setUname(""); setPass(""); setDist(""); setShowForm(false);
+  };
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h1 className="text-xl font-bold text-gray-800">👥 User Management</h1>
+        <button onClick={() => setShowForm(!showForm)}
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+          + New User
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+          <h2 className="font-bold text-gray-800">புதிய User சேர்</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">District</label>
+              <select value={dist} onChange={e => setDist(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400">
+                <option value="">Select District</option>
+                {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Username</label>
+              <input value={uname} onChange={e => setUname(e.target.value)} placeholder="district_user"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Password</label>
+              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password"
+                autoComplete="new-password"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleAdd}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "#16a34a" }}>Create User</button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search users..."
+        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 bg-white" />
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead style={{ background: "#0a1628" }}>
+              <tr>
+                {["#", "Username", "District", "Status", "Created At", "Actions"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((u, i) => (
+                <tr key={u.id} className={`hover:bg-gray-50 ${!u.active ? "bg-red-50/30" : ""}`}>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
+                  <td className="px-4 py-3 font-mono font-medium text-blue-700">{u.username}</td>
+                  <td className="px-4 py-3 text-gray-700">🏛️ {u.district}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold
+                      ${u.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      {u.active ? "✅ Active" : "❌ Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{u.createdAt}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1 flex-wrap">
+                      <button onClick={() => onToggleUser(u.id)}
+                        className={`px-2 py-1 rounded text-xs font-semibold text-white
+                          ${u.active ? "bg-orange-400" : "bg-green-500"}`}>
+                        {u.active ? "🔴" : "🟢"}
+                      </button>
+                      <button onClick={() => onDeleteUser(u.id)}
+                        className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No users found</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// GOOGLE SHEETS SYNC PAGE
+// ============================================================
+function GoogleSheetsSyncPage({ transactions, bills, vendors, wallet }: {
+  transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; wallet: WalletEntry[];
+}) {
+  const [syncing, setSyncing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+
+  const handleSaveToSheets = async () => {
+    setSyncing(true);
+    setStatus('idle');
+    setMessage('');
+    
+    try {
+      const success = await saveToSheets();
+      
+      if (success) {
+        setStatus('success');
+        setMessage(`✅ ${vendors.length} vendors, ${transactions.length} txns, ${bills.length} bills, ${wallet.length} wallet entries synced!`);
+        setLastSync(new Date().toLocaleString('en-IN'));
+      } else {
+        setStatus('error');
+        setMessage('❌ Sync failed. Check Apps Script deployment.');
+      }
+    } catch (err) {
+      setStatus('error');
+      setMessage('❌ Network error: ' + (err as Error).message);
+    }
+    
+    setSyncing(false);
+  };
+
+  const handleLoadFromSheets = async () => {
+    setLoading(true);
+    setStatus('idle');
+    setMessage('');
+    
+    try {
+      const success = await loadFromSheets();
+      
+      if (success) {
+        setStatus('success');
+        setMessage('✅ Data loaded from Google Sheets! Refreshing...');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setStatus('error');
+        setMessage('❌ Load failed. Check if Google Sheets has data.');
+      }
+    } catch (err) {
+      setStatus('error');
+      setMessage('❌ Network error: ' + (err as Error).message);
+    }
+    
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-800">📊 Google Sheets Sync</h1>
+        <p className="text-sm text-gray-500">Real-time data synchronization</p>
+      </div>
+
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-bold text-gray-800">🔄 Sync Status</h2>
+            <p className="text-xs text-gray-500 mt-1">Auto-sync: Every 5 minutes</p>
+          </div>
+          {lastSync && (
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Last sync:</p>
+              <p className="text-sm font-medium text-gray-700">{lastSync}</p>
+            </div>
+          )}
+        </div>
+
+        {status === 'success' && (
+          <div className="mb-4 p-4 rounded-lg bg-green-50 border border-green-200">
+            <p className="text-sm text-green-700 font-medium">{message}</p>
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-sm text-red-700 font-medium">{message}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={handleSaveToSheets} disabled={syncing || loading}
+            className="px-6 py-3 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}>
+            {syncing ? '⏳ Syncing...' : '☁️ Save to Sheets'}
+          </button>
+          <button onClick={handleLoadFromSheets} disabled={syncing || loading}
+            className="px-6 py-3 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #2563eb, #3b82f6)" }}>
+            {loading ? '⏳ Loading...' : '📥 Load from Sheets'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          ['🏢 Vendors', vendors.length, '#1a2f5e'],
+          ['📋 Transactions', transactions.length, '#0369a1'],
+          ['🧾 Bills', bills.length, '#7c3aed'],
+          ['💰 Wallet', wallet.length, '#b45309'],
+        ].map(([label, count, color]) => (
+          <div key={label as string} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 mb-1">{label}</p>
+            <p className="text-2xl font-bold" style={{ color: color as string }}>{count}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+        <h3 className="font-bold text-blue-900 mb-3">ℹ️ எப்படி வேலை செய்கிறது?</h3>
+        <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
+          <li><strong>Auto-sync:</strong> App load ஆகும்போது + ஒவ்வொரு 5 நிமிடமும்</li>
+          <li><strong>Save to Sheets:</strong> Current data → Google Sheets</li>
+          <li><strong>Load from Sheets:</strong> Google Sheets → App (Page refresh)</li>
+          <li><strong>Offline-safe:</strong> Sync fail ஆனாலும் localStorage-ல data safe</li>
+        </ul>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwrPPOya5wWtVM9wFzE7cqSo27Oyf6irXvqhQ3c25x18rAYBoPctoGk7CIdyU8-M8lR/exec';
 
-// Load data from Google Sheets → localStorage
 export async function loadFromSheets(): Promise<boolean> {
   try {
     console.log('📥 Loading from Google Sheets...');
@@ -8,7 +7,6 @@ export async function loadFromSheets(): Promise<boolean> {
     const data = await response.json();
     
     if (data.status === 'success') {
-      // Map to localStorage format
       const mapped = {
         vendors: (data.vendors || []).map((v: any) => ({
           id: v.vendorCode || Math.random().toString(36).substr(2, 9),
@@ -77,7 +75,6 @@ export async function loadFromSheets(): Promise<boolean> {
       console.log('✅ Google Sheets → localStorage sync complete');
       return true;
     }
-    console.log('⚠️ No data or error from Sheets');
     return false;
   } catch (error) {
     console.error('❌ Sheets load failed:', error);
@@ -85,19 +82,14 @@ export async function loadFromSheets(): Promise<boolean> {
   }
 }
 
-// Save data from localStorage → Google Sheets
 export async function saveToSheets(): Promise<boolean> {
   try {
     console.log('☁️ Saving to Google Sheets...');
     const raw = localStorage.getItem('AR_ERP_V3_DATA');
-    if (!raw) {
-      console.log('⚠️ No local data to sync');
-      return false;
-    }
+    if (!raw) return false;
     
     const data = JSON.parse(raw);
     
-    // Map to Sheets format
     const payload = {
       action: 'FULL_SYNC',
       vendors: (data.vendors || []).map((v: any) => ({
@@ -167,7 +159,6 @@ export async function saveToSheets(): Promise<boolean> {
       console.log('✅ localStorage → Google Sheets sync complete');
       return true;
     }
-    console.log('⚠️ Sheets sync returned error:', result.message);
     return false;
   } catch (error) {
     console.error('❌ Sheets save failed:', error);
@@ -175,19 +166,13 @@ export async function saveToSheets(): Promise<boolean> {
   }
 }
 
-// Auto-sync every X minutes
 let syncInterval: number | null = null;
 
 export function startAutoSync(intervalMinutes: number = 5): void {
-  // Initial sync
   saveToSheets();
   
-  // Clear existing interval if any
-  if (syncInterval) {
-    clearInterval(syncInterval);
-  }
+  if (syncInterval) clearInterval(syncInterval);
   
-  // Start new interval
   syncInterval = window.setInterval(() => {
     console.log('🔄 Auto-sync triggered...');
     saveToSheets();
@@ -200,6 +185,5 @@ export function stopAutoSync(): void {
   if (syncInterval) {
     clearInterval(syncInterval);
     syncInterval = null;
-    console.log('⏹️ Auto-sync stopped');
   }
 }

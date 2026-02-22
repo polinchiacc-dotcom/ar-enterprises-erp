@@ -84,9 +84,6 @@ const BILL_TOTAL_RATE = 1.18; // 🔒 LOCKED
 
 const USERS: User[] = [
   { id: "U001", username: "admin", password: "Admin@123", role: "admin" },
-  { id: "U002", username: "chennai_user", password: "Chennai@123", role: "district", district: "Chennai" },
-  { id: "U003", username: "coimbatore_user", password: "Coimbatore@123", role: "district", district: "Coimbatore" },
-  { id: "U004", username: "madurai_user", password: "Madurai@123", role: "district", district: "Madurai" },
 ];
 
 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -104,15 +101,23 @@ const INIT_BILLS: Bill[] = [];
 // ============================================================
 // LOGIN PAGE
 // ============================================================
-function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
+function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; managedUsers: ManagedUser[] }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    const user = USERS.find(u => u.username === username && u.password === password);
-    if (user) { setError(""); onLogin(user); }
-    else setError("தவறான username அல்லது password!");
+    // Check admin first
+    const adminUser = USERS.find(u => u.username === username && u.password === password);
+    if (adminUser) { setError(""); onLogin(adminUser); return; }
+    // Check managed district users
+    const distUser = managedUsers.find(u => u.username === username && u.password === password && u.active);
+    if (distUser) {
+      setError("");
+      onLogin({ id: distUser.id, username: distUser.username, password: distUser.password, role: "district", district: distUser.district });
+      return;
+    }
+    setError("தவறான username அல்லது password!");
   };
 
   return (
@@ -124,17 +129,15 @@ function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
           </div>
           <h1 className="text-2xl font-bold text-white">AR Enterprises</h1>
           <p className="text-sm mt-1" style={{ color: "#c9a227" }}>Multi-District Vendor ERP System V3.0</p>
-          <p className="text-xs text-gray-400 mt-1">Tamil Nadu GST Bill Automation</p>
         </div>
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Username</label>
-            <select value={username} onChange={e => setUsername(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
-              <option value="">-- Select Username --</option>
-              {USERS.map(u => <option key={u.id} value={u.username} style={{ background: "#1a2f5e" }}>{u.username}</option>)}
-            </select>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              placeholder="Enter username" autoComplete="off"
+              className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Password</label>
@@ -150,11 +153,6 @@ function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
             style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}>
             Login →
           </button>
-        </div>
-        <div className="mt-6 p-3 rounded-lg text-xs text-gray-400 space-y-1" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <p className="font-medium text-gray-300">Demo Credentials:</p>
-          <p>👑 admin / Admin@123</p>
-          <p>🏙️ chennai_user / Chennai@123</p>
         </div>
       </div>
     </div>
@@ -172,11 +170,7 @@ export default function App() {
   const [bills, setBills] = useState<Bill[]>(INIT_BILLS);
   const [wallet, setWallet] = useState<WalletEntry[]>(INIT_WALLET);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([
-    { id: "MU001", username: "chennai_user", password: "Chennai@123", district: "Chennai", active: true, createdAt: "2025-04-01" },
-    { id: "MU002", username: "coimbatore_user", password: "Coimbatore@123", district: "Coimbatore", active: true, createdAt: "2025-04-01" },
-    { id: "MU003", username: "madurai_user", password: "Madurai@123", district: "Madurai", active: true, createdAt: "2025-04-01" },
-  ]);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
 
   // Wallet helpers
   const getWalletBalance = useCallback(() => {
@@ -199,7 +193,7 @@ export default function App() {
     });
   }, []);
 
-  if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} />;
+  if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} managedUsers={managedUsers} />;
 
   const district = user.role === "district" ? user.district! : "";
   const isAdmin = user.role === "admin";
@@ -434,7 +428,7 @@ function DashboardPage({ isAdmin, district, transactions, vendors, bills, wallet
         <h1 className="text-xl font-bold text-gray-800">
           {isAdmin ? "📊 Master Dashboard — AR Enterprises" : `📊 ${district} Dashboard`}
         </h1>
-        <p className="text-sm text-gray-500">Tamil Nadu GST Bill Automation ERP V3.0</p>
+        <p className="text-sm text-gray-500">AR Enterprises — Multi District ERP V3.0</p>
       </div>
 
       {/* 🔴 PENDING CLOSE ALERTS — Admin only */}

@@ -99,6 +99,28 @@ const INIT_TRANSACTIONS: Transaction[] = [];
 const INIT_BILLS: Bill[] = [];
 
 // ============================================================
+// LOCAL STORAGE HELPERS — Auto Save & Load
+// ============================================================
+const LS_KEY = "AR_ERP_V3_DATA";
+
+const saveToStorage = (data: {
+  vendors: Vendor[]; transactions: Transaction[];
+  bills: Bill[]; wallet: WalletEntry[]; managedUsers: ManagedUser[];
+}) => {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch (e) { console.error("Storage save error:", e); }
+};
+
+const loadFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+};
+
+// ============================================================
 // LOGIN PAGE
 // ============================================================
 function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; managedUsers: ManagedUser[] }) {
@@ -163,14 +185,23 @@ function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; mana
 // MAIN APP
 // ============================================================
 export default function App() {
+  // Load from LocalStorage on first render
+  const saved = loadFromStorage();
   const [user, setUser] = useState<User | null>(null);
   const [page, setPage] = useState("dashboard");
-  const [vendors, setVendors] = useState<Vendor[]>(INIT_VENDORS);
-  const [transactions, setTransactions] = useState<Transaction[]>(INIT_TRANSACTIONS);
-  const [bills, setBills] = useState<Bill[]>(INIT_BILLS);
-  const [wallet, setWallet] = useState<WalletEntry[]>(INIT_WALLET);
+  const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || INIT_VENDORS);
+  const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || INIT_TRANSACTIONS);
+  const [bills, setBills] = useState<Bill[]>(saved?.bills || INIT_BILLS);
+  const [wallet, setWallet] = useState<WalletEntry[]>(saved?.wallet || INIT_WALLET);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(saved?.managedUsers || []);
+
+  // Auto-save to LocalStorage whenever data changes
+  const saveData = useCallback((
+    v: Vendor[], t: Transaction[], b: Bill[], w: WalletEntry[], u: ManagedUser[]
+  ) => {
+    saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u });
+  }, []);
 
   // Wallet helpers
   const getWalletBalance = useCallback(() => {
@@ -189,7 +220,17 @@ export default function App() {
         id: genId("W"), date: new Date().toISOString().split("T")[0],
         description, txnId, debit, credit, balance: newBal, type
       };
-      return [...prev, entry];
+      const nw = [...prev, entry];
+      // save wallet immediately
+      const saved2 = loadFromStorage();
+      saveToStorage({
+        vendors: saved2?.vendors || [],
+        transactions: saved2?.transactions || [],
+        bills: saved2?.bills || [],
+        wallet: nw,
+        managedUsers: saved2?.managedUsers || []
+      });
+      return nw;
     });
   }, []);
 
@@ -294,8 +335,8 @@ export default function App() {
           <VendorsPage
             isAdmin={isAdmin} district={district}
             vendors={myVendors}
-            onAdd={(v) => setVendors(prev => [...prev, v])}
-            onDelete={(id) => setVendors(prev => prev.filter(v => v.id !== id))}
+            onAdd={(v) => { const nv = [...vendors, v]; setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers); }}
+            onDelete={(id) => { const nv = vendors.filter(v => v.id !== id); setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers); }}
           />
         )}
         {page === "transactions" && (
@@ -303,10 +344,12 @@ export default function App() {
             isAdmin={isAdmin} district={district}
             transactions={myTxns} vendors={myVendors} bills={myBills}
             onAdd={(txn, advance) => {
-              setTransactions(prev => [...prev, txn]);
+              const nt = [...transactions, txn];
+              setTransactions(nt);
               if (advance > 0) {
                 addWalletEntry(`Advance Paid — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
               }
+              saveData(vendors, nt, bills, wallet, managedUsers);
             }}
             onClose={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
@@ -315,12 +358,14 @@ export default function App() {
               if (gstBal > 0) {
                 addWalletEntry(`GST Balance Debit — ${txn.vendorName} (${txnId})`, gstBal, 0, "gst", txnId);
               }
-              setTransactions(prev => prev.map(t => t.txnId === txnId
-                ? { ...t, status: "PendingClose", closedByDistrict: true, remainingExpected: 0 }
-                : t));
+              const nt = transactions.map(t => t.txnId === txnId
+                ? { ...t, status: "PendingClose" as const, closedByDistrict: true, remainingExpected: 0 }
+                : t);
+              setTransactions(nt);
+              saveData(vendors, nt, bills, wallet, managedUsers);
             }}
-            onEdit={(updated) => setTransactions(prev => prev.map(t => t.txnId === updated.txnId ? updated : t))}
-            onDeleteTxn={(txnId) => setTransactions(prev => prev.filter(t => t.txnId !== txnId))}
+            onEdit={(updated) => { const nt = transactions.map(t => t.txnId === updated.txnId ? updated : t); setTransactions(nt); saveData(vendors, nt, bills, wallet, managedUsers); }}
+            onDeleteTxn={(txnId) => { const nt = transactions.filter(t => t.txnId !== txnId); setTransactions(nt); saveData(vendors, nt, bills, wallet, managedUsers); }}
           />
         )}
         {page === "bills" && (
@@ -328,33 +373,35 @@ export default function App() {
             isAdmin={isAdmin} district={district}
             bills={myBills} transactions={myTxns} vendors={myVendors}
             onAdd={(bill) => {
-              setBills(prev => [...prev, bill]);
-              // Update transaction billsReceived & remainingExpected
-              setTransactions(prev => prev.map(t => {
+              const nb = [...bills, bill];
+              setBills(nb);
+              const nt = transactions.map(t => {
                 if (t.txnId !== bill.txnId) return t;
-                const txnBills = [...bills, bill].filter(b => b.txnId === t.txnId);
-                // 🔒 AR_TRANSACTION_CALC_FINAL_LOCKED
-                // Remaining = Expected - Sum(Bill Amount × 1.18)
+                const txnBills = nb.filter(b => b.txnId === t.txnId);
                 const sumTotal = txnBills.reduce((s, b) => s + round2(b.billAmount * BILL_TOTAL_RATE), 0);
                 const remaining = round2(Math.max(0, t.expectedAmount - sumTotal));
                 const billsReceived = txnBills.reduce((s, b) => s + b.billAmount, 0);
                 return { ...t, billsReceived: round2(billsReceived), remainingExpected: remaining };
-              }));
+              });
+              setTransactions(nt);
+              saveData(vendors, nt, nb, wallet, managedUsers);
             }}
-            onEditBill={(updated) => setBills(prev => prev.map(b => b.id === updated.id ? updated : b))}
+            onEditBill={(updated) => { const nb = bills.map(b => b.id === updated.id ? updated : b); setBills(nb); saveData(vendors, transactions, nb, wallet, managedUsers); }}
             onDelete={(billId) => {
               const bill = bills.find(b => b.id === billId);
               if (!bill) return;
-              const newBills = bills.filter(b => b.id !== billId);
-              setBills(newBills);
-              setTransactions(prev => prev.map(t => {
+              const nb = bills.filter(b => b.id !== billId);
+              setBills(nb);
+              const nt = transactions.map(t => {
                 if (t.txnId !== bill.txnId) return t;
-                const txnBills = newBills.filter(b => b.txnId === t.txnId);
+                const txnBills = nb.filter(b => b.txnId === t.txnId);
                 const sumTotal = txnBills.reduce((s, b) => s + round2(b.billAmount * BILL_TOTAL_RATE), 0);
                 const remaining = round2(Math.max(0, t.expectedAmount - sumTotal));
                 const billsReceived = txnBills.reduce((s, b) => s + b.billAmount, 0);
                 return { ...t, billsReceived: round2(billsReceived), remainingExpected: remaining };
-              }));
+              });
+              setTransactions(nt);
+              saveData(vendors, nt, nb, wallet, managedUsers);
             }}
           />
         )}
@@ -381,17 +428,17 @@ export default function App() {
         {page === "districts" && isAdmin && (
           <DistrictManagementPage
             districtUsers={managedUsers}
-            onAddUser={(u) => setManagedUsers(prev => [...prev, u])}
-            onToggleUser={(id) => setManagedUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u))}
+            onAddUser={(u) => { const nu = [...managedUsers, u]; setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
+            onToggleUser={(id) => { const nu = managedUsers.map(u => u.id === id ? { ...u, active: !u.active } : u); setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
           />
         )}
         {page === "users" && isAdmin && (
           <UserManagementPage
             districtUsers={managedUsers}
-            onAddUser={(u) => setManagedUsers(prev => [...prev, u])}
-            onToggleUser={(id) => setManagedUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u))}
-            onDeleteUser={(id) => setManagedUsers(prev => prev.filter(u => u.id !== id))}
-            onEditUser={(updated) => setManagedUsers(prev => prev.map(u => u.id === updated.id ? updated : u))}
+            onAddUser={(u) => { const nu = [...managedUsers, u]; setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
+            onToggleUser={(id) => { const nu = managedUsers.map(u => u.id === id ? { ...u, active: !u.active } : u); setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
+            onDeleteUser={(id) => { const nu = managedUsers.filter(u => u.id !== id); setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
+            onEditUser={(updated) => { const nu = managedUsers.map(u => u.id === updated.id ? updated : u); setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu); }}
           />
         )}
         {page === "sheets" && isAdmin && (

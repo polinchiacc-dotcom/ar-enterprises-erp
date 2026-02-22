@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { loadFromSheets, saveToSheets, startAutoSync } from './services/googleSheets';
 
 // ============================================================
 // TYPES
@@ -185,10 +186,41 @@ function LoginPage({ onLogin, managedUsers }: { onLogin: (u: User) => void; mana
 // MAIN APP
 // ============================================================
 export default function App() {
-  // Load from LocalStorage on first render
   const saved = loadFromStorage();
   const [user, setUser] = useState<User | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true); // 🆕
   const [page, setPage] = useState("dashboard");
+  const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || INIT_VENDORS);
+  const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || INIT_TRANSACTIONS);
+  const [bills, setBills] = useState<Bill[]>(saved?.bills || INIT_BILLS);
+  const [wallet, setWallet] = useState<WalletEntry[]>(saved?.wallet || INIT_WALLET);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(saved?.managedUsers || []);
+
+  // 🆕 Google Sheets Initial Load + Auto-Sync
+  useEffect(() => {
+    async function initialize() {
+      try {
+        await loadFromSheets();
+        const reloaded = loadFromStorage();
+        
+        if (reloaded) {
+          setVendors(reloaded.vendors || []);
+          setTransactions(reloaded.transactions || []);
+          setBills(reloaded.bills || []);
+          setWallet(reloaded.wallet || []);
+          setManagedUsers(reloaded.managedUsers || []);
+        }
+      } catch (err) {
+        console.log('Initial load failed, using localStorage:', err);
+      }
+      
+      setIsInitializing(false);
+      startAutoSync(5); // Auto-sync every 5 minutes
+    }
+    
+    initialize();
+  }, []);
   const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || INIT_VENDORS);
   const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || INIT_TRANSACTIONS);
   const [bills, setBills] = useState<Bill[]>(saved?.bills || INIT_BILLS);
@@ -198,11 +230,12 @@ export default function App() {
 
   // Auto-save to LocalStorage whenever data changes
   const saveData = useCallback((
-    v: Vendor[], t: Transaction[], b: Bill[], w: WalletEntry[], u: ManagedUser[]
-  ) => {
-    saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u });
-  }, []);
-
+  v: Vendor[], t: Transaction[], b: Bill[], w: WalletEntry[], u: ManagedUser[]
+) => {
+  saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u });
+  // 🆕 Background sync to Google Sheets
+  saveToSheets().catch(err => console.log('Background sync failed:', err));
+}, []);
   // Wallet helpers
   const getWalletBalance = useCallback(() => {
     if (wallet.length === 0) return 0;
@@ -234,7 +267,22 @@ export default function App() {
     });
   }, []);
 
-  if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} managedUsers={managedUsers} />;
+ // 🆕 Loading screen during initialization
+if (isInitializing) {
+  return (
+    <div className="min-h-screen flex items-center justify-center" 
+      style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
+          style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
+        <p className="text-white font-semibold text-lg">Google Sheets-லிருந்து தரவு ஏற்றப்படுகிறது...</p>
+        <p className="text-gray-400 text-sm mt-2">சிறிது காத்திருக்கவும்</p>
+      </div>
+    </div>
+  );
+}
+
+if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} managedUsers={managedUsers} />;
 
   const district = user.role === "district" ? user.district! : "";
   const isAdmin = user.role === "admin";

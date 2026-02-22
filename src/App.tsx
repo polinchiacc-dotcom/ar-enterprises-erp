@@ -96,32 +96,9 @@ const genId = (prefix: string) => prefix + Math.random().toString(36).substr(2,7
 // ============================================================
 // INITIAL DATA
 // ============================================================
-const INIT_VENDORS: Vendor[] = [
-  { id: "V001", vendorCode: "ALB-V001", vendorName: "Sri Balaji Hardwares", district: "Chennai" },
-  { id: "V002", vendorCode: "CBE-V001", vendorName: "Coimbatore Traders", district: "Coimbatore" },
-];
-
-const _INIT_WALLET_BALANCE = 500000; void _INIT_WALLET_BALANCE;
-const INIT_WALLET: WalletEntry[] = [
-  { id: "W001", date: "2025-04-01", description: "Initial Investment", debit: 0, credit: 500000, balance: 500000, type: "manual" },
-  // 🔒 AR_WALLET_CALC_FINAL_LOCKED — Step 1: Advance ₹5,000 debit for TXN-CHE-001
-  { id: "W002", date: "2025-04-01", description: "Advance Paid — Sri Balaji Hardwares (TXN-CHE-001)", txnId: "TXN-CHE-001", debit: 5000, credit: 0, balance: 495000, type: "advance" }
-];
-
-const INIT_TRANSACTIONS: Transaction[] = [
-  {
-    id: "T001", txnId: "TXN-CHE-001", district: "Chennai",
-    vendorCode: "ALB-V001", vendorName: "Sri Balaji Hardwares",
-    financialYear: "2025-26", month: "February",
-    expectedAmount: 300950, advanceAmount: 5000,
-    gstPercent: 4,
-    gstAmount: round2(300950 * 4 / 100),
-    gstBalance: round2(300950 * 4 / 100 - 5000),
-    billsReceived: 0, remainingExpected: 300950,
-    status: "Open", closedByDistrict: false, confirmedByAdmin: false, profit: 0
-  }
-];
-
+const INIT_VENDORS: Vendor[] = [];
+const INIT_WALLET: WalletEntry[] = [];
+const INIT_TRANSACTIONS: Transaction[] = [];
 const INIT_BILLS: Bill[] = [];
 
 // ============================================================
@@ -333,7 +310,6 @@ export default function App() {
             transactions={myTxns} vendors={myVendors} bills={myBills}
             onAdd={(txn, advance) => {
               setTransactions(prev => [...prev, txn]);
-              // 🔒 AR_WALLET_CALC_FINAL_LOCKED Step 1: Advance → Debit immediately
               if (advance > 0) {
                 addWalletEntry(`Advance Paid — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
               }
@@ -341,7 +317,6 @@ export default function App() {
             onClose={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
               if (!txn) return;
-              // 🔒 AR_WALLET_CALC_FINAL_LOCKED Step 2: GST Balance Debit
               const gstBal = round2(txn.gstAmount - txn.advanceAmount);
               if (gstBal > 0) {
                 addWalletEntry(`GST Balance Debit — ${txn.vendorName} (${txnId})`, gstBal, 0, "gst", txnId);
@@ -350,6 +325,8 @@ export default function App() {
                 ? { ...t, status: "PendingClose", closedByDistrict: true, remainingExpected: 0 }
                 : t));
             }}
+            onEdit={(updated) => setTransactions(prev => prev.map(t => t.txnId === updated.txnId ? updated : t))}
+            onDeleteTxn={(txnId) => setTransactions(prev => prev.filter(t => t.txnId !== txnId))}
           />
         )}
         {page === "bills" && (
@@ -370,6 +347,7 @@ export default function App() {
                 return { ...t, billsReceived: round2(billsReceived), remainingExpected: remaining };
               }));
             }}
+            onEditBill={(updated) => setBills(prev => prev.map(b => b.id === updated.id ? updated : b))}
             onDelete={(billId) => {
               const bill = bills.find(b => b.id === billId);
               if (!bill) return;
@@ -578,6 +556,10 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
   { isAdmin: boolean; district: string; vendors: Vendor[]; onAdd: (v: Vendor) => void; onDelete: (id: string) => void; }) {
   const [showForm, setShowForm] = useState(false);
   const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
+  const [editVendor, setEditVendor] = useState<Vendor | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [name, setName] = useState("");
   const [dist, setDist] = useState(isAdmin ? "" : district);
   const [mobile, setMobile] = useState("");
@@ -592,6 +574,10 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
     v.vendorCode.toLowerCase().includes(search.toLowerCase()) ||
     (v.mobile || "").includes(search)
   );
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const selectAll = () => setSelectedIds(filtered.map(v => v.id));
+  const clearSelect = () => setSelectedIds([]);
 
   // Auto-generate smart vendor code
   const autoCode = dist && bizType && regYear ? genVendorCode(dist, bizType, regYear, vendors) : "";
@@ -609,13 +595,21 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold text-gray-800">🏢 Vendor Management</h1>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-          + New Vendor
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          {selectedIds.length > 0 && (
+            <button onClick={() => setConfirmBulkDelete(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
+              🗑️ Delete Selected ({selectedIds.length})
+            </button>
+          )}
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+            + New Vendor
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -701,6 +695,9 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
+                <th className="px-3 py-3">
+                  <input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelect()} className="rounded" />
+                </th>
                 {["Vendor Code","Vendor Name","Mobile","Business","District","GST No","Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
@@ -708,7 +705,10 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(v => (
-                <tr key={v.id} className="hover:bg-gray-50">
+                <tr key={v.id} className={`hover:bg-gray-50 ${selectedIds.includes(v.id) ? "bg-blue-50" : ""}`}>
+                  <td className="px-3 py-3">
+                    <input type="checkbox" checked={selectedIds.includes(v.id)} onChange={() => toggleSelect(v.id)} className="rounded" />
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-blue-700 whitespace-nowrap">{v.vendorCode}</td>
                   <td className="px-4 py-3 font-medium text-gray-800">{v.vendorName}</td>
                   <td className="px-4 py-3 text-gray-600">{v.mobile || "—"}</td>
@@ -722,7 +722,8 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <button onClick={() => setViewVendor(v)} className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">👁️</button>
-                      <button onClick={() => onDelete(v.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
+                      <button onClick={() => setEditVendor({...v})} className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
+                      <button onClick={() => setConfirmDeleteId(v.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -761,6 +762,80 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
           </div>
         </div>
       )}
+
+      {/* Edit Vendor Modal */}
+      {editVendor && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800">✏️ Vendor Edit</h3>
+              <button onClick={() => setEditVendor(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              {[
+                ["Vendor Name", "vendorName", "text"],
+                ["Mobile", "mobile", "text"],
+                ["GST Number", "gstNo", "text"],
+                ["Address", "address", "text"],
+              ].map(([label, field, type]) => (
+                <div key={field}>
+                  <label className="text-xs text-gray-500 mb-1 block">{label}</label>
+                  <input type={type} value={(editVendor as unknown as Record<string,string>)[field] || ""}
+                    onChange={e => setEditVendor({...editVendor, [field as keyof Vendor]: e.target.value} as Vendor)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+                </div>
+              ))}
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Business Type</label>
+                <select value={editVendor.businessType || ""} onChange={e => setEditVendor({...editVendor, businessType: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
+                  {BUSINESS_TYPES.map(b => <option key={b}>{b}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => { onDelete(editVendor.id); onAdd({...editVendor, id: genId("V")}); setEditVendor(null); }}
+                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
+                  💾 Save
+                </button>
+                <button onClick={() => setEditVendor(null)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Delete உறுதிப்படுத்தல்</h3>
+            <p className="text-sm text-gray-600 mb-4">இந்த Vendor-ஐ delete செய்கிறீர்களா?</p>
+            <div className="flex gap-2">
+              <button onClick={() => { onDelete(confirmDeleteId); setConfirmDeleteId(null); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
+              <button onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirm */}
+      {confirmBulkDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedIds.length} Vendors</h3>
+            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedIds.length} vendors-ஐ delete செய்கிறீர்களா?</p>
+            <div className="flex gap-2">
+              <button onClick={() => { selectedIds.forEach(id => onDelete(id)); setSelectedIds([]); setConfirmBulkDelete(false); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
+              <button onClick={() => setConfirmBulkDelete(false)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -768,8 +843,8 @@ function VendorsPage({ isAdmin, district, vendors, onAdd, onDelete }:
 // ============================================================
 // TRANSACTIONS PAGE
 // ============================================================
-function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onAdd, onClose }:
-  { isAdmin: boolean; district: string; transactions: Transaction[]; vendors: Vendor[]; bills: Bill[]; onAdd: (t: Transaction, advance: number) => void; onClose: (id: string) => void; }) {
+function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onAdd, onClose, onEdit, onDeleteTxn }:
+  { isAdmin: boolean; district: string; transactions: Transaction[]; vendors: Vendor[]; bills: Bill[]; onAdd: (t: Transaction, advance: number) => void; onClose: (id: string) => void; onEdit: (t: Transaction) => void; onDeleteTxn: (id: string) => void; }) {
   const [showForm, setShowForm] = useState(false);
   const [viewTxn, setViewTxn] = useState<Transaction | null>(null);
   const [vendorCode, setVendorCode] = useState("");
@@ -780,6 +855,10 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
   const [gstPct, setGstPct] = useState(4);
   const [search, setSearch] = useState("");
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
+  const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
+  const [confirmBulkDeleteTxn, setConfirmBulkDeleteTxn] = useState(false);
+  const [editTxn, setEditTxn] = useState<Transaction | null>(null);
+  const [confirmDeleteTxnId, setConfirmDeleteTxnId] = useState<string | null>(null);
 
   const myVendors = isAdmin ? vendors : vendors.filter(v => v.district === district);
   const filtered = transactions.filter(t =>
@@ -816,15 +895,23 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold text-gray-800">📋 Monthly Transactions</h1>
-        {!isAdmin && (
-          <button onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-            + New Transaction
-          </button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {selectedTxnIds.length > 0 && isAdmin && (
+            <button onClick={() => setConfirmBulkDeleteTxn(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
+              🗑️ Delete Selected ({selectedTxnIds.length})
+            </button>
+          )}
+          {!isAdmin && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+              + New Transaction
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -931,6 +1018,7 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
+                {isAdmin && <th className="px-3 py-3"><input type="checkbox" onChange={e => e.target.checked ? setSelectedTxnIds(filtered.map(t=>t.txnId)) : setSelectedTxnIds([])} className="rounded" /></th>}
                 {["TXN ID","Vendor","Month","Expected ₹",`${4}% GST Amt`,"Advance","Bills Received","Remaining ₹","GST Balance","Status","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
@@ -948,7 +1036,8 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                 const canClose = remaining <= 0 && t.status === "Open";
 
                 return (
-                  <tr key={t.txnId} className={`hover:bg-gray-50 ${t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
+                  <tr key={t.txnId} className={`hover:bg-gray-50 ${selectedTxnIds.includes(t.txnId) ? "bg-blue-50" : t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
+                    {isAdmin && <td className="px-3 py-3"><input type="checkbox" checked={selectedTxnIds.includes(t.txnId)} onChange={() => setSelectedTxnIds(prev => prev.includes(t.txnId) ? prev.filter(x=>x!==t.txnId) : [...prev, t.txnId])} className="rounded" /></td>}
                     <td className="px-3 py-3 font-mono text-xs text-blue-700 whitespace-nowrap">{t.txnId}</td>
                     <td className="px-3 py-3">
                       <p className="font-medium text-gray-800">{t.vendorName}</p>
@@ -983,6 +1072,12 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                       <div className="flex gap-1 flex-wrap">
                         <button onClick={() => setViewTxn(t)}
                           className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">👁️</button>
+                        {t.status === "Open" && (
+                          <button onClick={() => setEditTxn({...t})}
+                            className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
+                        )}
+                        <button onClick={() => setConfirmDeleteTxnId(t.txnId)}
+                          className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100">🗑️</button>
                         {!isAdmin && t.status === "Open" && (
                           <button onClick={() => setConfirmClose(t.txnId)}
                             className={`px-2 py-1 rounded text-xs font-bold text-white whitespace-nowrap
@@ -1033,6 +1128,113 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
         </div>
       </div>
 
+      {/* Bulk Delete Transaction Modal */}
+      {confirmBulkDeleteTxn && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedTxnIds.length} Transactions</h3>
+            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedTxnIds.length} transactions-ஐ delete செய்கிறீர்களா?</p>
+            <div className="flex gap-2">
+              <button onClick={() => { setConfirmBulkDeleteTxn(false); setSelectedTxnIds([]); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
+              <button onClick={() => setConfirmBulkDeleteTxn(false)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Transaction Modal */}
+      {editTxn && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800">✏️ Transaction Edit</h3>
+              <button onClick={() => setEditTxn(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Expected Amount (₹)</label>
+                  <input type="number" value={editTxn.expectedAmount}
+                    onChange={e => {
+                      const exp = parseFloat(e.target.value) || 0;
+                      const gstAmt = round2(exp * editTxn.gstPercent / 100);
+                      const gstBal = round2(gstAmt - editTxn.advanceAmount);
+                      setEditTxn({...editTxn, expectedAmount: exp, gstAmount: gstAmt, gstBalance: gstBal, remainingExpected: exp});
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Advance Amount (₹)</label>
+                  <input type="number" value={editTxn.advanceAmount}
+                    onChange={e => {
+                      const adv = parseFloat(e.target.value) || 0;
+                      const gstBal = round2(editTxn.gstAmount - adv);
+                      setEditTxn({...editTxn, advanceAmount: adv, gstBalance: gstBal});
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">GST %</label>
+                  <select value={editTxn.gstPercent}
+                    onChange={e => {
+                      const pct = parseFloat(e.target.value);
+                      const gstAmt = round2(editTxn.expectedAmount * pct / 100);
+                      const gstBal = round2(gstAmt - editTxn.advanceAmount);
+                      setEditTxn({...editTxn, gstPercent: pct, gstAmount: gstAmt, gstBalance: gstBal});
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
+                    {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Month</label>
+                  <select value={editTxn.month} onChange={e => setEditTxn({...editTxn, month: e.target.value})}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
+                    {MONTHS.map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* 🔒 Preview */}
+              <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
+                <p className="font-bold text-blue-800">🔒 AR_TRANSACTION_CALC_FINAL_LOCKED</p>
+                <p className="text-blue-700">GST: {fmt(editTxn.expectedAmount)} × {editTxn.gstPercent}% = <strong>{fmt(editTxn.gstAmount)}</strong></p>
+                <p className="text-blue-700">GST Balance: {fmt(editTxn.gstAmount)} − {fmt(editTxn.advanceAmount)} = <strong>{fmt(editTxn.gstBalance)}</strong></p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  onEdit(editTxn);
+                  setEditTxn(null);
+                }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
+                  💾 Save
+                </button>
+                <button onClick={() => setEditTxn(null)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Transaction Confirm */}
+      {confirmDeleteTxnId && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Transaction Delete</h3>
+            <p className="text-sm text-gray-600 mb-4">இந்த Transaction-ஐ delete செய்கிறீர்களா? அதன் Bills-உம் affected ஆகும்.</p>
+            <div className="flex gap-2">
+              <button onClick={() => {
+                onDeleteTxn(confirmDeleteTxnId!);
+                setConfirmDeleteTxnId(null);
+              }} className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
+              <button onClick={() => setConfirmDeleteTxnId(null)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Transaction Modal */}
       {viewTxn && (
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -1080,11 +1282,15 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
 // GST Amount = Bill Amount × GST%
 // Total Amount = Bill Amount × 1.18 (FIXED)
 // ============================================================
-function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, onAdd, onDelete }:
-  { isAdmin: boolean; district: string; bills: Bill[]; transactions: Transaction[]; vendors: Vendor[]; onAdd: (b: Bill) => void; onDelete: (id: string) => void; }) {
+function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, onAdd, onDelete, onEditBill }:
+  { isAdmin: boolean; district: string; bills: Bill[]; transactions: Transaction[]; vendors: Vendor[]; onAdd: (b: Bill) => void; onDelete: (id: string) => void; onEditBill: (b: Bill) => void; }) {
   void _vendors;
   const [showForm, setShowForm] = useState(false);
   const [viewBill, setViewBill] = useState<Bill | null>(null);
+  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+  const [confirmBulkDeleteBill, setConfirmBulkDeleteBill] = useState(false);
+  const [confirmDeleteBillId, setConfirmDeleteBillId] = useState<string | null>(null);
+  const [editBill, setEditBill] = useState<Bill | null>(null);
   const [txnId, setTxnId] = useState("");
   const [billNo, setBillNo] = useState("");
   const [billDate, setBillDate] = useState(new Date().toISOString().split("T")[0]);
@@ -1135,13 +1341,21 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
           <h1 className="text-xl font-bold text-gray-800">🧾 Bill Management</h1>
           <p className="text-xs text-gray-400 mt-0.5">🔒 GST = Bill×GST% | Total = Bill×1.18 (FIXED)</p>
         </div>
-        {!isAdmin && (
-          <button onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
-            + புதிய Bill
-          </button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {selectedBillIds.length > 0 && (
+            <button onClick={() => setConfirmBulkDeleteBill(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700">
+              🗑️ Delete Selected ({selectedBillIds.length})
+            </button>
+          )}
+          {!isAdmin && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
+              + புதிய Bill
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -1224,6 +1438,7 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
           <table className="w-full text-sm">
             <thead style={{ background: "#0a1628" }}>
               <tr>
+                <th className="px-3 py-3"><input type="checkbox" onChange={e => e.target.checked ? setSelectedBillIds(filtered.map(b=>b.id)) : setSelectedBillIds([])} className="rounded" /></th>
                 {["Bill ID","TXN ID","Vendor","Bill Number","Bill Date","Bill Amount","GST%","GST தொகை","Total Amount","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
                 ))}
@@ -1231,7 +1446,8 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(b => (
-                <tr key={b.id} className="hover:bg-gray-50">
+                <tr key={b.id} className={`hover:bg-gray-50 ${selectedBillIds.includes(b.id) ? "bg-blue-50" : ""}`}>
+                  <td className="px-3 py-3"><input type="checkbox" checked={selectedBillIds.includes(b.id)} onChange={() => setSelectedBillIds(prev => prev.includes(b.id) ? prev.filter(x=>x!==b.id) : [...prev, b.id])} className="rounded" /></td>
                   <td className="px-3 py-3 font-mono text-xs text-blue-700">{b.id}</td>
                   <td className="px-3 py-3 font-mono text-xs text-gray-600">{b.txnId}</td>
                   <td className="px-3 py-3">
@@ -1242,14 +1458,13 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
                   <td className="px-3 py-3 text-gray-600">{b.billDate}</td>
                   <td className="px-3 py-3 font-semibold text-gray-800">{fmt(b.billAmount)}</td>
                   <td className="px-3 py-3 text-gray-600">{b.gstPercent}%</td>
-                  {/* 🔒 GST = Bill × GST% */}
                   <td className="px-3 py-3 text-purple-700 font-semibold">{fmt(b.gstAmount)}</td>
-                  {/* 🔒 Total = Bill × 1.18 */}
                   <td className="px-3 py-3 text-green-700 font-semibold">{fmt(b.totalAmount)}</td>
                   <td className="px-3 py-3">
                     <div className="flex gap-1">
                       <button onClick={() => setViewBill(b)} className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700">👁️</button>
-                      {!isAdmin && <button onClick={() => onDelete(b.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600">🗑️</button>}
+                      <button onClick={() => setEditBill({...b})} className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100">✏️</button>
+                      <button onClick={() => setConfirmDeleteBillId(b.id)} className="px-2 py-1 rounded text-xs bg-red-50 text-red-600">🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -1271,6 +1486,100 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors: _vendors, 
           {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No bills found</p>}
         </div>
       </div>
+
+      {/* Delete Bill Confirm */}
+      {confirmDeleteBillId && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bill Delete உறுதிப்படுத்தல்</h3>
+            <p className="text-sm text-gray-600 mb-4">இந்த Bill-ஐ delete செய்கிறீர்களா? Transaction recalculate ஆகும்.</p>
+            <div className="flex gap-2">
+              <button onClick={() => { onDelete(confirmDeleteBillId); setConfirmDeleteBillId(null); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete</button>
+              <button onClick={() => setConfirmDeleteBillId(null)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Bills */}
+      {confirmBulkDeleteBill && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="font-bold text-gray-800 mb-2">🗑️ Bulk Delete — {selectedBillIds.length} Bills</h3>
+            <p className="text-sm text-gray-600 mb-4">தேர்வு செய்த {selectedBillIds.length} bills-ஐ delete செய்கிறீர்களா?</p>
+            <div className="flex gap-2">
+              <button onClick={() => { selectedBillIds.forEach(id => onDelete(id)); setSelectedBillIds([]); setConfirmBulkDeleteBill(false); }}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-red-600">🗑️ Delete All</button>
+              <button onClick={() => setConfirmBulkDeleteBill(false)}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Bill Modal — 🔒 AR_BILL_CALC_FINAL_LOCKED */}
+      {editBill && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800">✏️ Bill Edit</h3>
+              <button onClick={() => setEditBill(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Bill Number</label>
+                <input value={editBill.billNumber} onChange={e => setEditBill({...editBill, billNumber: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Bill Date</label>
+                <input type="date" value={editBill.billDate} onChange={e => setEditBill({...editBill, billDate: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Bill Amount (Taxable ₹)</label>
+                <input type="number" value={editBill.billAmount}
+                  onChange={e => {
+                    const amt = parseFloat(e.target.value) || 0;
+                    // 🔒 AR_BILL_CALC_FINAL_LOCKED
+                    const gstAmt = round2(amt * editBill.gstPercent / 100);
+                    const total = round2(amt * BILL_TOTAL_RATE);
+                    setEditBill({...editBill, billAmount: amt, gstAmount: gstAmt, totalAmount: total});
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">GST %</label>
+                <select value={editBill.gstPercent}
+                  onChange={e => {
+                    const pct = parseFloat(e.target.value);
+                    const gstAmt = round2(editBill.billAmount * pct / 100);
+                    setEditBill({...editBill, gstPercent: pct, gstAmount: gstAmt});
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
+                  {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
+                </select>
+              </div>
+              {/* 🔒 Preview */}
+              <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
+                <p className="font-bold text-blue-800">🔒 AR_BILL_CALC_FINAL_LOCKED</p>
+                <p className="text-blue-700">GST: {fmt(editBill.billAmount)} × {editBill.gstPercent}% = <strong>{fmt(editBill.gstAmount)}</strong></p>
+                <p className="text-blue-700">Total: {fmt(editBill.billAmount)} × 18% = <strong>{fmt(editBill.totalAmount)}</strong></p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { onEditBill(editBill); setEditBill(null); }}
+                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "#16a34a" }}>
+                  💾 Save
+                </button>
+                <button onClick={() => setEditBill(null)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* View Bill Modal */}
       {viewBill && (

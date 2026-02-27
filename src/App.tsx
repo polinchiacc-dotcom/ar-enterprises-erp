@@ -93,6 +93,7 @@ const saveToStorage = (data: {
 }) => {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(data));
+    console.log("✅ Data saved to localStorage");
   } catch (e) { console.error("Storage save error:", e); }
 };
 
@@ -236,6 +237,101 @@ export default function App() {
     });
   }, []);
 
+  // ============================================================
+  // 🔥 FIXED: handleConfirmClose with all protections
+  // ============================================================
+  const handleConfirmClose = useCallback((txnId: string) => {
+    const txn = transactions.find(t => t.txnId === txnId);
+    
+    // 🛡️ Protection 1: Transaction not found
+    if (!txn) {
+      console.log("❌ Transaction not found:", txnId);
+      return;
+    }
+
+    // 🛡️ Protection 2: Already confirmed - PREVENT DUPLICATE
+    if (txn.confirmedByAdmin || txn.status === "Closed") {
+      console.log("⚠️ Transaction already confirmed, skipping duplicate!", txnId);
+      alert("⚠️ இந்த Transaction ஏற்கனவே Closed & Confirmed ஆகிவிட்டது!");
+      return;
+    }
+
+    // 🛡️ Protection 3: Wallet already has profit entry for this txn
+    const existingProfitEntry = wallet.find(
+      w => w.txnId === txnId && w.type === "profit"
+    );
+    if (existingProfitEntry) {
+      console.log("⚠️ Profit already credited for this transaction!", txnId);
+      alert("⚠️ இந்த Transaction-க்கு Profit ஏற்கனவே Credit ஆகிவிட்டது!");
+      // Fix the transaction status if it's stuck
+      const fixedTransactions = transactions.map(t =>
+        t.txnId === txnId
+          ? { ...t, status: "Closed" as const, confirmedByAdmin: true }
+          : t
+      );
+      setTransactions(fixedTransactions);
+      saveToStorage({
+        vendors,
+        transactions: fixedTransactions,
+        bills,
+        wallet,
+        managedUsers
+      });
+      return;
+    }
+
+    // ✅ Safe to proceed - Calculate profit
+    const profit = round2(txn.expectedAmount * PROFIT_RATE);
+    console.log(`✅ Processing Confirm Close: ${txnId}, Profit: ₹${profit}`);
+
+    // ✅ Create new wallet entry
+    const lastBal = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
+    const newBal = round2(lastBal + profit);
+    const walletEntry: WalletEntry = {
+      id: genId("W"),
+      date: new Date().toISOString().split("T")[0],
+      description: `8% Profit Credit — ${txn.vendorName} (${txnId})`,
+      txnId,
+      debit: 0,
+      credit: profit,
+      balance: newBal,
+      type: "profit"
+    };
+
+    // ✅ Update transactions
+    const updatedTransactions = transactions.map(t =>
+      t.txnId === txnId
+        ? { ...t, status: "Closed" as const, confirmedByAdmin: true, profit }
+        : t
+    );
+
+    // ✅ Update wallet
+    const updatedWallet = [...wallet, walletEntry];
+
+    // ✅ Update state
+    setTransactions(updatedTransactions);
+    setWallet(updatedWallet);
+
+    // 🛡️ Protection 4: IMMEDIATE SAVE to localStorage
+    saveToStorage({
+      vendors,
+      transactions: updatedTransactions,
+      bills,
+      wallet: updatedWallet,
+      managedUsers
+    });
+    console.log("✅ Data saved to localStorage IMMEDIATELY after confirm");
+
+    // 🛡️ Protection 5: Sync to Google Sheets
+    saveToSheets().then(() => {
+      console.log("✅ Data synced to Google Sheets");
+    }).catch(err => {
+      console.log("⚠️ Google Sheets sync pending:", err);
+    });
+
+    console.log(`🎉 Transaction ${txnId} closed successfully! Profit: ₹${profit}`);
+  }, [transactions, wallet, vendors, bills, managedUsers]);
+
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center" 
@@ -330,15 +426,7 @@ export default function App() {
             transactions={myTxns} vendors={myVendors} bills={myBills}
             wallet={wallet} walletBalance={getWalletBalance()}
             pendingClose={pendingClose}
-            onConfirmClose={(txnId) => {
-              const txn = transactions.find(t => t.txnId === txnId);
-              if (!txn) return;
-              const profit = round2(txn.expectedAmount * PROFIT_RATE);
-              addWalletEntry(`8% Profit Credit — ${txn.vendorName} (${txnId})`, 0, profit, "profit", txnId);
-              setTransactions(prev => prev.map(t => t.txnId === txnId
-                ? { ...t, status: "Closed", confirmedByAdmin: true, profit }
-                : t));
-            }}
+            onConfirmClose={handleConfirmClose}
           />
         )}
         {page === "vendors" && (
@@ -510,6 +598,7 @@ export default function App() {
     </div>
   );
 }
+
 // ============================================================
 // DASHBOARD PAGE
 // ============================================================
@@ -1031,6 +1120,7 @@ function VendorsPage({ isAdmin, district, vendors, allVendors, onAdd, onUpdate, 
     </div>
   );
 }
+
 // ============================================================
 // TRANSACTIONS PAGE - ENHANCED
 // ============================================================
@@ -1095,7 +1185,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
 
   const handleEditSave = () => {
     if (!editTxn) return;
-    // Recalculate GST values
     const gstAmt = round2(editTxn.expectedAmount * editTxn.gstPercent / 100);
     const gstBal = round2(gstAmt - editTxn.advanceAmount);
     onUpdate({ ...editTxn, gstAmount: gstAmt, gstBalance: gstBal });
@@ -1131,7 +1220,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
   const previewGST = expectedAmt ? round2(parseFloat(expectedAmt) * gstPct / 100) : 0;
   const previewBalance = previewGST - (parseFloat(advanceAmt) || 0);
 
-  // Footer Totals
   const totalExpected = filtered.reduce((s, t) => s + t.expectedAmount, 0);
   const totalGST = filtered.reduce((s, t) => s + t.gstAmount, 0);
   const totalAdvance = filtered.reduce((s, t) => s + t.advanceAmount, 0);
@@ -1370,7 +1458,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                 );
               })}
             </tbody>
-            {/* Footer Totals */}
             {filtered.length > 0 && (
               <tfoot style={{ background: "#1a2f5e" }}>
                 <tr>
@@ -1492,7 +1579,6 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
                 </div>
               </div>
               
-              {/* Preview */}
               <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
                 <p className="font-bold text-blue-800">🔒 Calculated Values Preview</p>
                 <p className="text-blue-700">GST: {fmt(editTxn.expectedAmount)} × {editTxn.gstPercent}% = <strong>{fmt(round2(editTxn.expectedAmount * editTxn.gstPercent / 100))}</strong></p>
@@ -1578,6 +1664,7 @@ function TransactionsPage({ isAdmin, district, transactions, vendors, bills, onA
     </div>
   );
 }
+
 // ============================================================
 // BILLS PAGE - ENHANCED WITH BULK ADD
 // ============================================================
@@ -1622,7 +1709,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
   const clearSelect = () => setSelectedIds([]);
   const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
 
-  // Single Add
   const handleAdd = () => {
     if (!txnId || !billAmt || !billNo) return;
     const txn = transactions.find(t => t.txnId === txnId);
@@ -1639,7 +1725,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     setBillNo(""); setBillAmt(""); setShowForm(false);
   };
 
-  // Initialize Bulk Add Form
   const initBulkAdd = () => {
     if (!bulkAddTxnId || bulkAddCount < 1) return;
     const emptyBills = Array.from({ length: bulkAddCount }, () => ({
@@ -1651,7 +1736,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     setBulkBills(emptyBills);
   };
 
-  // Handle Bulk Add Submit
   const handleBulkAddSubmit = () => {
     const txn = transactions.find(t => t.txnId === bulkAddTxnId);
     if (!txn) return;
@@ -1688,12 +1772,10 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     setBulkAddCount(5);
   };
 
-  // Update bulk bill row
   const updateBulkBill = (index: number, field: string, value: string | number) => {
     setBulkBills(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
   };
 
-  // Edit Save
   const handleEditSave = () => {
     if (!editBill) return;
     const gstAmt = round2(editBill.billAmount * editBill.gstPercent / 100);
@@ -1702,7 +1784,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     setEditBill(null);
   };
 
-  // Bulk Edit
   const handleBulkEdit = () => {
     if (selectedIds.length === 0 || !bulkEditValue) return;
     selectedIds.forEach(id => {
@@ -1722,24 +1803,20 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     setBulkEditValue("");
   };
 
-  // Bulk Delete
   const handleBulkDelete = () => {
     onBulkDelete(selectedIds);
     setSelectedIds([]);
     setConfirmBulkDelete(false);
   };
 
-  // Preview calculations
   const previewBillAmt = parseFloat(billAmt) || 0;
   const previewGST = round2(previewBillAmt * gstPct / 100);
   const previewTotal = round2(previewBillAmt * BILL_TOTAL_RATE);
 
-  // Footer Totals
   const totalBillAmt = filtered.reduce((s, b) => s + b.billAmount, 0);
   const totalGST = filtered.reduce((s, b) => s + b.gstAmount, 0);
   const totalAmt = filtered.reduce((s, b) => s + b.totalAmount, 0);
 
-  // Bulk Add Preview Totals
   const bulkPreviewTotal = bulkBills.reduce((s, b) => {
     const amt = parseFloat(b.billAmount) || 0;
     return s + round2(amt * BILL_TOTAL_RATE);
@@ -1782,7 +1859,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
         </div>
       </div>
 
-      {/* Bulk Edit Panel */}
       {bulkEditMode && (
         <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-3">
           <div className="flex items-center justify-between">
@@ -1821,7 +1897,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
         </div>
       )}
 
-      {/* Bulk Add Panel */}
       {showBulkAdd && (
         <div className="bg-purple-50 rounded-xl p-5 border border-purple-200 space-y-4">
           <div className="flex items-center justify-between">
@@ -1829,7 +1904,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
             <button onClick={() => { setShowBulkAdd(false); setBulkBills([]); }} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
           </div>
 
-          {/* Step 1: Select Transaction & Count */}
           {bulkBills.length === 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -1859,7 +1933,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
             </div>
           )}
 
-          {/* Step 2: Fill Bills */}
           {bulkBills.length > 0 && (
             <>
               <div className="bg-white rounded-lg p-3 border border-purple-100">
@@ -1955,7 +2028,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
         </div>
       )}
 
-      {/* Single Add Form */}
       {showForm && (
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-4">
           <h2 className="font-bold text-gray-800">🧾 புதிய GST Bill சேர்</h2>
@@ -2010,7 +2082,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search bills..."
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 bg-white" />
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -2049,7 +2120,8 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
                     <div className="flex gap-1">
                       <button onClick={() => setViewBill(b)} 
                         className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100" title="View">👁️</button>
-                      <button onClick={() => setEditBill({...b})} 
+                      <button onClick={() => setEditB
+                                              <button onClick={() => setEditBill({...b})} 
                         className="px-2 py-1 rounded text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100" title="Edit">✏️</button>
                       <button onClick={() => setConfirmDeleteId(b.id)} 
                         className="px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100" title="Delete">🗑️</button>
@@ -2058,7 +2130,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
                 </tr>
               ))}
             </tbody>
-            {/* Footer Totals */}
             {filtered.length > 0 && (
               <tfoot style={{ background: "#1a2f5e" }}>
                 <tr>
@@ -2149,7 +2220,6 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
                 </select>
               </div>
               
-              {/* Preview */}
               <div className="p-3 rounded-lg text-xs space-y-1" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
                 <p className="font-bold text-blue-800">🔒 Calculated Values</p>
                 <p className="text-blue-700">GST: {fmt(editBill.billAmount)} × {editBill.gstPercent}% = <strong>{fmt(round2(editBill.billAmount * editBill.gstPercent / 100))}</strong></p>
@@ -2203,6 +2273,7 @@ function BillsPage({ isAdmin, district, bills, transactions, vendors, onAdd, onB
     </div>
   );
 }
+
 // ============================================================
 // WALLET PAGE
 // ============================================================
@@ -2544,7 +2615,7 @@ function ReportsPage({ transactions, bills, vendors, isAdmin: _isAdmin, district
 }
 
 // ============================================================
-// ANALYTICS PAGE - ENHANCED
+// ANALYTICS PAGE
 // ============================================================
 function AnalyticsPage({ transactions, bills, vendors, wallet }:
   { transactions: Transaction[]; bills: Bill[]; vendors: Vendor[]; wallet: WalletEntry[]; }) {
@@ -2557,7 +2628,6 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
   const totalAdvance = wallet.filter(w => w.type === "advance").reduce((s, w) => s + w.debit, 0);
   const walletBalance = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
 
-  // District-wise summary
   const districtSummary = DISTRICTS.map(d => {
     const dTxns = transactions.filter(t => t.district === d);
     const dBills = bills.filter(b => b.district === d);
@@ -2572,7 +2642,6 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
     };
   }).filter(d => d.txnCount > 0).sort((a, b) => b.expected - a.expected);
 
-  // GST Rate-wise summary
   const gstRateSummary = GST_RATES.map(r => ({
     rate: r,
     count: transactions.filter(t => t.gstPercent === r).length,
@@ -2580,28 +2649,6 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
     gstAmount: transactions.filter(t => t.gstPercent === r).reduce((s, t) => s + t.gstAmount, 0),
   })).filter(r => r.count > 0);
 
-  // Vendor-wise GST summary
-  const vendorGSTSummary = vendors.map(v => {
-    const vTxns = transactions.filter(t => t.vendorCode === v.vendorCode);
-    return {
-      vendor: v,
-      txnCount: vTxns.length,
-      expected: vTxns.reduce((s, t) => s + t.expectedAmount, 0),
-      gst: vTxns.reduce((s, t) => s + t.gstAmount, 0),
-      advance: vTxns.reduce((s, t) => s + t.advanceAmount, 0),
-      gstBalance: vTxns.reduce((s, t) => s + t.gstBalance, 0),
-    };
-  }).filter(v => v.txnCount > 0).sort((a, b) => b.gst - a.gst);
-
-  // Wallet movement breakdown
-  const walletBreakdown = {
-    manual: { credit: wallet.filter(w => w.type === "manual").reduce((s, w) => s + w.credit, 0), debit: wallet.filter(w => w.type === "manual").reduce((s, w) => s + w.debit, 0) },
-    advance: { credit: 0, debit: wallet.filter(w => w.type === "advance").reduce((s, w) => s + w.debit, 0) },
-    gst: { credit: 0, debit: wallet.filter(w => w.type === "gst").reduce((s, w) => s + w.debit, 0) },
-    profit: { credit: wallet.filter(w => w.type === "profit").reduce((s, w) => s + w.credit, 0), debit: 0 },
-  };
-
-  // CSV Export Functions
   const exportTransactionsCSV = () => {
     const rows = [
       ["TXN ID", "District", "Vendor", "Month", "FY", "Expected", "Advance", "GST%", "GST Amt", "Bills", "Remaining", "Profit", "Status"],
@@ -2627,28 +2674,6 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
     const a = document.createElement("a"); a.href = url; a.download = "AR_Bills.csv"; a.click();
   };
 
-  const exportVendorsCSV = () => {
-    const rows = [
-      ["Vendor Code", "Vendor Name", "District", "Mobile", "Business Type", "GST No", "Address"],
-      ...vendors.map(v => [v.vendorCode, v.vendorName, v.district, v.mobile || "", v.businessType || "", v.gstNo || "", v.address || ""])
-    ];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "AR_Vendors.csv"; a.click();
-  };
-
-  const exportWalletCSV = () => {
-    const rows = [
-      ["Date", "Description", "Type", "Debit", "Credit", "Balance"],
-      ...wallet.map(w => [w.date, w.description, w.type, w.debit, w.credit, w.balance])
-    ];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "AR_Wallet.csv"; a.click();
-  };
-
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -2661,16 +2686,11 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
             className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600">📥 Txn CSV</button>
           <button onClick={exportBillsCSV}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600">📥 Bills CSV</button>
-          <button onClick={exportVendorsCSV}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-green-600">📥 Vendors CSV</button>
-          <button onClick={exportWalletCSV}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-orange-600">📥 Wallet CSV</button>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 flex-wrap">
-        {["overview", "district-wise", "gst-analysis", "vendor-gst", "wallet-analysis"].map(t => (
+        {["overview", "district-wise", "gst-analysis"].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize ${tab === t ? "text-white" : "text-gray-600 bg-white border border-gray-200"}`}
             style={tab === t ? { background: "#1a2f5e" } : {}}>
@@ -2679,7 +2699,6 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
         ))}
       </div>
 
-      {/* OVERVIEW */}
       {tab === "overview" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2699,53 +2718,11 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
               </div>
             ))}
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">Transaction Status</h2>
-              {[
-                ["Open", transactions.filter(t => t.status === "Open").length, "#2563eb", "bg-blue-100"],
-                ["Pending Close 🔴", transactions.filter(t => t.status === "PendingClose").length, "#dc2626", "bg-red-100"],
-                ["Closed ✅", transactions.filter(t => t.status === "Closed").length, "#16a34a", "bg-green-100"],
-              ].map(([l, v, c, bg]) => (
-                <div key={l as string} className="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ background: c as string }}></div>
-                    <span className="text-sm text-gray-700">{l as string}</span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${bg as string}`} style={{ color: c as string }}>
-                    {v as number}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <h2 className="font-bold text-gray-800 mb-3">Financial Summary</h2>
-              {[
-                ["Expected Amount", fmt(totalExpected)],
-                ["Bills Received (Taxable)", fmt(totalBillsAmt)],
-                ["Total GST Collected", fmt(totalGST)],
-                ["Total Advance Paid", fmt(totalAdvance)],
-                ["8% Service Profit", fmt(totalProfit)],
-                ["Net Wallet Position", fmt(walletBalance)],
-              ].map(([l, v]) => (
-                <div key={l} className="flex justify-between py-2 border-b border-gray-50 last:border-0 text-sm">
-                  <span className="text-gray-500">{l}</span>
-                  <span className="font-semibold text-gray-800">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
-      {/* DISTRICT WISE */}
       {tab === "district-wise" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="font-bold text-gray-800">District-wise Financial Summary</h2>
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead style={{ background: "#0a1628" }}>
@@ -2775,142 +2752,38 @@ function AnalyticsPage({ transactions, bills, vendors, wallet }:
                   </tr>
                 ))}
               </tbody>
-              {districtSummary.length > 0 && (
-                <tfoot style={{ background: "#f8fafc" }}>
-                  <tr>
-                    <td colSpan={3} className="px-3 py-3 font-bold text-gray-800 text-xs">மொத்தம்</td>
-                    <td className="px-3 py-3 font-bold text-gray-800">{fmt(districtSummary.reduce((s, d) => s + d.expected, 0))}</td>
-                    <td className="px-3 py-3 font-bold text-purple-700">{fmt(districtSummary.reduce((s, d) => s + d.gst, 0))}</td>
-                    <td className="px-3 py-3 font-bold text-green-700">{fmt(districtSummary.reduce((s, d) => s + d.bills, 0))}</td>
-                    <td className="px-3 py-3 font-bold text-amber-600">{fmt(districtSummary.reduce((s, d) => s + d.profit, 0))}</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              )}
             </table>
             {districtSummary.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No district data</p>}
           </div>
         </div>
       )}
 
-      {/* GST ANALYSIS */}
       {tab === "gst-analysis" && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-4">GST Rate-wise Breakdown</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead style={{ background: "#7c3aed" }}>
-                  <tr>
-                    {["GST Rate", "Transactions", "Expected ₹", "GST Amount"].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-white">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {gstRateSummary.map(r => (
-                    <tr key={r.rate} className="hover:bg-purple-50">
-                      <td className="px-4 py-3">
-                        <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-bold">{r.rate}%</span>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-gray-800">{r.count}</td>
-                      <td className="px-4 py-3 text-gray-800">{fmt(r.expected)}</td>
-                      <td className="px-4 py-3 font-bold text-purple-700">{fmt(r.gstAmount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {gstRateSummary.length > 0 && (
-                  <tfoot style={{ background: "#f3e8ff" }}>
-                    <tr>
-                      <td className="px-4 py-3 font-bold text-purple-800">Total</td>
-                      <td className="px-4 py-3 font-bold text-purple-800">{gstRateSummary.reduce((s, r) => s + r.count, 0)}</td>
-                      <td className="px-4 py-3 font-bold text-purple-800">{fmt(gstRateSummary.reduce((s, r) => s + r.expected, 0))}</td>
-                      <td className="px-4 py-3 font-bold text-purple-800">{fmt(gstRateSummary.reduce((s, r) => s + r.gstAmount, 0))}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-              {gstRateSummary.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No GST data</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* VENDOR GST */}
-      {tab === "vendor-gst" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="font-bold text-gray-800">Vendor-wise GST Summary</h2>
-          </div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <h2 className="font-bold text-gray-800 mb-4">GST Rate-wise Breakdown</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead style={{ background: "#0a1628" }}>
+              <thead style={{ background: "#7c3aed" }}>
                 <tr>
-                  {["Vendor", "District", "Txns", "Expected ₹", "GST Amount", "Advance", "GST Balance"].map(h => (
-                    <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
+                  {["GST Rate", "Transactions", "Expected ₹", "GST Amount"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-white">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {vendorGSTSummary.slice(0, 20).map(v => (
-                  <tr key={v.vendor.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3 font-medium text-gray-800">{v.vendor.vendorName}</td>
-                    <td className="px-3 py-3 text-gray-600">{v.vendor.district}</td>
-                    <td className="px-3 py-3 text-center font-bold text-blue-700">{v.txnCount}</td>
-                    <td className="px-3 py-3">{fmt(v.expected)}</td>
-                    <td className="px-3 py-3 font-semibold text-purple-700">{fmt(v.gst)}</td>
-                    <td className="px-3 py-3 text-orange-600">{fmt(v.advance)}</td>
-                    <td className="px-3 py-3 text-red-600 font-semibold">{fmt(v.gstBalance)}</td>
+                {gstRateSummary.map(r => (
+                  <tr key={r.rate} className="hover:bg-purple-50">
+                    <td className="px-4 py-3">
+                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-bold">{r.rate}%</span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-gray-800">{r.count}</td>
+                    <td className="px-4 py-3 text-gray-800">{fmt(r.expected)}</td>
+                    <td className="px-4 py-3 font-bold text-purple-700">{fmt(r.gstAmount)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {vendorGSTSummary.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No vendor data</p>}
-          </div>
-        </div>
-      )}
-
-      {/* WALLET ANALYSIS */}
-      {tab === "wallet-analysis" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              ["Wallet Balance", fmt(walletBalance), "#c9a227"],
-              ["Total Credit", fmt(wallet.reduce((s, w) => s + w.credit, 0)), "#16a34a"],
-              ["Total Debit", fmt(wallet.reduce((s, w) => s + w.debit, 0)), "#dc2626"],
-              ["Total Entries", wallet.length.toString(), "#374151"],
-            ].map(([l, v, c]) => (
-              <div key={l} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                <p className="text-xs text-gray-500">{l}</p>
-                <p className="text-xl font-bold mt-1" style={{ color: c }}>{v}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-bold text-gray-800 mb-4">Wallet Movement Breakdown</h2>
-            <div className="space-y-3">
-              {[
-                { type: "manual", label: "💼 Manual/Investment", color: "#1a2f5e", bg: "#eff6ff" },
-                { type: "advance", label: "💸 Advance Payments", color: "#ea580c", bg: "#fff7ed" },
-                { type: "gst", label: "🏛️ GST Settlements", color: "#dc2626", bg: "#fef2f2" },
-                { type: "profit", label: "📈 8% Profit Credits", color: "#16a34a", bg: "#f0fdf4" },
-              ].map(({ type, label, color, bg }) => {
-                const data = walletBreakdown[type as keyof typeof walletBreakdown];
-                return (
-                  <div key={type} className="flex items-center justify-between p-4 rounded-lg" style={{ background: bg }}>
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color }}>{label}</p>
-                      <p className="text-xs text-gray-500">{wallet.filter(w => w.type === type).length} entries</p>
-                    </div>
-                    <div className="text-right">
-                      {data.debit > 0 && <p className="text-sm font-bold text-red-600">−{fmt(data.debit)}</p>}
-                      {data.credit > 0 && <p className="text-sm font-bold text-green-600">+{fmt(data.credit)}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {gstRateSummary.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">No GST data</p>}
           </div>
         </div>
       )}
@@ -3035,7 +2908,7 @@ function DistrictManagementPage({ districtUsers, onAddUser, onToggleUser }:
 }
 
 // ============================================================
-// USER MANAGEMENT PAGE - ENHANCED
+// USER MANAGEMENT PAGE
 // ============================================================
 function UserManagementPage({ districtUsers, onAddUser, onUpdateUser, onToggleUser, onDeleteUser, onBulkDelete }:
   { districtUsers: ManagedUser[]; onAddUser: (u: ManagedUser) => void; onUpdateUser: (u: ManagedUser) => void; onToggleUser: (id: string) => void; onDeleteUser: (id: string) => void; onBulkDelete: (ids: string[]) => void; }) {
@@ -3059,7 +2932,6 @@ function UserManagementPage({ districtUsers, onAddUser, onUpdateUser, onToggleUs
   const selectAll = () => setSelectedIds(filtered.map(u => u.id));
   const clearSelect = () => setSelectedIds([]);
   const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
-
   const toggleShowPass = (id: string) => setShowPassIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleAdd = () => {

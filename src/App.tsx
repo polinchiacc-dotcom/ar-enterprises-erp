@@ -326,13 +326,15 @@ const downloadBackup = (data: any) => {
   URL.revokeObjectURL(url);
 };
 
+import { hashPassword } from './utils/auth'; // or wherever your hash function is
+
 // ============================================================
 // DEFAULT ADMIN USER
 // ============================================================
 const DEFAULT_ADMIN: User = {
   id: "U001",
   username: "admin",
-  password: "Admin@123",
+  password: await hashPassword("Admin@123"), // Hash it!
   role: "admin",
   createdAt: new Date().toISOString(),
 };

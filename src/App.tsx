@@ -731,7 +731,7 @@ export default function App() {
     setPage("dashboard");
   };
 
-  // Loading screen
+    // Loading screen
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center" 
@@ -754,27 +754,12 @@ export default function App() {
   const district = user.role === "district" ? user.district! : "";
   const isAdmin = user.role === "admin";
 
-  // Filter data based on role
-  // ✅ CORRECT:
-const myVendors = useMemo(() => {
-  return isAdmin ? vendors : vendors.filter(v => v.district === district);
-}, [vendors, district, isAdmin]);
+  // Filter data based on role (simple - no useMemo)
+  const myVendors = isAdmin ? vendors : vendors.filter(v => v.district === district);
+  const myTxns = isAdmin ? transactions : transactions.filter(t => t.district === district);
+  const myBills = isAdmin ? bills : bills.filter(b => b.district === district);
+  const pendingClose = transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
 
-const myTxns = useMemo(() => {
-  return isAdmin ? transactions : transactions.filter(t => t.district === district);
-}, [transactions, district, isAdmin]);
-
-const myBills = useMemo(() => {
-  return isAdmin ? bills : bills.filter(b => b.district === district);
-}, [bills, district, isAdmin]);
-
-const pendingClose = useMemo(() => {
-  return transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
-}, [transactions]);
-  const pendingClose = useMemo(() =>
-    transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin),
-    [transactions]
-  );
   // Navigation items
   const navItems = isAdmin
     ? [
@@ -798,6 +783,7 @@ const pendingClose = useMemo(() => {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5", fontFamily: "'Segoe UI', sans-serif" }}>
+      {/* Rest of the component... */}
       {/* Sidebar */}
       <div className={`flex-shrink-0 transition-all duration-300 ${sidebarOpen ? "w-64" : "w-16"}`}
         style={{ 

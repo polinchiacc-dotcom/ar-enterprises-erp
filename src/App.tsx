@@ -3,7 +3,6 @@
 // ============================================================
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import * as Yup from "yup";
 import DOMPurify from "dompurify";
@@ -173,9 +172,21 @@ const decryptData = (encrypted: string): any => {
   }
 };
 
-// Password Hashing
-const hashPassword = (password: string): string => bcrypt.hashSync(password, 10);
-const verifyPassword = (password: string, hash: string): boolean => bcrypt.compareSync(password, hash);
+// ============================================================
+// PASSWORD HASHING (Browser-compatible)
+// ============================================================
+const hashPassword = (password: string): string => {
+  const hash = CryptoJS.SHA256(password + ENCRYPTION_KEY).toString();
+  return `$sha256$${hash}`;
+};
+
+const verifyPassword = (password: string, storedHash: string): boolean => {
+  if (storedHash.startsWith("$sha256$")) {
+    const hash = CryptoJS.SHA256(password + ENCRYPTION_KEY).toString();
+    return storedHash === `$sha256$${hash}`;
+  }
+  return password === storedHash;
+};
 
 // Session Management
 const generateDeviceId = (): string => {

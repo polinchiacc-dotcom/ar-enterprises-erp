@@ -1261,7 +1261,9 @@ export default function App() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `AR_Backup_${new Date().toISOString().split('T')[0]}.json`;
+             // ✅ Correct:
+const fileName = `AR_Backup_${new Date().toISOString().split("T")[0]}.json`;
+a.download = fileName;
               a.click();
 
               alert("✅ Backup downloaded!");

@@ -173,21 +173,16 @@ const decryptData = (encrypted: string): any => {
 };
 
 // ============================================================
-// PASSWORD HASHING (Browser-compatible)
+// PASSWORD FUNCTIONS - SIMPLE VERSION
 // ============================================================
 const hashPassword = (password: string): string => {
-  const hash = CryptoJS.SHA256(password + ENCRYPTION_KEY).toString();
-  return `$sha256$${hash}`;
+  return password; // No hashing for now - direct password
 };
 
 const verifyPassword = (password: string, storedHash: string): boolean => {
-  if (storedHash.startsWith("$sha256$")) {
-    const hash = CryptoJS.SHA256(password + ENCRYPTION_KEY).toString();
-    return storedHash === `$sha256$${hash}`;
-  }
-  return password === storedHash;
+  console.log("🔐 Verifying:", { password, storedHash }); // Debug log
+  return password === storedHash; // Direct comparison
 };
-
 // Session Management
 const generateDeviceId = (): string => {
   let deviceId = localStorage.getItem("AR_DEVICE_ID");
@@ -332,12 +327,12 @@ const downloadBackup = (data: any) => {
 };
 
 // ============================================================
-// INITIAL DEFAULT ADMIN (Hashed Password)
+// DEFAULT ADMIN USER
 // ============================================================
 const DEFAULT_ADMIN: User = {
   id: "U001",
   username: "admin",
-  password: "$sha256$" + CryptoJS.SHA256("Admin@123" + ENCRYPTION_KEY).toString(),
+  password: "Admin@123",
   role: "admin",
   createdAt: new Date().toISOString(),
 };
@@ -644,45 +639,50 @@ export default function App() {
     }
   }, [session, isAdmin, settings.autoBackupEnabled, settings.backupFrequencyDays]);
 
-  // ============================================================
-  // LOGIN HANDLER
-  // ============================================================
   const handleLogin = useCallback((username: string, password: string) => {
-    setLoginError("");
+  setLoginError("");
 
-    const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  console.log("🔍 Login attempt:", { username, password }); // Debug
+  console.log("👥 Available users:", users); // Debug
 
-    if (!foundUser) {
-      setLoginError("❌ User not found!");
-      logAudit("LOGIN", "User", "", null, { error: "user_not_found", username });
-      return;
-    }
+  const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
 
-    // Verify password (supports both hashed and plain for migration)
-    const isValid = foundUser.password.startsWith("$2")
-      ? verifyPassword(password, foundUser.password)
-      : foundUser.password === password;
+  if (!foundUser) {
+    console.log("❌ User not found"); // Debug
+    setLoginError("❌ User not found!");
+    logAudit("LOGIN", "User", "", null, { error: "user_not_found", username });
+    return;
+  }
 
-    if (!isValid) {
-      setLoginError("❌ Incorrect password!");
-      logAudit("LOGIN", "User", foundUser.id, null, { error: "invalid_password" });
-      return;
-    }
+  console.log("✅ User found:", foundUser); // Debug
+  console.log("🔐 Password check:", { 
+    input: password, 
+    stored: foundUser.password,
+    match: verifyPassword(password, foundUser.password)
+  }); // Debug
 
-    // Create session
-    const newSession = createSession(foundUser);
-    setSession(newSession);
-    saveSession(newSession);
+  const isValid = verifyPassword(password, foundUser.password);
 
-    // Update last login
-    setUsers(prev => prev.map(u =>
-      u.id === foundUser.id ? { ...u, lastLogin: new Date().toISOString() } : u
-    ));
+  if (!isValid) {
+    console.log("❌ Password incorrect"); // Debug
+    setLoginError("❌ Incorrect password!");
+    logAudit("LOGIN", "User", foundUser.id, null, { error: "invalid_password" });
+    return;
+  }
 
-    logAudit("LOGIN", "User", foundUser.id, null, { success: true });
-    setPage("dashboard");
-  }, [users, logAudit, saveSession]);
+  console.log("🎉 Login success!"); // Debug
 
+  const newSession = createSession(foundUser);
+  setSession(newSession);
+  saveSession(newSession);
+
+  setUsers(prev => prev.map(u =>
+    u.id === foundUser.id ? { ...u, lastLogin: new Date().toISOString() } : u
+  ));
+
+  logAudit("LOGIN", "User", foundUser.id, null, { success: true });
+  setPage("dashboard");
+}, [users, logAudit, saveSession]);
   // ============================================================
   // LOGOUT HANDLER
   // ============================================================

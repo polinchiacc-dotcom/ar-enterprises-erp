@@ -755,21 +755,22 @@ export default function App() {
   const isAdmin = user.role === "admin";
 
   // Filter data based on role
-  const myVendors = useMemo(() => 
-    isAdmin ? vendors : vendors.filter(v => v.district === district),
-    [vendors, district, isAdmin]
-  );
+  // ✅ CORRECT:
+const myVendors = useMemo(() => {
+  return isAdmin ? vendors : vendors.filter(v => v.district === district);
+}, [vendors, district, isAdmin]);
 
-  const myTxns = useMemo(() =>
-    isAdmin ? transactions : transactions.filter(t => t.district === district),
-    [transactions, district, isAdmin]
-  );
+const myTxns = useMemo(() => {
+  return isAdmin ? transactions : transactions.filter(t => t.district === district);
+}, [transactions, district, isAdmin]);
 
-  const myBills = useMemo(() =>
-    isAdmin ? bills : bills.filter(b => b.district === district),
-    [bills, district, isAdmin]
-  );
+const myBills = useMemo(() => {
+  return isAdmin ? bills : bills.filter(b => b.district === district);
+}, [bills, district, isAdmin]);
 
+const pendingClose = useMemo(() => {
+  return transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
+}, [transactions]);
   const pendingClose = useMemo(() =>
     transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin),
     [transactions]

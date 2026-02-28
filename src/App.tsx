@@ -337,7 +337,7 @@ const downloadBackup = (data: any) => {
 const DEFAULT_ADMIN: User = {
   id: "U001",
   username: "admin",
-  password: hashPassword("Admin@123"), // Hashed!
+  password: "$sha256$" + CryptoJS.SHA256("Admin@123" + ENCRYPTION_KEY).toString(),
   role: "admin",
   createdAt: new Date().toISOString(),
 };

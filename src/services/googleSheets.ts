@@ -1,5 +1,5 @@
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwrPPOya5wWtVM9wFzE7cqSo27Oyf6irXvqhQ3c25x18rAYBoPctoGk7CIdyU8-M8lR/exec';
-
+const SHEET_URL = https://script.google.com/macros/s/AKfycbwP40hwY1-9Vs_ysetinlZalAYE26Sy3PFCPx6Te9IxDLAXy-XLj1f2H9XTTjSr1NKh/exec;
+const API_KEY = 'AR_PUDUKKOTTAI_2025_SECRET';
 export async function loadFromSheets(): Promise<boolean> {
   try {
     console.log('📥 Loading from Google Sheets...');

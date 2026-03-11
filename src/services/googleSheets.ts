@@ -1,189 +1,138 @@
 const SHEET_URL = https://script.google.com/macros/s/AKfycbwP40hwY1-9Vs_ysetinlZalAYE26Sy3PFCPx6Te9IxDLAXy-XLj1f2H9XTTjSr1NKh/exec;
 const API_KEY = 'AR_PUDUKKOTTAI_2025_SECRET';
-export async function loadFromSheets(): Promise<boolean> {
-  try {
-    console.log('📥 Loading from Google Sheets...');
-    const response = await fetch(SHEET_URL);
-    const data = await response.json();
-    
-    if (data.status === 'success') {
-      const mapped = {
-        vendors: (data.vendors || []).map((v: any) => ({
-          id: v.vendorCode || Math.random().toString(36).substr(2, 9),
-          vendorCode: v.vendorCode || '',
-          vendorName: v.vendorName || '',
-          district: v.districtName || v.district || '',
-          mobile: v.mobile || '',
-          businessType: v.businessType || '',
-          address: v.address || '',
-          gstNo: v.gstNumber || '',
-          regYear: v.regYear || ''
-        })),
-        transactions: (data.transactions || []).map((t: any) => ({
-          id: t.txnId || Math.random().toString(36).substr(2, 9),
-          txnId: t.txnId || '',
-          district: t.districtName || t.district || '',
-          vendorCode: t.vendorCode || '',
-          vendorName: t.vendorName || '',
-          financialYear: t.financialYear || '',
-          month: t.month || '',
-          expectedAmount: Number(t.expectedAmount) || 0,
-          advanceAmount: Number(t.advanceAmount) || 0,
-          gstPercent: Number(t.gstPercent) || 0,
-          gstAmount: Number(t.gstAmount) || 0,
-          gstBalance: Number(t.gstBalance) || 0,
-          billsReceived: Number(t.actualGoodsAmount) || 0,
-          remainingExpected: Number(t.remainingAmount) || 0,
-          status: t.status || 'Open',
-          closedByDistrict: t.status === 'PendingClose' || t.status === 'Closed',
-          confirmedByAdmin: t.status === 'Closed',
-          profit: 0
-        })),
-        bills: (data.bills || []).map((b: any) => ({
-          id: b.billId || Math.random().toString(36).substr(2, 9),
-          txnId: b.txnId || '',
-          vendorCode: b.vendorCode || '',
-          vendorName: b.vendorName || '',
-          district: '',
-          billNumber: b.billNumber || '',
-          billDate: b.billDate || '',
-          billAmount: Number(b.billAmount) || 0,
-          gstPercent: Number(b.gstPercent) || 0,
-          gstAmount: Number(b.gstAmount) || 0,
-          totalAmount: Number(b.totalAmount) || 0
-        })),
-        wallet: (data.wallet || []).map((w: any) => ({
-          id: Math.random().toString(36).substr(2, 9),
-          date: w.date || '',
-          description: w.description || '',
-          type: w.type || 'manual',
-          debit: Number(w.debit) || 0,
-          credit: Number(w.credit) || 0,
-          balance: Number(w.balance) || 0
-        })),
-        managedUsers: (data.users || []).map((u: any) => ({
-          id: u.userId || Math.random().toString(36).substr(2, 9),
-          username: u.username || '',
-          password: u.password || '',
-          district: u.districtName || '',
-          active: true,
-          createdAt: new Date().toISOString().split('T')[0]
-        }))
-      };
-      
-      localStorage.setItem('AR_ERP_V3_DATA', JSON.stringify(mapped));
-      console.log('✅ Google Sheets → localStorage sync complete');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('❌ Sheets load failed:', error);
-    return false;
-  }
+const LS_KEY = "AR_ERP_V3_DATA_ENCRYPTED";
+
+export interface StorageData {
+  vendors: any[];
+  transactions: any[];
+  bills: any[];
+  wallet: any[];
+  managedUsers: any[];
+  auditLogs?: any[];
 }
 
 export async function saveToSheets(): Promise<boolean> {
-  try {
-    console.log('☁️ Saving to Google Sheets...');
-    const raw = localStorage.getItem('AR_ERP_V3_DATA');
-    if (!raw) return false;
-    
-    const data = JSON.parse(raw);
-    
-    const payload = {
-      action: 'FULL_SYNC',
-      vendors: (data.vendors || []).map((v: any) => ({
-        vendorCode: v.vendorCode,
-        vendorName: v.vendorName,
-        districtName: v.district,
-        mobile: v.mobile || '',
-        businessType: v.businessType || '',
-        gstNumber: v.gstNo || '',
-        address: v.address || '',
-        regYear: v.regYear || '',
-        createdAt: new Date().toISOString().split('T')[0]
-      })),
-      transactions: (data.transactions || []).map((t: any) => ({
-        txnId: t.txnId,
-        districtName: t.district,
-        vendorCode: t.vendorCode,
-        vendorName: t.vendorName,
-        financialYear: t.financialYear,
-        month: t.month,
-        expectedAmount: t.expectedAmount,
-        advanceAmount: t.advanceAmount,
-        gstPercent: t.gstPercent,
-        gstAmount: t.gstAmount,
-        actualGoodsAmount: t.billsReceived,
-        remainingAmount: t.remainingExpected,
-        gstBalance: t.gstBalance,
-        status: t.status
-      })),
-      bills: (data.bills || []).map((b: any) => ({
-        billId: b.id,
-        txnId: b.txnId,
-        vendorCode: b.vendorCode,
-        vendorName: b.vendorName,
-        billNumber: b.billNumber,
-        billDate: b.billDate,
-        billAmount: b.billAmount,
-        gstPercent: b.gstPercent,
-        gstAmount: b.gstAmount,
-        totalAmount: b.totalAmount
-      })),
-      wallet: (data.wallet || []).map((w: any) => ({
-        date: w.date,
-        description: w.description,
-        type: w.type,
-        debit: w.debit,
-        credit: w.credit,
-        balance: w.balance
-      })),
-      users: (data.managedUsers || []).map((u: any) => ({
-        userId: u.id,
-        username: u.username,
-        password: u.password,
-        role: 'district',
-        districtName: u.district
-      }))
-    };
+  console.log('☁️ Attempting to save to Google Sheets...');
+  
+  if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_ACTUAL_DEPLOYMENT_URL_HERE') {
+    console.log('⚠️ Google Sheets URL not configured');
+    return false;
+  }
 
-    const response = await fetch(SHEET_URL, {
+  try {
+    const data = localStorage.getItem(LS_KEY);
+    if (!data) {
+      console.log('📭 No data to sync');
+      return false;
+    }
+
+    // Decrypt data
+    const parsed: StorageData = JSON.parse(data);
+    
+    console.log('📤 Sending data:', {
+      vendors: parsed.vendors?.length || 0,
+      transactions: parsed.transactions?.length || 0,
+      bills: parsed.bills?.length || 0
+    });
+    
+    const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'FULL_SYNC',
+        apiKey: API_KEY,
+        data: {
+          vendors: parsed.vendors || [],
+          transactions: parsed.transactions || [],
+          bills: parsed.bills || [],
+          wallet: parsed.wallet || [],
+          managedUsers: parsed.managedUsers || [],
+          auditLogs: parsed.auditLogs || []
+        }
+      }),
+      mode: 'no-cors' // Important for Google Apps Script
     });
 
-    const result = await response.json();
+    console.log('✅ Data sent to Google Sheets (no-cors mode)');
+    return true;
     
-    if (result.status === 'success') {
-      console.log('✅ localStorage → Google Sheets sync complete');
+  } catch (err) {
+    console.error('❌ Sheets sync error:', err);
+    return false;
+  }
+}
+
+export async function loadFromSheets(): Promise<boolean> {
+  console.log('📥 Attempting to load from Google Sheets...');
+  
+  if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_ACTUAL_DEPLOYMENT_URL_HERE') {
+    console.log('⚠️ Google Sheets URL not configured');
+    return false;
+  }
+
+  try {
+    const url = `${SCRIPT_URL}?action=LOAD&apiKey=${encodeURIComponent(API_KEY)}`;
+    
+    console.log('🔗 Fetching from:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    console.log('📥 Received data:', {
+      vendors: data.vendors?.length || 0,
+      transactions: data.transactions?.length || 0,
+      bills: data.bills?.length || 0
+    });
+    
+    if (data && (data.vendors || data.transactions)) {
+      const storageData: StorageData = {
+        vendors: data.vendors || [],
+        transactions: data.transactions || [],
+        bills: data.bills || [],
+        wallet: data.wallet || [],
+        managedUsers: data.managedUsers || [],
+        auditLogs: data.auditLogs || []
+      };
+      
+      localStorage.setItem(LS_KEY, JSON.stringify(storageData));
+      console.log('✅ Google Sheets → localStorage sync complete');
       return true;
     }
+    
     return false;
-  } catch (error) {
-    console.error('❌ Sheets save failed:', error);
+    
+  } catch (err) {
+    console.error('❌ Sheets load error:', err);
     return false;
   }
 }
-
-let syncInterval: number | null = null;
 
 export function startAutoSync(intervalMinutes: number = 5): void {
-  saveToSheets();
-  
-  if (syncInterval) clearInterval(syncInterval);
-  
-  syncInterval = window.setInterval(() => {
-    console.log('🔄 Auto-sync triggered...');
-    saveToSheets();
-  }, intervalMinutes * 60 * 1000);
-  
   console.log(`⏰ Auto-sync started: Every ${intervalMinutes} minutes`);
-}
-
-export function stopAutoSync(): void {
-  if (syncInterval) {
-    clearInterval(syncInterval);
-    syncInterval = null;
-  }
+  
+  // Initial sync after 10 seconds
+  setTimeout(() => {
+    saveToSheets().catch(err => 
+      console.log('Initial sync skipped:', err)
+    );
+  }, 10000);
+  
+  // Periodic sync
+  setInterval(() => {
+    saveToSheets().catch(err => 
+      console.log('Background sync skipped:', err)
+    );
+  }, intervalMinutes * 60 * 1000);
 }

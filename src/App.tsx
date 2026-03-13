@@ -640,7 +640,7 @@ const handleLogin = async () => {
 // APP.TSX — PART 2 REPLACEMENT (FINAL — Build Fix + All Features)
 // இந்த முழு block-ஐ பழைய "export default function App()" block-ஆக replace செய்யவும்
 // ============================================================
-
+}
 export default function App() {
   const saved = loadFromStorage();
 

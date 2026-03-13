@@ -651,6 +651,11 @@ function LoginPage({
 // Main App Component
 // ============================================================
 
+// ============================================================
+// APP.TSX — PART 2 REPLACEMENT (FINAL — Build Fix + All Features)
+// இந்த முழு block-ஐ பழைய "export default function App()" block-ஆக replace செய்யவும்
+// ============================================================
+
 export default function App() {
   const saved = loadFromStorage();
 
@@ -661,37 +666,33 @@ export default function App() {
     } catch { return DEFAULT_COMMISSION_SLABS; }
   })();
 
-  const [user, setUser] = useState<User | null>(null);
+  // ── State ──────────────────────────────────────────────────
+  const [user, setUser]                   = useState<User | null>(null);
+  const [loginRole, setLoginRole]         = useState<"admin"|"district"|"agent"|"vendor"|null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [page, setPage] = useState("dashboard");
-  const [vendors, setVendors] = useState<Vendor[]>(saved?.vendors || []);
-  const [transactions, setTransactions] = useState<Transaction[]>(saved?.transactions || []);
-  const [bills, setBills] = useState<Bill[]>(saved?.bills || []);
-  const [wallet, setWallet] = useState<WalletEntry[]>(saved?.wallet || []);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(saved?.managedUsers || []);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(saved?.auditLogs || []);
-  const [agents, setAgents] = useState<Agent[]>((saved as any)?.agents || []);
-  const [agentWallet, setAgentWallet] = useState<AgentWalletEntry[]>((saved as any)?.agentWallet || []);
+  const [page, setPage]                   = useState("dashboard");
+  const [vendors, setVendors]             = useState<Vendor[]>(saved?.vendors || []);
+  const [transactions, setTransactions]   = useState<Transaction[]>(saved?.transactions || []);
+  const [bills, setBills]                 = useState<Bill[]>(saved?.bills || []);
+  const [wallet, setWallet]               = useState<WalletEntry[]>(saved?.wallet || []);
+  const [managedUsers, setManagedUsers]   = useState<ManagedUser[]>(saved?.managedUsers || []);
+  const [auditLogs, setAuditLogs]         = useState<AuditLog[]>(saved?.auditLogs || []);
+  const [agents, setAgents]               = useState<Agent[]>((saved as any)?.agents || []);
+  const [agentWallet, setAgentWallet]     = useState<AgentWalletEntry[]>((saved as any)?.agentWallet || []);
   const [agentOverrides, setAgentOverrides] = useState<AgentVendorOverride[]>((saved as any)?.agentOverrides || []);
   const [commissionSlabs, setCommissionSlabs] = useState<CommissionSlab[]>(savedSlabs);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [settings, setSettings] = useState({
-    autoBackup: true,
-    backupFrequency: 7,
-    emailNotifications: true,
-    browserNotifications: false,
-    dataEncryption: false
+  const [sidebarOpen, setSidebarOpen]     = useState(true);
+  const [settings, setSettings]           = useState({
+    autoBackup: true, backupFrequency: 7,
+    emailNotifications: true, browserNotifications: false, dataEncryption: false
   });
 
-  // ── Initialize ──────────────────────────────────────────
+  // ── Initialize ─────────────────────────────────────────────
   useEffect(() => {
     async function initialize() {
       try {
         const session = loadSession();
-        if (session) {
-          setUser(session.user);
-          console.log('✅ Session restored');
-        }
+        if (session) { setUser(session.user); }
         await loadFromSheets();
         const reloaded = loadFromStorage() as any;
         if (reloaded) {
@@ -705,116 +706,75 @@ export default function App() {
           setAgentWallet(reloaded.agentWallet || []);
           setAgentOverrides(reloaded.agentOverrides || []);
         }
-      } catch (err) {
-        console.log('Initial load failed, using localStorage:', err);
-      }
+      } catch (err) { console.log('Initial load failed:', err); }
       setIsInitializing(false);
       startAutoSync(5);
     }
     initialize();
   }, []);
 
-  // ── Mobile sidebar ───────────────────────────────────────
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) setSidebarOpen(false);
-    };
+    const handleResize = () => { if (window.innerWidth < 768) setSidebarOpen(false); };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
-    if (settings.browserNotifications && 'Notification' in window) {
-      Notification.requestPermission();
-    }
+    if (settings.browserNotifications && 'Notification' in window) Notification.requestPermission();
   }, [settings.browserNotifications]);
 
-  // ── Core save (agent data சேர்த்து) ─────────────────────
+  // ── Save ───────────────────────────────────────────────────
   const saveData = useCallback((
     v: Vendor[], t: Transaction[], b: Bill[],
     w: WalletEntry[], u: ManagedUser[], a: AuditLog[],
     ag?: Agent[], agw?: AgentWalletEntry[], ago?: AgentVendorOverride[]
   ) => {
-    saveToStorage({
-      vendors: v, transactions: t, bills: b,
-      wallet: w, managedUsers: u, auditLogs: a,
-      agents: ag,
-      agentWallet: agw,
-      agentOverrides: ago
-    } as any);
-    saveToSheets().catch(err => console.log('Background sync failed:', err));
+    saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u, auditLogs: a, agents: ag, agentWallet: agw, agentOverrides: ago } as any);
+    saveToSheets().catch(err => console.log('Sync failed:', err));
   }, []);
 
-  // ── Audit log ────────────────────────────────────────────
+  // ── Audit ──────────────────────────────────────────────────
   const logAction = useCallback((
-    action: AuditLog['action'],
-    entity: AuditLog['entity'],
-    entityId: string,
-    before?: any,
-    after?: any
+    action: AuditLog['action'], entity: AuditLog['entity'],
+    entityId: string, before?: any, after?: any
   ) => {
     if (!user) return;
-    const log: AuditLog = {
-      id: genId("LOG"),
-      timestamp: new Date().toISOString(),
-      user: user.username,
-      action, entity, entityId, before, after
-    };
+    const log: AuditLog = { id: genId("LOG"), timestamp: new Date().toISOString(), user: user.username, action, entity, entityId, before, after };
     setAuditLogs(prev => [...prev, log]);
-    console.log('📋 Audit:', log);
   }, [user]);
 
-  // ── Wallet helpers ───────────────────────────────────────
-  const getWalletBalance = useCallback(() => {
-    if (wallet.length === 0) return 0;
-    return wallet[wallet.length - 1].balance;
-  }, [wallet]);
+  // ── Wallet ─────────────────────────────────────────────────
+  const getWalletBalance = useCallback(() => wallet.length > 0 ? wallet[wallet.length - 1].balance : 0, [wallet]);
 
-  const addWalletEntry = useCallback((
-    description: string,
-    debit: number,
-    credit: number,
-    type: WalletEntry["type"],
-    txnId?: string
-  ) => {
+  const addWalletEntry = useCallback((desc: string, debit: number, credit: number, type: WalletEntry["type"], txnId?: string) => {
     setWallet(prev => {
       const lastBal = prev.length > 0 ? prev[prev.length - 1].balance : 0;
-      const newBal = round2(lastBal - debit + credit);
       const entry: WalletEntry = {
-        id: genId("W"),
-        date: new Date().toISOString().split("T")[0],
-        description, txnId, debit, credit,
-        balance: newBal, type,
-        createdBy: user?.username
+        id: genId("W"), date: new Date().toISOString().split("T")[0],
+        description: desc, txnId, debit, credit,
+        balance: round2(lastBal - debit + credit), type, createdBy: user?.username
       };
       return [...prev, entry];
     });
   }, [user]);
 
-  // ── Confirm Close — Agent commission சேர்த்து ────────────
+  // ── Confirm Close ──────────────────────────────────────────
   const handleConfirmClose = useCallback((txnId: string) => {
     const txn = transactions.find(t => t.txnId === txnId);
     if (!txn) { alert("❌ Transaction இல்லை!"); return; }
-    if (txn.confirmedByAdmin || txn.status === "Closed") {
-      alert("⚠️ இந்த Transaction ஏற்கனவே Closed!"); return;
-    }
+    if (txn.confirmedByAdmin || txn.status === "Closed") { alert("⚠️ Already Closed!"); return; }
 
     const profit = round2(txn.expectedAmount * PROFIT_RATE);
-
-    // Admin wallet profit
     const existingProfit = wallet.find(w => w.txnId === txnId && w.type === "profit");
     let updatedWallet = [...wallet];
     if (!existingProfit) {
       const lastBal = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
       updatedWallet = [...wallet, {
-        id: genId("W"),
-        date: new Date().toISOString().split("T")[0],
+        id: genId("W"), date: new Date().toISOString().split("T")[0],
         description: `8% Profit Credit — ${txn.vendorName} (${txnId})`,
-        txnId, debit: 0, credit: profit,
-        balance: round2(lastBal + profit),
-        type: "profit" as const,
-        createdBy: user?.username
+        txnId, debit: 0, credit: profit, balance: round2(lastBal + profit),
+        type: "profit" as const, createdBy: user?.username
       }];
     }
 
@@ -822,89 +782,54 @@ export default function App() {
     let updatedAgents = [...agents];
     let updatedAgentWallet = [...agentWallet];
     let commissionInfo = "";
-
     const txnAgent = agents.find(a => a.agentId === (txn as any).createdByAgent);
     if (txnAgent && txnAgent.status === "approved") {
-      const alreadyPaid = agentWallet.find(
-        w => w.txnId === txnId && w.agentId === txnAgent.id
-      );
+      const alreadyPaid = agentWallet.find(w => w.txnId === txnId && w.agentId === txnAgent.id);
       if (!alreadyPaid) {
-        const commission = calcAgentCommission(
-          txnAgent, txn.vendorCode, txn.gstPercent,
-          txn.expectedAmount, agentOverrides, commissionSlabs
-        );
+        const commission = calcAgentCommission(txnAgent, txn.vendorCode, txn.gstPercent, txn.expectedAmount, agentOverrides, commissionSlabs);
         if (commission.amount > 0) {
           const agentEntries = agentWallet.filter(w => w.agentId === txnAgent.id);
-          const prevBal = agentEntries.length > 0
-            ? agentEntries[agentEntries.length - 1].balance
-            : txnAgent.commissionBalance;
-          const newBal = round2(prevBal + commission.amount);
+          const prevBal = agentEntries.length > 0 ? agentEntries[agentEntries.length - 1].balance : txnAgent.commissionBalance;
           const entry: AgentWalletEntry = {
-            id: genId("AW"),
-            agentId: txnAgent.id,
+            id: genId("AW"), agentId: txnAgent.id,
             date: new Date().toISOString().split("T")[0],
             description: `Commission — ${txn.vendorName} (${txnId})`,
-            txnId, vendorName: txn.vendorName,
-            billAmount: txn.expectedAmount,
-            gstPercent: txn.gstPercent,
-            commissionPercent: commission.percent,
-            commissionAmount: commission.amount,
-            commissionType: commission.type,
-            balance: newBal
+            txnId, vendorName: txn.vendorName, billAmount: txn.expectedAmount,
+            gstPercent: txn.gstPercent, commissionPercent: commission.percent,
+            commissionAmount: commission.amount, commissionType: commission.type,
+            balance: round2(prevBal + commission.amount)
           };
           updatedAgentWallet = [...agentWallet, entry];
-          updatedAgents = agents.map(a =>
-            a.id === txnAgent.id ? { ...a, commissionBalance: newBal } : a
-          );
-          commissionInfo = `\n🤝 Agent Commission (${txnAgent.fullName}): ${fmt(commission.amount)} (${commission.percent}%)`;
+          updatedAgents = agents.map(a => a.id === txnAgent.id ? { ...a, commissionBalance: round2(prevBal + commission.amount) } : a);
+          commissionInfo = `\n🤝 Agent: ${txnAgent.fullName} — ${fmt(commission.amount)}`;
         }
       }
     }
 
     const updatedT = transactions.map(t =>
-      t.txnId === txnId
-        ? { ...t, status: "Closed" as const, confirmedByAdmin: true, profit, closedAt: new Date().toISOString() }
-        : t
+      t.txnId === txnId ? { ...t, status: "Closed" as const, confirmedByAdmin: true, profit, closedAt: new Date().toISOString() } : t
     );
-
-    setTransactions(updatedT);
-    setWallet(updatedWallet);
-    setAgents(updatedAgents);
-    setAgentWallet(updatedAgentWallet);
+    setTransactions(updatedT); setWallet(updatedWallet);
+    setAgents(updatedAgents); setAgentWallet(updatedAgentWallet);
     saveData(vendors, updatedT, bills, updatedWallet, managedUsers, auditLogs, updatedAgents, updatedAgentWallet, agentOverrides);
     logAction("CONFIRM", "Transaction", txnId);
+    alert(`✅ Transaction Closed!\n\n💰 Profit: ${fmt(profit)}${commissionInfo}`);
+  }, [transactions, wallet, vendors, bills, managedUsers, auditLogs, agents, agentWallet, agentOverrides, commissionSlabs, user, saveData, logAction]);
 
-    if (settings.browserNotifications && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('AR Enterprises', { body: `Transaction ${txnId} closed! Profit: ${fmt(profit)}` });
-    }
-    alert(`✅ Transaction Closed!\n\n💰 Admin Profit: ${fmt(profit)}${commissionInfo}`);
-  }, [transactions, wallet, vendors, bills, managedUsers, auditLogs, agents, agentWallet, agentOverrides, commissionSlabs, user, settings, saveData, logAction]);
-
-  // ── Login ─────────────────────────────────────────────────
+  // ── Login / Logout ─────────────────────────────────────────
   const handleLogin = async (loggedInUser: User) => {
-    // Agent login check
-    const agentMatch = agents.find(
-      a => a.username === loggedInUser.username && a.status === "approved"
-    );
-    if (agentMatch) {
-      const agentUser = { ...loggedInUser, role: "agent" as any };
-      setUser(agentUser);
-      const session = createSession(agentUser, 8);
-      saveSession(session);
-      setPage("agent_dashboard");
-      return;
-    }
     setUser(loggedInUser);
     const session = createSession(loggedInUser, 8);
     saveSession(session);
+    setLoginRole(null);
+
+    if ((loggedInUser as any).role === "agent") { setPage("agent_dashboard"); return; }
+    if ((loggedInUser as any).role === "vendor") { setPage("vendor_dashboard"); return; }
+
     if (loggedInUser.role === "district") {
-      const updatedUsers = managedUsers.map(u =>
-        u.username === loggedInUser.username
-          ? { ...u, lastLogin: new Date().toISOString() }
-          : u
-      );
-      setManagedUsers(updatedUsers);
-      saveData(vendors, transactions, bills, wallet, updatedUsers, auditLogs, agents, agentWallet, agentOverrides);
+      const nu = managedUsers.map(u => u.username === loggedInUser.username ? { ...u, lastLogin: new Date().toISOString() } : u);
+      setManagedUsers(nu);
+      saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
     }
     logAction("LOGIN", "User", loggedInUser.id);
     setPage("dashboard");
@@ -912,52 +837,58 @@ export default function App() {
 
   const handleLogout = () => {
     if (user) logAction("LOGOUT", "User", user.id);
-    clearSession();
-    setUser(null);
-    setPage("dashboard");
+    clearSession(); setUser(null); setLoginRole(null); setPage("dashboard");
   };
 
-  // ── Loading ───────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center"
-        style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
         <div className="text-center">
-          <div className="w-16 h-16 rounded-full border-4 animate-spin mx-auto mb-4"
-            style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
+          <div className="w-16 h-16 rounded-full border-4 animate-spin mx-auto mb-4" style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
           <p className="text-white font-semibold text-lg">📊 Loading AR ERP...</p>
-          <p className="text-gray-400 text-sm mt-2">Google Sheets-லிருந்து தரவு ஏற்றுகிறது</p>
         </div>
       </div>
     );
   }
 
-  if (!user) return <LoginPage onLogin={handleLogin} managedUsers={managedUsers} agents={agents} />;
+  // ── Not logged in — Landing or Login ──────────────────────
+  if (!user) {
+    if (!loginRole) return <LandingPage onSelectRole={setLoginRole} />;
+    return (
+      <LoginPage
+        role={loginRole}
+        onLogin={handleLogin}
+        onBack={() => setLoginRole(null)}
+        managedUsers={managedUsers}
+        agents={agents}
+        vendors={vendors}
+      />
+    );
+  }
 
-  // ── Agent login — AgentDashboardPage காட்டு ──────────────
+  // ── Vendor Dashboard ───────────────────────────────────────
+  if ((user as any).role === "vendor") {
+    const vendorData = vendors.find(v => v.vendorCode === user.username || v.id === user.id);
+    if (vendorData) {
+      return <VendorDashboardPage vendor={vendorData} transactions={transactions} bills={bills} onLogout={handleLogout} />;
+    }
+  }
+
+  // ── Agent Dashboard ────────────────────────────────────────
   if ((user as any).role === "agent") {
     const agentData = agents.find(a => a.username === user.username);
     if (agentData) {
       return (
         <AgentDashboardPage
-          agent={agentData}
-          transactions={transactions}
-          vendors={vendors}
-          bills={bills}
-          agentWallet={agentWallet}
-          agentOverrides={agentOverrides}
+          agent={agentData} transactions={transactions} vendors={vendors}
+          bills={bills} agentWallet={agentWallet} agentOverrides={agentOverrides}
           commissionSlabs={commissionSlabs}
-          onAddVendor={(v) => {
-            const nv = [...vendors, v];
-            setVendors(nv);
-            saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-          }}
+          onAddVendor={(v) => { const nv = [...vendors, v]; setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides); }}
           onAddTransaction={(txn, advance) => {
             const nt = [...transactions, { ...txn, createdAt: new Date().toISOString() }];
             setTransactions(nt);
-            if (advance > 0) {
-              addWalletEntry(`Advance — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
-            }
+            if (advance > 0) addWalletEntry(`Advance — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
             saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
           }}
           onAddBill={(bill) => {
@@ -978,12 +909,13 @@ export default function App() {
     }
   }
 
+  // ── Admin / District UI ────────────────────────────────────
   const district = user.role === "district" ? user.district! : "";
-  const isAdmin = user.role === "admin";
+  const isAdmin  = user.role === "admin";
   const myVendors = isAdmin ? vendors : vendors.filter(v => v.district === district);
-  const myTxns   = isAdmin ? transactions : transactions.filter(t => t.district === district);
-  const myBills  = isAdmin ? bills : bills.filter(b => b.district === district);
-  const pendingClose = transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
+  const myTxns    = isAdmin ? transactions : transactions.filter(t => t.district === district);
+  const myBills   = isAdmin ? bills : bills.filter(b => b.district === district);
+  const pendingClose  = transactions.filter(t => t.closedByDistrict && !t.confirmedByAdmin);
   const pendingAgents = agents.filter(a => a.status === "pending").length;
 
   const navItems = isAdmin
@@ -1026,34 +958,26 @@ export default function App() {
             {sidebarOpen ? "◀" : "▶"}
           </button>
         </div>
-
         {sidebarOpen && (
           <div className="p-3 m-3 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
             <p className="text-xs text-gray-400">{isAdmin ? "👑 Super Admin" : `🏛️ ${district}`}</p>
             <p className="text-xs font-medium text-white truncate">{user.username}</p>
           </div>
         )}
-
         <nav className="p-2 space-y-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
           {navItems.map(n => (
-            <button
-              key={n.id}
-              onClick={() => setPage(n.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
-                ${page === n.id ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+            <button key={n.id} onClick={() => setPage(n.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${page === n.id ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
               style={page === n.id ? { background: "linear-gradient(135deg, #c9a227, #f0d060)" } : {}}
             >
               <span className="text-lg">{n.icon}</span>
               {sidebarOpen && <span className="flex-1 text-left">{n.label}</span>}
               {sidebarOpen && (n as any).badge > 0 && (
-                <span className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
-                  {(n as any).badge}
-                </span>
+                <span className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">{(n as any).badge}</span>
               )}
             </button>
           ))}
         </nav>
-
         {sidebarOpen && (
           <div className="absolute bottom-4 left-0 w-64 px-3">
             <button onClick={handleLogout} className="w-full py-2 rounded-lg text-xs text-gray-400 hover:text-white transition-all" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -1072,12 +996,10 @@ export default function App() {
             transactions={myTxns} vendors={myVendors} bills={myBills}
             wallet={wallet} walletBalance={getWalletBalance()}
             pendingClose={pendingClose} onConfirmClose={handleConfirmClose}
-            settings={settings}
-            agents={agents}
+            settings={settings} agents={agents}
             onAddAgent={(newAgent) => {
-              const updatedAgents = [...agents, newAgent];
-              setAgents(updatedAgents);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updatedAgents, agentWallet, agentOverrides);
+              const ua = [...agents, newAgent]; setAgents(ua);
+              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides);
             }}
             user={user}
           />
@@ -1089,30 +1011,24 @@ export default function App() {
             vendors={myVendors} allVendors={vendors}
             onAdd={async (v) => {
               const val = await validateData(vendorSchema, v);
-              if (!val.valid) { alert("❌ Validation Error:\n\n" + val.errors.join("\n")); return; }
+              if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
               const nv = [...vendors, { ...v, createdAt: new Date().toISOString(), active: true }];
-              setVendors(nv);
-              saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
+              setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
               logAction("CREATE", "Vendor", v.id, null, v);
             }}
-            onUpdate={(updatedVendor) => {
-              const before = vendors.find(v => v.id === updatedVendor.id);
-              const nv = vendors.map(v => v.id === updatedVendor.id ? updatedVendor : v);
-              setVendors(nv);
-              saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("UPDATE", "Vendor", updatedVendor.id, before, updatedVendor);
+            onUpdate={(u) => {
+              const nv = vendors.map(v => v.id === u.id ? u : v);
+              setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("UPDATE", "Vendor", u.id);
             }}
             onDelete={(id) => {
-              const vendor = vendors.find(v => v.id === id);
-              if (!vendor) return;
-              if (transactions.some(t => t.vendorCode === vendor.vendorCode) || bills.some(b => b.vendorCode === vendor.vendorCode)) {
-                alert(`❌ Cannot delete ${vendor.vendorName}!\n\nActive transactions/bills exist.`); return;
-              }
-              if (!confirm(`Delete ${vendor.vendorName}?`)) return;
-              const nv = vendors.filter(v => v.id !== id);
-              setVendors(nv);
-              saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("DELETE", "Vendor", id, vendor, null);
+              const v = vendors.find(x => x.id === id);
+              if (!v) return;
+              if (transactions.some(t => t.vendorCode === v.vendorCode)) { alert("❌ Active transactions exist!"); return; }
+              if (!confirm(`Delete ${v.vendorName}?`)) return;
+              const nv = vendors.filter(x => x.id !== id);
+              setVendors(nv); saveData(nv, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("DELETE", "Vendor", id);
             }}
           />
         )}
@@ -1123,42 +1039,36 @@ export default function App() {
             transactions={myTxns} vendors={myVendors} bills={myBills}
             onAdd={async (txn, advance) => {
               const val = await validateData(transactionSchema, { expectedAmount: txn.expectedAmount, advanceAmount: txn.advanceAmount });
-              if (!val.valid) { alert("❌ Validation Error:\n\n" + val.errors.join("\n")); return; }
+              if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
               const nt = [...transactions, { ...txn, createdAt: new Date().toISOString() }];
               setTransactions(nt);
-              if (advance > 0) addWalletEntry(`Advance Paid — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
+              if (advance > 0) addWalletEntry(`Advance — ${txn.vendorName} (${txn.txnId})`, advance, 0, "advance", txn.txnId);
               saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("CREATE", "Transaction", txn.txnId, null, txn);
+              logAction("CREATE", "Transaction", txn.txnId);
             }}
             onClose={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
               if (!txn) return;
               const gstBal = round2(txn.gstAmount - txn.advanceAmount);
-              if (gstBal > 0) addWalletEntry(`GST Balance Debit — ${txn.vendorName} (${txnId})`, gstBal, 0, "gst", txnId);
-              const nt = transactions.map(t =>
-                t.txnId === txnId ? { ...t, status: "PendingClose" as const, closedByDistrict: true, remainingExpected: 0 } : t
-              );
+              if (gstBal > 0) addWalletEntry(`GST Balance — ${txn.vendorName} (${txnId})`, gstBal, 0, "gst", txnId);
+              const nt = transactions.map(t => t.txnId === txnId ? { ...t, status: "PendingClose" as const, closedByDistrict: true, remainingExpected: 0 } : t);
               setTransactions(nt);
               saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
               logAction("CLOSE", "Transaction", txnId);
-              alert("✅ Transaction closed!\n\nWaiting for Admin confirmation.");
+              alert("✅ Closed! Admin confirmation pending.");
             }}
-            onUpdate={(updated) => {
-              const before = transactions.find(t => t.txnId === updated.txnId);
-              const nt = transactions.map(t => t.txnId === updated.txnId ? updated : t);
-              setTransactions(nt);
-              saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("UPDATE", "Transaction", updated.txnId, before, updated);
+            onUpdate={(u) => {
+              const nt = transactions.map(t => t.txnId === u.txnId ? u : t);
+              setTransactions(nt); saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("UPDATE", "Transaction", u.txnId);
             }}
             onDelete={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
-              if (!txn) return;
-              if (txn.status !== "Open") { alert("❌ Cannot delete closed transactions!"); return; }
-              if (!confirm(`Delete transaction ${txnId}?`)) return;
+              if (!txn || txn.status !== "Open") { alert("❌ Cannot delete!"); return; }
+              if (!confirm(`Delete ${txnId}?`)) return;
               const nt = transactions.filter(t => t.txnId !== txnId);
-              setTransactions(nt);
-              saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("DELETE", "Transaction", txnId, txn, null);
+              setTransactions(nt); saveData(vendors, nt, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("DELETE", "Transaction", txnId);
             }}
           />
         )}
@@ -1169,38 +1079,33 @@ export default function App() {
             bills={myBills} transactions={myTxns} vendors={myVendors}
             onAdd={async (bill) => {
               const val = await validateData(billSchema, { billNumber: bill.billNumber, billAmount: bill.billAmount, billDate: bill.billDate });
-              if (!val.valid) { alert("❌ Validation Error:\n\n" + val.errors.join("\n")); return; }
+              if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
               const txn = transactions.find(t => t.txnId === bill.txnId);
-              if (txn && txn.status !== "Open") { alert("❌ Cannot add bills to closed transactions!"); return; }
+              if (txn && txn.status !== "Open") { alert("❌ Closed transaction!"); return; }
               const nb = [...bills, { ...bill, createdAt: new Date().toISOString() }];
               const nt = recalcTransactions(transactions, nb);
               setBills(nb); setTransactions(nt);
               saveData(vendors, nt, nb, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("CREATE", "Bill", bill.id, null, bill);
+              logAction("CREATE", "Bill", bill.id);
             }}
             onBulkAdd={(newBills) => {
-              const nb = [...bills, ...newBills];
-              const nt = recalcTransactions(transactions, nb);
+              const nb = [...bills, ...newBills]; const nt = recalcTransactions(transactions, nb);
               setBills(nb); setTransactions(nt);
               saveData(vendors, nt, nb, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
             }}
-            onUpdate={(updated) => {
-              const before = bills.find(b => b.id === updated.id);
-              const nb = bills.map(b => b.id === updated.id ? updated : b);
-              const nt = recalcTransactions(transactions, nb);
+            onUpdate={(u) => {
+              const nb = bills.map(b => b.id === u.id ? u : b); const nt = recalcTransactions(transactions, nb);
               setBills(nb); setTransactions(nt);
               saveData(vendors, nt, nb, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("UPDATE", "Bill", updated.id, before, updated);
+              logAction("UPDATE", "Bill", u.id);
             }}
             onDelete={(billId) => {
-              const bill = bills.find(b => b.id === billId);
-              if (!bill) return;
-              if (!confirm(`Delete bill ${bill.billNumber}?`)) return;
-              const nb = bills.filter(b => b.id !== billId);
-              const nt = recalcTransactions(transactions, nb);
+              const b = bills.find(x => x.id === billId);
+              if (!b || !confirm(`Delete ${b.billNumber}?`)) return;
+              const nb = bills.filter(x => x.id !== billId); const nt = recalcTransactions(transactions, nb);
               setBills(nb); setTransactions(nt);
               saveData(vendors, nt, nb, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("DELETE", "Bill", billId, bill, null);
+              logAction("DELETE", "Bill", billId);
             }}
           />
         )}
@@ -1210,89 +1115,35 @@ export default function App() {
             wallet={wallet} balance={getWalletBalance()}
             onManualEntry={(desc, debit, credit) => {
               addWalletEntry(sanitizeInput(desc), debit, credit, "manual");
-              setTimeout(() => {
-                setWallet(prev => {
-                  saveData(vendors, transactions, bills, prev, managedUsers, auditLogs, agents, agentWallet, agentOverrides);
-                  return prev;
-                });
-              }, 100);
+              setTimeout(() => setWallet(prev => { saveData(vendors, transactions, bills, prev, managedUsers, auditLogs, agents, agentWallet, agentOverrides); return prev; }), 100);
             }}
             onSetBalance={(newBal) => {
-              const current = getWalletBalance();
-              const diff = newBal - current;
+              const diff = newBal - getWalletBalance();
               if (diff > 0) addWalletEntry("Balance Adjustment (Credit)", 0, diff, "manual");
               else if (diff < 0) addWalletEntry("Balance Adjustment (Debit)", Math.abs(diff), 0, "manual");
             }}
           />
         )}
 
-        {page === "analytics" && isAdmin && (
-          <AnalyticsPage transactions={transactions} bills={bills} vendors={vendors} wallet={wallet} />
-        )}
-
-        {page === "reports" && !isAdmin && (
-          <ReportsPage transactions={myTxns} bills={myBills} vendors={myVendors} district={district} />
-        )}
+        {page === "analytics" && isAdmin && <AnalyticsPage transactions={transactions} bills={bills} vendors={vendors} wallet={wallet} />}
+        {page === "reports" && !isAdmin && <ReportsPage transactions={myTxns} bills={myBills} vendors={myVendors} district={district} />}
 
         {page === "agents" && isAdmin && (
           <AdminAgentsPage
-            agents={agents}
-            agentWallet={agentWallet}
-            agentOverrides={agentOverrides}
-            commissionSlabs={commissionSlabs}
-            transactions={transactions}
-            vendors={vendors}
-            bills={bills}
+            agents={agents} agentWallet={agentWallet} agentOverrides={agentOverrides}
+            commissionSlabs={commissionSlabs} transactions={transactions} vendors={vendors} bills={bills}
             onApprove={(agentId, commType, customPct) => {
-              const updated = agents.map(a =>
-                a.id === agentId
-                  ? { ...a, status: "approved" as const, commissionType: commType, customCommissionPercent: customPct, approvedBy: user?.username, approvedAt: new Date().toISOString() }
-                  : a
-              );
-              setAgents(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updated, agentWallet, agentOverrides);
-              alert("✅ Agent approved!");
+              const ua = agents.map(a => a.id === agentId ? { ...a, status: "approved" as const, commissionType: commType, customCommissionPercent: customPct, approvedBy: user?.username, approvedAt: new Date().toISOString() } : a);
+              setAgents(ua); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides);
+              alert("✅ Approved!");
             }}
-            onReject={(agentId) => {
-              const updated = agents.map(a => a.id === agentId ? { ...a, status: "rejected" as const } : a);
-              setAgents(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updated, agentWallet, agentOverrides);
-            }}
-            onSuspend={(agentId) => {
-              const updated = agents.map(a =>
-                a.id === agentId
-                  ? { ...a, status: a.status === "suspended" ? "approved" as const : "suspended" as const }
-                  : a
-              );
-              setAgents(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updated, agentWallet, agentOverrides);
-            }}
-            onDelete={(agentId) => {
-              const updated = agents.filter(a => a.id !== agentId);
-              setAgents(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updated, agentWallet, agentOverrides);
-            }}
-            onSetCommission={(agentId, type, pct) => {
-              const updated = agents.map(a =>
-                a.id === agentId ? { ...a, commissionType: type, customCommissionPercent: pct } : a
-              );
-              setAgents(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, updated, agentWallet, agentOverrides);
-            }}
-            onAddOverride={(override) => {
-              const updated = [...agentOverrides, override];
-              setAgentOverrides(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, updated);
-            }}
-            onDeleteOverride={(id) => {
-              const updated = agentOverrides.filter(o => o.id !== id);
-              setAgentOverrides(updated);
-              saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, updated);
-            }}
-            onUpdateSlabs={(slabs) => {
-              setCommissionSlabs(slabs);
-              localStorage.setItem("AR_COMMISSION_SLABS", JSON.stringify(slabs));
-            }}
+            onReject={(id) => { const ua = agents.map(a => a.id === id ? { ...a, status: "rejected" as const } : a); setAgents(ua); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides); }}
+            onSuspend={(id) => { const ua = agents.map(a => a.id === id ? { ...a, status: a.status === "suspended" ? "approved" as const : "suspended" as const } : a); setAgents(ua); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides); }}
+            onDelete={(id) => { const ua = agents.filter(a => a.id !== id); setAgents(ua); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides); }}
+            onSetCommission={(id, type, pct) => { const ua = agents.map(a => a.id === id ? { ...a, commissionType: type, customCommissionPercent: pct } : a); setAgents(ua); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides); }}
+            onAddOverride={(o) => { const uo = [...agentOverrides, o]; setAgentOverrides(uo); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, uo); }}
+            onDeleteOverride={(id) => { const uo = agentOverrides.filter(o => o.id !== id); setAgentOverrides(uo); saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, uo); }}
+            onUpdateSlabs={(slabs) => { setCommissionSlabs(slabs); localStorage.setItem("AR_COMMISSION_SLABS", JSON.stringify(slabs)); }}
           />
         )}
 
@@ -1301,48 +1152,80 @@ export default function App() {
             districtUsers={managedUsers}
             onAddUser={async (u) => {
               const val = await validateData(userSchema, { username: u.username, password: u.password });
-              if (!val.valid) { alert("❌ Validation Error:\n\n" + val.errors.join("\n")); return; }
-              if (managedUsers.some(existing => existing.username === u.username)) { alert("❌ Username already exists!"); return; }
-              const hashedPassword = await hashPassword(u.password);
-              const newUser = { ...u, password: hashedPassword };
-              const nu = [...managedUsers, newUser];
-              setManagedUsers(nu);
-              saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("CREATE", "User", newUser.id, null, newUser);
-              alert("✅ User created successfully!");
+              if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
+              if (managedUsers.some(x => x.username === u.username)) { alert("❌ Username exists!"); return; }
+              const hp = await hashPassword(u.password);
+              const nu = [...managedUsers, { ...u, password: hp }];
+              setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("CREATE", "User", u.id); alert("✅ User created!");
             }}
-            onUpdateUser={async (updated) => {
-              const before = managedUsers.find(u => u.id === updated.id);
-              if (before && updated.password !== before.password) updated.password = await hashPassword(updated.password);
-              const nu = managedUsers.map(u => u.id === updated.id ? updated : u);
-              setManagedUsers(nu);
-              saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("UPDATE", "User", updated.id, before, updated);
+            onUpdateUser={async (u) => {
+              const before = managedUsers.find(x => x.id === u.id);
+              if (before && u.password !== before.password) u.password = await hashPassword(u.password);
+              const nu = managedUsers.map(x => x.id === u.id ? u : x);
+              setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("UPDATE", "User", u.id);
             }}
             onToggleUser={(id) => {
               const nu = managedUsers.map(u => u.id === id ? { ...u, active: !u.active } : u);
-              setManagedUsers(nu);
-              saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
+              setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
             }}
             onDeleteUser={(id) => {
-              const u = managedUsers.find(u => u.id === id);
-              if (!u) return;
-              if (u.username === DEFAULT_ADMIN_USERNAME) { alert("❌ Cannot delete default admin!"); return; }
-              if (!confirm(`Delete user ${u.username}?`)) return;
+              const u = managedUsers.find(x => x.id === id);
+              if (!u || u.username === DEFAULT_ADMIN_USERNAME) { alert("❌ Cannot delete!"); return; }
+              if (!confirm(`Delete ${u.username}?`)) return;
               const nu = managedUsers.filter(x => x.id !== id);
-              setManagedUsers(nu);
-              saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
-              logAction("DELETE", "User", id, u, null);
+              setManagedUsers(nu); saveData(vendors, transactions, bills, wallet, nu, auditLogs, agents, agentWallet, agentOverrides);
+              logAction("DELETE", "User", id);
             }}
           />
         )}
-</div>
-</div>
+
+        {page === "audit" && isAdmin && <AuditLogsPage logs={auditLogs} />}
+
+        {page === "settings" && isAdmin && (
+          <SettingsPage
+            settings={settings}
+            onUpdateSettings={(s) => { setSettings(s); localStorage.setItem('AR_SETTINGS', JSON.stringify(s)); }}
+            onBackup={() => {
+              const backup = { timestamp: new Date().toISOString(), version: "3.0", data: { vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides } };
+              const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url;
+              a.download = `AR_Backup_${new Date().toISOString().split("T")[0]}.json`; a.click();
+              alert("✅ Backup downloaded!");
+            }}
+            onRestore={(file) => {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                try {
+                  const backup = JSON.parse(e.target?.result as string);
+                  if (!backup.data) throw new Error();
+                  setVendors(backup.data.vendors || []); setTransactions(backup.data.transactions || []);
+                  setBills(backup.data.bills || []); setWallet(backup.data.wallet || []);
+                  setManagedUsers(backup.data.managedUsers || []); setAuditLogs(backup.data.auditLogs || []);
+                  setAgents(backup.data.agents || []); setAgentWallet(backup.data.agentWallet || []);
+                  setAgentOverrides(backup.data.agentOverrides || []);
+                  saveData(backup.data.vendors||[], backup.data.transactions||[], backup.data.bills||[], backup.data.wallet||[], backup.data.managedUsers||[], backup.data.auditLogs||[], backup.data.agents||[], backup.data.agentWallet||[], backup.data.agentOverrides||[]);
+                  alert("✅ Restored!"); setTimeout(() => window.location.reload(), 1000);
+                } catch { alert("❌ Invalid backup!"); }
+              };
+              reader.readAsText(file);
+            }}
+            onClearData={() => {
+              if (!confirm("⚠️ Delete ALL data?")) return;
+              if (!confirm("⚠️ FINAL WARNING — sure?")) return;
+              localStorage.clear(); sessionStorage.clear(); window.location.reload();
+            }}
+            storageUsed={new Blob([JSON.stringify({ vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides })]).size}
+          />
+        )}
+
+      </div>
+    </div>
   );
 }
-// DashboardPage, VendorsPage, TransactionsPage
-// Paste this AFTER Part 2
-// ============================================================
+
 
 // ============================================================
 // DASHBOARD PAGE

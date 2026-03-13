@@ -530,12 +530,10 @@ function LoginPage({
         setError("தவறான Agent credentials!");
       }
 
-      // ── Vendor ──
+// ── Vendor ──
 else if (role === "vendor") {
-  // localStorage-லிருந்து நேரடியாக vendors எடு
   const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
   const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
-  
   const vendor = allVendors.find((v: any) =>
     (v.gstNo && v.gstNo.trim().toUpperCase() === username.trim().toUpperCase()) ||
     v.vendorCode.trim().toUpperCase() === username.trim().toUpperCase()
@@ -549,9 +547,8 @@ else if (role === "vendor") {
       district: vendor.district
     });
     return;
-  } else {
-    setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
   }
+  setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
 }
           onLogin({
             id: vendor.id,

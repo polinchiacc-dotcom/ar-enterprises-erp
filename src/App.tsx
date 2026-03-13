@@ -531,13 +531,27 @@ function LoginPage({
       }
 
       // ── Vendor ──
-      else if (role === "vendor") {
-        // Username = GST No or Vendor Code, Password = Mobile
-        const vendor = vendors.find(v =>
-          (v.gstNo && v.gstNo.toUpperCase() === username.toUpperCase()) ||
-          v.vendorCode.toUpperCase() === username.toUpperCase()
-        );
-        if (vendor && vendor.mobile === password) {
+else if (role === "vendor") {
+  // localStorage-லிருந்து நேரடியாக vendors எடு
+  const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
+  const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
+  
+  const vendor = allVendors.find((v: any) =>
+    (v.gstNo && v.gstNo.trim().toUpperCase() === username.trim().toUpperCase()) ||
+    v.vendorCode.trim().toUpperCase() === username.trim().toUpperCase()
+  );
+  if (vendor && vendor.mobile && vendor.mobile.trim() === password.trim()) {
+    onLogin({
+      id: vendor.id,
+      username: vendor.vendorCode,
+      password: vendor.mobile || "",
+      role: "vendor" as any,
+      district: vendor.district
+    });
+    return;
+  }
+  setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
+}
           onLogin({
             id: vendor.id,
             username: vendor.vendorCode,

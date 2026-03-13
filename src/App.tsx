@@ -1001,6 +1001,11 @@ export default function App() {
               const ua = [...agents, newAgent]; setAgents(ua);
               saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides);
             }}
+            onAddAgent={(newAgent) => {
+  const ua = [...agents, newAgent];
+  setAgents(ua);
+  saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides);
+}}
             user={user}
           />
         )}

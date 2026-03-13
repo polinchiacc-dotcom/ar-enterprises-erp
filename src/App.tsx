@@ -374,78 +374,183 @@ const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
 // இதாக REPLACE செய்யவும் (agents prop சேர்க்கப்பட்டது)
 // ============================================================
 
+// ============================================================
+// LANDING PAGE — 4 Role Buttons
+// Replace existing LoginPage function with these TWO functions
+// ============================================================
+
+// ── 1. Landing Page (முதல் பக்கம்) ──────────────────────────
+function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "district" | "agent" | "vendor") => void }) {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}
+    >
+      <div className="w-full max-w-lg px-6">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}
+          >
+            <span className="text-3xl font-bold text-gray-900">AR</span>
+          </div>
+          <h1 className="text-3xl font-bold text-white">AR Enterprises</h1>
+          <p className="text-sm mt-2" style={{ color: "#c9a227" }}>Multi-District Vendor ERP System V3.0</p>
+          <p className="text-xs text-gray-400 mt-1">உங்கள் role-ஐ தேர்ந்தெடுக்கவும்</p>
+        </div>
+
+        {/* Role Buttons */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Admin */}
+          <button
+            onClick={() => onSelectRole("admin")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)", border: "1px solid rgba(201,162,39,0.3)" }}
+          >
+            <div className="text-4xl mb-3">👑</div>
+            <p className="font-bold text-white text-lg">Admin</p>
+            <p className="text-xs text-gray-400 mt-1">Super Admin access</p>
+            <div className="mt-3 text-xs font-semibold" style={{ color: "#c9a227" }}>Login →</div>
+          </button>
+
+          {/* District */}
+          <button
+            onClick={() => onSelectRole("district")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #0c4a6e, #0369a1)", border: "1px solid rgba(56,189,248,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🏛️</div>
+            <p className="font-bold text-white text-lg">District</p>
+            <p className="text-xs text-gray-400 mt-1">District Manager access</p>
+            <div className="mt-3 text-xs font-semibold text-sky-300">Login →</div>
+          </button>
+
+          {/* Agent */}
+          <button
+            onClick={() => onSelectRole("agent")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed)", border: "1px solid rgba(167,139,250,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🤝</div>
+            <p className="font-bold text-white text-lg">Agent</p>
+            <p className="text-xs text-gray-400 mt-1">Field Agent access</p>
+            <div className="mt-3 text-xs font-semibold text-purple-300">Login →</div>
+          </button>
+
+          {/* Vendor */}
+          <button
+            onClick={() => onSelectRole("vendor")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #14532d, #15803d)", border: "1px solid rgba(74,222,128,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🏢</div>
+            <p className="font-bold text-white text-lg">Vendor</p>
+            <p className="text-xs text-gray-400 mt-1">Vendor self-service</p>
+            <div className="mt-3 text-xs font-semibold text-green-300">Login →</div>
+          </button>
+        </div>
+
+        <p className="text-center text-xs text-gray-500 mt-8">🔒 AR Enterprises ERP V3.0 — Secured</p>
+      </div>
+    </div>
+  );
+}
+
+// ── 2. Role-specific Login Page ───────────────────────────────
 function LoginPage({
+  role,
   onLogin,
+  onBack,
   managedUsers,
-  agents
+  agents,
+  vendors
 }: {
+  role: "admin" | "district" | "agent" | "vendor";
   onLogin: (u: User) => void;
+  onBack: () => void;
   managedUsers: ManagedUser[];
   agents: Agent[];
+  vendors: Vendor[];
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const roleConfig = {
+    admin:    { icon: "👑", label: "Admin Login",    color: "#c9a227",  hint: "Admin username & password" },
+    district: { icon: "🏛️", label: "District Login", color: "#38bdf8",  hint: "District manager credentials" },
+    agent:    { icon: "🤝", label: "Agent Login",    color: "#a78bfa",  hint: "Agent username & password" },
+    vendor:   { icon: "🏢", label: "Vendor Login",   color: "#4ade80",  hint: "GST No (or Vendor Code) + Mobile" },
+  };
+  const cfg = roleConfig[role];
+
   const handleLogin = async () => {
-    if (!username || !password) {
-      setError("Username மற்றும் Password தேவை!");
-      return;
-    }
-    setLoading(true);
-    setError("");
+    if (!username || !password) { setError("Username மற்றும் Password தேவை!"); return; }
+    setLoading(true); setError("");
     try {
-      // 1. Admin check
-      if (username === DEFAULT_ADMIN_USERNAME) {
-        const storedAdmin = managedUsers.find(u => u.username === DEFAULT_ADMIN_USERNAME);
-        if (storedAdmin) {
-          const isValid = await verifyPassword(password, storedAdmin.password);
-          if (isValid) {
-            onLogin({ id: storedAdmin.id, username: storedAdmin.username, password: storedAdmin.password, role: "admin" });
-            return;
+      // ── Admin ──
+      if (role === "admin") {
+        if (username === DEFAULT_ADMIN_USERNAME) {
+          const storedAdmin = managedUsers.find(u => u.username === DEFAULT_ADMIN_USERNAME);
+          if (storedAdmin) {
+            const ok = await verifyPassword(password, storedAdmin.password);
+            if (ok) { onLogin({ id: storedAdmin.id, username: storedAdmin.username, password: storedAdmin.password, role: "admin" }); return; }
+          } else if (password === DEFAULT_ADMIN_PASSWORD) {
+            const hp = await hashPassword(DEFAULT_ADMIN_PASSWORD);
+            onLogin({ id: "U001", username: DEFAULT_ADMIN_USERNAME, password: hp, role: "admin" }); return;
           }
-        } else if (password === DEFAULT_ADMIN_PASSWORD) {
-          const hashedPassword = await hashPassword(DEFAULT_ADMIN_PASSWORD);
-          onLogin({ id: "U001", username: DEFAULT_ADMIN_USERNAME, password: hashedPassword, role: "admin" });
-          return;
         }
+        setError("தவறான Admin credentials!");
       }
 
-      // 2. Agent check — approved
-      const approvedAgent = agents.find(a => a.username === username && a.status === "approved");
-      if (approvedAgent) {
-        const isValid = await verifyPassword(password, approvedAgent.password);
-        if (isValid) {
-          onLogin({ id: approvedAgent.id, username: approvedAgent.username, password: approvedAgent.password, role: "agent" as any });
-          return;
+      // ── District ──
+      else if (role === "district") {
+        const u = managedUsers.find(x => x.username === username && x.active);
+        if (u) {
+          const ok = await verifyPassword(password, u.password);
+          if (ok) { onLogin({ id: u.id, username: u.username, password: u.password, role: "district", district: u.district }); return; }
         }
+        setError("தவறான credentials அல்லது account inactive!");
       }
 
-      // 3. Pending agent — special message
-      const pendingAgent = agents.find(a => a.username === username && a.status === "pending");
-      if (pendingAgent) {
-        const isValid = await verifyPassword(password, pendingAgent.password);
-        if (isValid) {
-          setError("⏳ உங்கள் account admin approval-க்காக காத்திருக்கிறது!");
-          setLoading(false);
-          return;
+      // ── Agent ──
+      else if (role === "agent") {
+        const approved = agents.find(a => a.username === username && a.status === "approved");
+        if (approved) {
+          const ok = await verifyPassword(password, approved.password);
+          if (ok) { onLogin({ id: approved.id, username: approved.username, password: approved.password, role: "agent" as any }); return; }
         }
+        const pending = agents.find(a => a.username === username && a.status === "pending");
+        if (pending) {
+          const ok = await verifyPassword(password, pending.password);
+          if (ok) { setError("⏳ உங்கள் account admin approval-க்காக காத்திருக்கிறது!"); setLoading(false); return; }
+        }
+        setError("தவறான Agent credentials!");
       }
 
-      // 4. District user check
-      const distUser = managedUsers.find(u => u.username === username && u.active);
-      if (distUser) {
-        const isValid = await verifyPassword(password, distUser.password);
-        if (isValid) {
-          onLogin({ id: distUser.id, username: distUser.username, password: distUser.password, role: "district", district: distUser.district });
+      // ── Vendor ──
+      else if (role === "vendor") {
+        // Username = GST No or Vendor Code, Password = Mobile
+        const vendor = vendors.find(v =>
+          (v.gstNo && v.gstNo.toUpperCase() === username.toUpperCase()) ||
+          v.vendorCode.toUpperCase() === username.toUpperCase()
+        );
+        if (vendor && vendor.mobile === password) {
+          onLogin({
+            id: vendor.id,
+            username: vendor.vendorCode,
+            password: vendor.mobile || "",
+            role: "vendor" as any,
+            district: vendor.district
+          });
           return;
         }
+        setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
       }
-
-      setError("தவறான username அல்லது password!");
     } catch (err) {
-      setError("Login error occurred!");
+      setError("Login error!");
       console.error(err);
     } finally {
       setLoading(false);
@@ -461,51 +566,61 @@ function LoginPage({
         className="w-full max-w-md p-8 rounded-2xl shadow-2xl"
         style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(20px)" }}
       >
+        {/* Back */}
+        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
+          ← Back to Home
+        </button>
+
+        {/* Header */}
         <div className="text-center mb-8">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}
-          >
-            <span className="text-2xl font-bold text-gray-900">AR</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">AR Enterprises</h1>
-          <p className="text-sm mt-1" style={{ color: "#c9a227" }}>Multi-District Vendor ERP System V3.0</p>
+          <div className="text-5xl mb-3">{cfg.icon}</div>
+          <h1 className="text-2xl font-bold text-white">{cfg.label}</h1>
+          <p className="text-xs mt-2 text-gray-400">{cfg.hint}</p>
         </div>
 
+        {/* Form */}
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Username</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {role === "vendor" ? "GST Number / Vendor Code" : "Username"}
+            </label>
             <input
               type="text" value={username}
-              onChange={e => setUsername(sanitizeInput(e.target.value))}
+              onChange={e => setUsername(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              placeholder="Enter username" autoComplete="off" disabled={loading}
+              placeholder={role === "vendor" ? "33AAAAA0000A1Z5 or PDK25HW001" : "Enter username"}
+              autoComplete="off" disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Password</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {role === "vendor" ? "Mobile Number" : "Password"}
+            </label>
             <input
-              type="password" value={password}
+              type={role === "vendor" ? "text" : "password"} value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              placeholder="Enter password" autoComplete="new-password" disabled={loading}
+              placeholder={role === "vendor" ? "9876543210" : "Enter password"}
+              autoComplete="new-password" disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
             />
           </div>
+
           {error && (
             <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/50">
               <p className="text-red-300 text-xs text-center">{error}</p>
             </div>
           )}
+
           <button
             onClick={handleLogin} disabled={loading}
-            className="w-full py-2.5 rounded-lg font-semibold text-gray-900 text-sm transition-all disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}
+            className="w-full py-2.5 rounded-lg font-semibold text-gray-900 text-sm transition-all disabled:opacity-50 hover:scale-105"
+            style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
           >
-            {loading ? "🔄 Logging in..." : "Login →"}
+            {loading ? "🔄 Logging in..." : `${cfg.icon} Login →`}
           </button>
         </div>
 
@@ -516,6 +631,7 @@ function LoginPage({
     </div>
   );
 }
+
 
 // ============================================================
 // END — Updated LoginPage

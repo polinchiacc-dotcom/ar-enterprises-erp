@@ -369,12 +369,19 @@ const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
 // ============================================================
 // LOGIN PAGE COMPONENT
 // ============================================================
+// ============================================================
+// UPDATED LoginPage — PART 1-ல் உள்ள பழைய LoginPage-ஐ
+// இதாக REPLACE செய்யவும் (agents prop சேர்க்கப்பட்டது)
+// ============================================================
+
 function LoginPage({
   onLogin,
-  managedUsers
+  managedUsers,
+  agents
 }: {
   onLogin: (u: User) => void;
   managedUsers: ManagedUser[];
+  agents: Agent[];
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -389,47 +396,53 @@ function LoginPage({
     setLoading(true);
     setError("");
     try {
-      // Admin check
+      // 1. Admin check
       if (username === DEFAULT_ADMIN_USERNAME) {
         const storedAdmin = managedUsers.find(u => u.username === DEFAULT_ADMIN_USERNAME);
         if (storedAdmin) {
           const isValid = await verifyPassword(password, storedAdmin.password);
           if (isValid) {
-            onLogin({
-              id: storedAdmin.id,
-              username: storedAdmin.username,
-              password: storedAdmin.password,
-              role: "admin"
-            });
+            onLogin({ id: storedAdmin.id, username: storedAdmin.username, password: storedAdmin.password, role: "admin" });
             return;
           }
         } else if (password === DEFAULT_ADMIN_PASSWORD) {
-          // First-time login — hash and save
           const hashedPassword = await hashPassword(DEFAULT_ADMIN_PASSWORD);
-          onLogin({
-            id: "U001",
-            username: DEFAULT_ADMIN_USERNAME,
-            password: hashedPassword,
-            role: "admin"
-          });
+          onLogin({ id: "U001", username: DEFAULT_ADMIN_USERNAME, password: hashedPassword, role: "admin" });
           return;
         }
       }
-      // District user check
+
+      // 2. Agent check — approved
+      const approvedAgent = agents.find(a => a.username === username && a.status === "approved");
+      if (approvedAgent) {
+        const isValid = await verifyPassword(password, approvedAgent.password);
+        if (isValid) {
+          onLogin({ id: approvedAgent.id, username: approvedAgent.username, password: approvedAgent.password, role: "agent" as any });
+          return;
+        }
+      }
+
+      // 3. Pending agent — special message
+      const pendingAgent = agents.find(a => a.username === username && a.status === "pending");
+      if (pendingAgent) {
+        const isValid = await verifyPassword(password, pendingAgent.password);
+        if (isValid) {
+          setError("⏳ உங்கள் account admin approval-க்காக காத்திருக்கிறது!");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 4. District user check
       const distUser = managedUsers.find(u => u.username === username && u.active);
       if (distUser) {
         const isValid = await verifyPassword(password, distUser.password);
         if (isValid) {
-          onLogin({
-            id: distUser.id,
-            username: distUser.username,
-            password: distUser.password,
-            role: "district",
-            district: distUser.district
-          });
+          onLogin({ id: distUser.id, username: distUser.username, password: distUser.password, role: "district", district: distUser.district });
           return;
         }
       }
+
       setError("தவறான username அல்லது password!");
     } catch (err) {
       setError("Login error occurred!");
@@ -446,11 +459,7 @@ function LoginPage({
     >
       <div
         className="w-full max-w-md p-8 rounded-2xl shadow-2xl"
-        style={{
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          backdropFilter: "blur(20px)"
-        }}
+        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(20px)" }}
       >
         <div className="text-center mb-8">
           <div
@@ -460,22 +469,17 @@ function LoginPage({
             <span className="text-2xl font-bold text-gray-900">AR</span>
           </div>
           <h1 className="text-2xl font-bold text-white">AR Enterprises</h1>
-          <p className="text-sm mt-1" style={{ color: "#c9a227" }}>
-            Multi-District Vendor ERP System V3.0
-          </p>
+          <p className="text-sm mt-1" style={{ color: "#c9a227" }}>Multi-District Vendor ERP System V3.0</p>
         </div>
 
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Username</label>
             <input
-              type="text"
-              value={username}
+              type="text" value={username}
               onChange={e => setUsername(sanitizeInput(e.target.value))}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              placeholder="Enter username"
-              autoComplete="off"
-              disabled={loading}
+              placeholder="Enter username" autoComplete="off" disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
             />
@@ -483,13 +487,10 @@ function LoginPage({
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Password</label>
             <input
-              type="password"
-              value={password}
+              type="password" value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              placeholder="Enter password"
-              autoComplete="new-password"
-              disabled={loading}
+              placeholder="Enter password" autoComplete="new-password" disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
             />
@@ -500,8 +501,7 @@ function LoginPage({
             </div>
           )}
           <button
-            onClick={handleLogin}
-            disabled={loading}
+            onClick={handleLogin} disabled={loading}
             className="w-full py-2.5 rounded-lg font-semibold text-gray-900 text-sm transition-all disabled:opacity-50"
             style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}
           >
@@ -510,15 +510,16 @@ function LoginPage({
         </div>
 
         <div className="mt-6 pt-4 border-t border-gray-700">
-          <p className="text-xs text-gray-400 text-center">
-            🔒 AR Enterprises ERP V3.0
-          </p>
+          <p className="text-xs text-gray-400 text-center">🔒 AR Enterprises ERP V3.0</p>
         </div>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// END — Updated LoginPage
+// ============================================================
 // ============================================================
 // END OF PART 1
 // Next: PART 2 — Main App Component (App function)

@@ -1220,7 +1220,10 @@ export default function App() {
             }}
           />
         )}
-
+</div>
+</div>
+  );
+}
 // DashboardPage, VendorsPage, TransactionsPage
 // Paste this AFTER Part 2
 // ============================================================

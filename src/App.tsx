@@ -1257,7 +1257,7 @@ function DashboardPage({
   const closedTxns = transactions.filter(t => t.status === "Closed").length;
   const totalProfit = transactions
   .filter(t => t.status === "Closed" || t.confirmedByAdmin)
-  .reduce((s, t) => s + (t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)), 0);
+  .reduce((s, t) => s + ((t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)) > 0 ? (t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)) : round2(t.expectedAmount * PROFIT_RATE)), 0);
 
   // Agent Add Form State
   const [showAgentForm, setShowAgentForm] = useState(false);
@@ -2794,7 +2794,7 @@ function AnalyticsPage({
   const totalExpected  = transactions.reduce((s, t) => s + t.expectedAmount, 0);
   const totalBillsAmt  = bills.reduce((s, b) => s + b.billAmount, 0);
   const totalGST       = transactions.reduce((s, t) => s + t.gstAmount, 0);
-  const totalProfit    = transactions.filter(t => t.status === "Closed").reduce((s, t) => s + t.profit, 0);
+  const totalProfit    = transactions.filter(t => t.status === "Closed").reduce((s, t) => s + (t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)), 0);
   const walletBalance  = wallet.length > 0 ? wallet[wallet.length - 1].balance : 0;
 
   const districtSummary = DISTRICTS.map(d => {
@@ -2805,7 +2805,7 @@ function AnalyticsPage({
       expected: dT.reduce((s, t) => s + t.expectedAmount, 0),
       gst: dT.reduce((s, t) => s + t.gstAmount, 0),
       bills: dB.reduce((s, b) => s + b.billAmount, 0),
-      profit: dT.filter(t => t.status === "Closed").reduce((s, t) => s + t.profit, 0),
+      profit: dT.filter(t => t.status === "Closed").reduce((s, t) => s + (t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)), 0),
       closed: dT.filter(t => t.status === "Closed").length,
     };
   }).filter(d => d.txnCount > 0).sort((a, b) => b.expected - a.expected);

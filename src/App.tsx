@@ -486,23 +486,61 @@ function LoginPage({
   };
   const cfg = roleConfig[role];
 
-  const handleLogin = async () => {
-    if (!username || !password) { setError("Username மற்றும் Password தேவை!"); return; }
-    setLoading(true); setError("");
-    try {
-      // ── Admin ──
-      if (role === "admin") {
-        if (username === DEFAULT_ADMIN_USERNAME) {
-          const storedAdmin = managedUsers.find(u => u.username === DEFAULT_ADMIN_USERNAME);
-          if (storedAdmin) {
-            const ok = await verifyPassword(password, storedAdmin.password);
-            if (ok) { onLogin({ id: storedAdmin.id, username: storedAdmin.username, password: storedAdmin.password, role: "admin" }); return; }
-          } else if (password === DEFAULT_ADMIN_PASSWORD) {
-            const hp = await hashPassword(DEFAULT_ADMIN_PASSWORD);
-            onLogin({ id: "U001", username: DEFAULT_ADMIN_USERNAME, password: hp, role: "admin" }); return;
-          }
+const handleLogin = async () => {
+  if (!username || !password) { setError("Username மற்றும் Password தேவை!"); return; }
+  setLoading(true); setError("");
+  try {
+    if (role === "admin") {
+      if (username === DEFAULT_ADMIN_USERNAME) {
+        const storedAdmin = managedUsers.find(u => u.username === DEFAULT_ADMIN_USERNAME);
+        if (storedAdmin) {
+          const ok = await verifyPassword(password, storedAdmin.password);
+          if (ok) { onLogin({ id: storedAdmin.id, username: storedAdmin.username, password: storedAdmin.password, role: "admin" }); return; }
+        } else if (password === DEFAULT_ADMIN_PASSWORD) {
+          const hp = await hashPassword(DEFAULT_ADMIN_PASSWORD);
+          onLogin({ id: "U001", username: DEFAULT_ADMIN_USERNAME, password: hp, role: "admin" }); return;
         }
-        setError("தவறான Admin credentials!");
+      }
+      setError("தவறான Admin credentials!");
+    } else if (role === "district") {
+      const u = managedUsers.find(x => x.username === username && x.active);
+      if (u) {
+        const ok = await verifyPassword(password, u.password);
+        if (ok) { onLogin({ id: u.id, username: u.username, password: u.password, role: "district", district: u.district }); return; }
+      }
+      setError("தவறான credentials அல்லது account inactive!");
+    } else if (role === "agent") {
+      const approved = agents.find(a => a.username === username && a.status === "approved");
+      if (approved) {
+        const ok = await verifyPassword(password, approved.password);
+        if (ok) { onLogin({ id: approved.id, username: approved.username, password: approved.password, role: "agent" as any }); return; }
+      }
+      const pending = agents.find(a => a.username === username && a.status === "pending");
+      if (pending) {
+        const ok = await verifyPassword(password, pending.password);
+        if (ok) { setError("⏳ உங்கள் account admin approval-க்காக காத்திருக்கிறது!"); setLoading(false); return; }
+      }
+      setError("தவறான Agent credentials!");
+    } else if (role === "vendor") {
+      const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
+      const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
+      const vendor = allVendors.find((v: any) =>
+        (v.gstNo && v.gstNo.trim().toUpperCase() === username.trim().toUpperCase()) ||
+        v.vendorCode.trim().toUpperCase() === username.trim().toUpperCase()
+      );
+      if (vendor && vendor.mobile && vendor.mobile.trim() === password.trim()) {
+        onLogin({ id: vendor.id, username: vendor.vendorCode, password: vendor.mobile || "", role: "vendor" as any, district: vendor.district });
+        return;
+      }
+      setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
+    }
+  } catch (err) {
+    setError("Login error!");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
       }
 
       // ── District ──

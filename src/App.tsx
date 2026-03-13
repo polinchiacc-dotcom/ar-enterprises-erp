@@ -3448,7 +3448,383 @@ function AdminAgentsPage({
 // ============================================================
 // END OF AGENT PART 3
 // ============================================================
+// ============================================================
+// AGENT FEATURE — PART 4 of 5
+// AgentDashboardPage + Manager-ல் Agent Add feature
+//
+// 📌 எங்கே paste செய்வது:
+//    AdminAgentsPage (Part 3) க்கு கீழே paste செய்யவும்
+// ============================================================
 
+// ── Agent Dashboard (Agent login ஆனால் காண்பிக்கும் page) ──
+function AgentDashboardPage({
+  agent, transactions, vendors, bills, agentWallet, agentOverrides, commissionSlabs,
+  onAddVendor, onAddTransaction, onAddBill, onBulkAddBill, onLogout
+}: {
+  agent: Agent;
+  transactions: Transaction[];
+  vendors: Vendor[];
+  bills: Bill[];
+  agentWallet: AgentWalletEntry[];
+  agentOverrides: AgentVendorOverride[];
+  commissionSlabs: CommissionSlab[];
+  onAddVendor: (v: Vendor) => void;
+  onAddTransaction: (t: Transaction, advance: number) => void;
+  onAddBill: (b: Bill) => void;
+  onBulkAddBill: (bills: Bill[]) => void;
+  onLogout: () => void;
+}) {
+  const [page, setPage] = useState<"dashboard" | "vendors" | "transactions" | "bills" | "wallet">("dashboard");
+  const [selectedDistrict, setSelectedDistrict] = useState(agent.managerDistrict);
+
+  // Agent's own data
+  const myTxns   = transactions.filter(t => t.createdByAgent === agent.agentId);
+  const myBills  = bills.filter(b => myTxns.some(t => t.txnId === b.txnId));
+  const myWallet = agentWallet.filter(w => w.agentId === agent.id);
+
+  // Filter vendors by selected district
+  const districtVendors = vendors.filter(v => v.district === selectedDistrict);
+  const districtOpenTxns = myTxns.filter(t => t.district === selectedDistrict && t.status === "Open");
+
+  const totalCommission  = myWallet.reduce((s, w) => s + w.commissionAmount, 0);
+  const totalTxnAmt      = myTxns.reduce((s, t) => s + t.expectedAmount, 0);
+  const openTxns         = myTxns.filter(t => t.status === "Open").length;
+  const closedTxns       = myTxns.filter(t => t.status === "Closed").length;
+
+  // Month filter for wallet
+  const [walletMonth, setWalletMonth] = useState("");
+  const filteredWallet = myWallet.filter(w =>
+    !walletMonth || w.date.startsWith(walletMonth)
+  );
+
+  const navItems = [
+    { id: "dashboard",    label: "Dashboard",    icon: "📊" },
+    { id: "vendors",      label: "Vendors",      icon: "🏢" },
+    { id: "transactions", label: "Transactions", icon: "📋" },
+    { id: "bills",        label: "Bills",        icon: "🧾" },
+    { id: "wallet",       label: "My Wallet",    icon: "💰" },
+  ] as const;
+
+  return (
+    <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5" }}>
+      {/* Sidebar */}
+      <div className="w-56 flex-shrink-0" style={{ background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)" }}>
+        <div className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <p className="font-bold text-sm" style={{ color: "#f0d060" }}>AR Enterprises</p>
+          <p className="text-xs text-gray-400">Agent Portal</p>
+        </div>
+        <div className="p-3 m-3 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+          <p className="text-xs text-gray-400">🤝 Agent</p>
+          <p className="text-xs font-bold text-white truncate">{agent.fullName}</p>
+          <p className="text-xs text-green-400 mt-1">💰 {fmt(agent.commissionBalance)}</p>
+        </div>
+        <nav className="p-2 space-y-1">
+          {navItems.map(n => (
+            <button key={n.id} onClick={() => setPage(n.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${page === n.id ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+              style={page === n.id ? { background: "linear-gradient(135deg, #f0d060, #c9a227)" } : {}}
+            >
+              <span>{n.icon}</span><span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="absolute bottom-4 left-0 w-56 px-3">
+          <button onClick={onLogout} className="w-full py-2 rounded-lg text-xs text-gray-400 hover:text-white transition-all" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>🚪 Logout</button>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="flex-1 overflow-y-auto">
+
+        {/* District Selector — always visible */}
+        <div className="sticky top-0 z-10 px-6 py-3 flex items-center gap-3" style={{ background: "rgba(240,242,245,0.95)", borderBottom: "1px solid #e5e7eb" }}>
+          <span className="text-sm font-medium text-gray-600">🏛️ Working District:</span>
+          <select value={selectedDistrict} onChange={e => setSelectedDistrict(e.target.value)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:border-blue-500 bg-white">
+            {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <span className="text-xs text-gray-400">| எந்த district-லும் work செய்யலாம்</span>
+        </div>
+
+        {/* Dashboard */}
+        {page === "dashboard" && (
+          <div className="p-6 space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">👋 வணக்கம், {agent.fullName}!</h1>
+              <p className="text-sm text-gray-500">{agent.agentId} | Manager: {agent.managerName} ({agent.managerDistrict})</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "My Transactions",  value: myTxns.length, color: "#0369a1" },
+                { label: "Total Amount",     value: fmt(totalTxnAmt), color: "#b45309" },
+                { label: "Commission Earned",value: fmt(round2(totalCommission)), color: "#15803d" },
+                { label: "Wallet Balance",   value: fmt(agent.commissionBalance), color: "#7c3aed" },
+              ].map(s => (
+                <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <p className="text-xs text-gray-500 uppercase font-medium">{s.label}</p>
+                  <p className="text-2xl font-bold mt-2" style={{ color: s.color }}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Commission Info */}
+            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+              <h2 className="font-bold text-gray-800 mb-3">💰 My Commission Setup</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
+                  <p className="text-sm font-medium text-blue-700">Commission Type</p>
+                  <p className="text-lg font-bold text-blue-900 mt-1">
+                    {agent.commissionType === "custom"
+                      ? `✏️ Custom — ${agent.customCommissionPercent}%`
+                      : "📊 Auto (GST-based Slab)"}
+                  </p>
+                </div>
+                {agent.commissionType === "auto" && (
+                  <div className="p-4 rounded-lg" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                    <p className="text-sm font-medium text-green-700">Current Slab Rates</p>
+                    <div className="mt-2 space-y-1">
+                      {commissionSlabs.filter(s => s.agentCommission > 0).map(s => (
+                        <p key={s.gstPercent} className="text-xs text-green-700">GST {s.gstPercent}% → Commission {s.agentCommission}%</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent transactions */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">Recent Transactions</h2></div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead style={{ background: "#f8fafc" }}>
+                    <tr>{["TXN ID","Vendor","District","Amount","GST%","Commission","Status"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {myTxns.slice(0, 8).map(t => {
+                      const comm = calcAgentCommission(agent, t.vendorCode, t.gstPercent, t.expectedAmount, agentOverrides, commissionSlabs);
+                      return (
+                        <tr key={t.txnId} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-mono text-xs text-blue-700 font-bold">{t.txnId}</td>
+                          <td className="px-4 py-3 font-semibold text-gray-800">{t.vendorName}</td>
+                          <td className="px-4 py-3 text-gray-600">{t.district}</td>
+                          <td className="px-4 py-3 font-semibold">{fmt(t.expectedAmount)}</td>
+                          <td className="px-4 py-3">{t.gstPercent}%</td>
+                          <td className="px-4 py-3 text-green-700 font-semibold">
+                            {t.status === "Closed"
+                              ? (() => { const w = myWallet.find(w => w.txnId === t.txnId); return w ? fmt(w.commissionAmount) : "—"; })()
+                              : `~${fmt(comm.amount)} (${comm.percent}%)`}
+                          </td>
+                          <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${t.status === "Closed" ? "bg-green-100 text-green-700" : t.status === "PendingClose" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{t.status}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {myTxns.length === 0 && <p className="text-center py-8 text-gray-400">No transactions yet</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Wallet Page */}
+        {page === "wallet" && (
+          <div className="p-6 space-y-4">
+            <h1 className="text-2xl font-bold text-gray-800">💰 My Commission Wallet</h1>
+
+            <div className="rounded-xl p-6 text-white" style={{ background: "linear-gradient(135deg, #1a1a2e, #16213e)" }}>
+              <p className="text-sm text-gray-300">Current Balance</p>
+              <p className="text-5xl font-bold mt-2" style={{ color: "#f0d060" }}>{fmt(agent.commissionBalance)}</p>
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-white/10">
+                <div><p className="text-xs text-gray-400">Total Earned</p><p className="font-bold text-lg mt-1">{fmt(round2(totalCommission))}</p></div>
+                <div><p className="text-xs text-gray-400">Transactions</p><p className="font-bold text-lg mt-1">{closedTxns} closed</p></div>
+                <div><p className="text-xs text-gray-400">Pending</p><p className="font-bold text-lg mt-1">{openTxns} open</p></div>
+              </div>
+            </div>
+
+            {/* Month/Date filter */}
+            <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-600">Month Filter:</label>
+              <input type="month" value={walletMonth} onChange={e => setWalletMonth(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-blue-500" />
+              {walletMonth && <button onClick={() => setWalletMonth("")} className="text-xs text-gray-400 hover:text-gray-600">Clear ✕</button>}
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead style={{ background: "#1a1a2e" }}>
+                    <tr>{["Date","Vendor","TXN","Amount","GST%","Commission%","Earned","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[...filteredWallet].reverse().map(w => (
+                      <tr key={w.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-3 text-xs text-gray-500">{w.date}</td>
+                        <td className="px-3 py-3 font-semibold text-gray-800">{w.vendorName}</td>
+                        <td className="px-3 py-3 font-mono text-xs text-blue-700">{w.txnId}</td>
+                        <td className="px-3 py-3">{fmt(w.billAmount)}</td>
+                        <td className="px-3 py-3">{w.gstPercent}%</td>
+                        <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${w.commissionType === "custom" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{w.commissionPercent}%</span></td>
+                        <td className="px-3 py-3 font-bold text-green-700">{fmt(w.commissionAmount)}</td>
+                        <td className="px-3 py-3 font-bold text-gray-800">{fmt(w.balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredWallet.length === 0 && <p className="text-center py-8 text-gray-400">No commission entries found</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vendors, Transactions, Bills — reuse existing pages with district filter */}
+        {page === "vendors" && (
+          <VendorsPage
+            isAdmin={false} district={selectedDistrict}
+            vendors={vendors.filter(v => v.district === selectedDistrict)}
+            allVendors={vendors}
+            onAdd={onAddVendor} onUpdate={() => {}} onDelete={() => {}}
+          />
+        )}
+
+        {page === "transactions" && (
+          <TransactionsPage
+            isAdmin={false} district={selectedDistrict}
+            transactions={myTxns.filter(t => t.district === selectedDistrict)}
+            vendors={districtVendors} bills={myBills}
+            onAdd={(txn, advance) => onAddTransaction({ ...txn, createdByAgent: agent.agentId, agentName: agent.fullName }, advance)}
+            onClose={() => {}} onUpdate={() => {}} onDelete={() => {}}
+          />
+        )}
+
+        {page === "bills" && (
+          <BillsPage
+            isAdmin={false} district={selectedDistrict}
+            bills={myBills.filter(b => b.district === selectedDistrict)}
+            transactions={districtOpenTxns} vendors={districtVendors}
+            onAdd={onAddBill} onBulkAdd={onBulkAddBill} onUpdate={() => {}} onDelete={() => {}}
+          />
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ── Manager Add Agent Modal ──────────────────────────────────
+// 📌 VendorsPage-க்கு கீழே paste செய்யவும்
+// Manager (district user) இந்த component மூலம் agents add செய்கிறார்
+
+function ManagerAddAgentSection({
+  manager, agents, onAddAgent
+}: {
+  manager: User;
+  agents: Agent[];
+  onAddAgent: (agent: Agent) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNo, setAccountNo] = useState("");
+  const [ifsc, setIfsc] = useState("");
+  const [upi, setUpi] = useState("");
+
+  const myAgents = agents.filter(a => a.managerId === manager.id);
+
+  const handleAdd = async () => {
+    if (!fullName || !mobile || !username || !password) {
+      alert("❌ அனைத்து fields-ம் தேவை!"); return;
+    }
+    if (agents.some(a => a.username === username)) {
+      alert("❌ Username already exists!"); return;
+    }
+    const hashedPassword = await hashPassword(password);
+    onAddAgent({
+      id: genId("AGT"),
+      agentId: genAgentId(agents),
+      username, password: hashedPassword,
+      fullName: sanitizeInput(fullName),
+      mobile: sanitizeInput(mobile),
+      managerId: manager.id,
+      managerName: manager.username,
+      managerDistrict: manager.district || "",
+      commissionType: "auto",
+      customCommissionPercent: 0,
+      bankName, accountNumber: accountNo, ifscCode: ifsc, upiId: upi,
+      status: "pending",
+      commissionBalance: 0,
+      createdAt: new Date().toISOString()
+    });
+    setFullName(""); setMobile(""); setUsername(""); setPassword("");
+    setBankName(""); setAccountNo(""); setIfsc(""); setUpi("");
+    setShowForm(false);
+    alert("✅ Agent registration request submitted!\n\nAdmin approval-க்கு காத்திருக்கவும்.");
+  };
+
+  return (
+    <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-bold text-gray-800">🤝 My Agents ({myAgents.length})</h2>
+          <p className="text-xs text-gray-500">நீங்கள் add செய்த agents</p>
+        </div>
+        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #9333ea)" }}>+ New Agent</button>
+      </div>
+
+      {/* My agents list */}
+      {myAgents.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+          <table className="w-full text-sm">
+            <thead style={{ background: "#f8fafc" }}>
+              <tr>{["Agent ID","Name","Mobile","Status","Commission"].map(h => <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {myAgents.map(a => (
+                <tr key={a.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2.5 font-mono text-xs text-blue-700 font-bold">{a.agentId}</td>
+                  <td className="px-3 py-2.5 font-semibold text-gray-800">{a.fullName}</td>
+                  <td className="px-3 py-2.5 text-gray-600">{a.mobile}</td>
+                  <td className="px-3 py-2.5"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${a.status === "approved" ? "bg-green-100 text-green-700" : a.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>{a.status}</span></td>
+                  <td className="px-3 py-2.5 text-xs">{a.commissionType === "custom" ? `${a.customCommissionPercent}% custom` : "Auto slab"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add Agent Form */}
+      {showForm && (
+        <div className="space-y-4 p-4 rounded-xl border-2 border-purple-200 bg-purple-50">
+          <h3 className="font-bold text-purple-800">புதிய Agent Register</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label className="text-xs text-gray-600 mb-1 block font-medium">Full Name <span className="text-red-500">*</span></label><input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Agent full name" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block font-medium">Mobile <span className="text-red-500">*</span></label><input value={mobile} onChange={e => setMobile(e.target.value)} placeholder="9876543210" maxLength={10} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block font-medium">Username <span className="text-red-500">*</span></label><input value={username} onChange={e => setUsername(e.target.value.toLowerCase())} placeholder="agent_username" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block font-medium">Password <span className="text-red-500">*</span></label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Strong password" autoComplete="new-password" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" /></div>
+          </div>
+          <p className="text-xs font-bold text-gray-600 mt-2">🏦 Bank Details (Optional)</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label className="text-xs text-gray-600 mb-1 block">Bank Name</label><input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="SBI / HDFC / etc." className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block">Account Number</label><input value={accountNo} onChange={e => setAccountNo(e.target.value)} placeholder="Account number" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block">IFSC Code</label><input value={ifsc} onChange={e => setIfsc(e.target.value.toUpperCase())} placeholder="SBIN0001234" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none" /></div>
+            <div><label className="text-xs text-gray-600 mb-1 block">UPI ID</label><input value={upi} onChange={e => setUpi(e.target.value)} placeholder="agent@upi" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none" /></div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={handleAdd} className="px-6 py-2.5 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all" style={{ background: "#7c3aed" }}>📤 Submit for Approval</button>
+            <button onClick={() => setShowForm(false)} className="px-6 py-2.5 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// END OF AGENT PART 4
+// ============================================================
 function SettingsPage({
   settings, onUpdateSettings, onBackup, onRestore, onClearData, storageUsed
 }: {

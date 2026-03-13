@@ -2943,6 +2943,512 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
 // ============================================================
 // SETTINGS PAGE
 // ============================================================
+// ============================================================
+// AGENT FEATURE — PART 3 of 5
+// AdminAgentsPage — புதிய Component
+//
+// 📌 எங்கே paste செய்வது:
+//    App.tsx PART 4-ல் SettingsPage function-க்கு முன்னால்
+//    இந்த முழு component-ஐ paste செய்யவும்
+// ============================================================
+
+function AdminAgentsPage({
+  agents, agentWallet, agentOverrides, commissionSlabs,
+  transactions, vendors, bills,
+  onApprove, onReject, onSuspend, onDelete,
+  onSetCommission, onAddOverride, onDeleteOverride,
+  onUpdateSlabs
+}: {
+  agents: Agent[];
+  agentWallet: AgentWalletEntry[];
+  agentOverrides: AgentVendorOverride[];
+  commissionSlabs: CommissionSlab[];
+  transactions: Transaction[];
+  vendors: Vendor[];
+  bills: Bill[];
+  onApprove: (agentId: string, commissionType: "auto" | "custom", customPct: number) => void;
+  onReject: (agentId: string) => void;
+  onSuspend: (agentId: string) => void;
+  onDelete: (agentId: string) => void;
+  onSetCommission: (agentId: string, type: "auto" | "custom", pct: number) => void;
+  onAddOverride: (override: AgentVendorOverride) => void;
+  onDeleteOverride: (id: string) => void;
+  onUpdateSlabs: (slabs: CommissionSlab[]) => void;
+}) {
+  const [tab, setTab] = useState<"list" | "pending" | "slabs">("list");
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [detailTab, setDetailTab] = useState<"overview" | "txns" | "wallet" | "overrides">("overview");
+
+  // Approve modal state
+  const [approveAgentId, setApproveAgentId] = useState<string | null>(null);
+  const [approveType, setApproveType] = useState<"auto" | "custom">("auto");
+  const [approvePct, setApprovePct] = useState("1");
+
+  // Override modal state
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideVendorCode, setOverrideVendorCode] = useState("");
+  const [overridePct, setOverridePct] = useState("1");
+
+  // Commission edit modal
+  const [editCommAgent, setEditCommAgent] = useState<Agent | null>(null);
+  const [editCommType, setEditCommType] = useState<"auto" | "custom">("auto");
+  const [editCommPct, setEditCommPct] = useState("1");
+
+  // Slab editor state
+  const [editSlabs, setEditSlabs] = useState<CommissionSlab[]>([...commissionSlabs]);
+
+  const pending  = agents.filter(a => a.status === "pending");
+  const approved = agents.filter(a => a.status === "approved");
+
+  const getAgentStats = (agent: Agent) => {
+    const agentTxns = transactions.filter(t => t.createdByAgent === agent.agentId);
+    const agentBills = bills.filter(b => agentTxns.some(t => t.txnId === b.txnId));
+    const agentVendors = [...new Set(agentTxns.map(t => t.vendorCode))];
+    const walletEntries = agentWallet.filter(w => w.agentId === agent.id);
+    const totalCommission = walletEntries.reduce((s, w) => s + w.commissionAmount, 0);
+    return {
+      txnCount: agentTxns.length,
+      billCount: agentBills.length,
+      vendorCount: agentVendors.length,
+      totalTxnAmt: agentTxns.reduce((s, t) => s + t.expectedAmount, 0),
+      totalCommission: round2(totalCommission),
+      walletBalance: agent.commissionBalance
+    };
+  };
+
+  // ── Selected Agent Detail View ────────────────────────────
+  if (selectedAgent) {
+    const stats = getAgentStats(selectedAgent);
+    const agentTxns = transactions.filter(t => t.createdByAgent === selectedAgent.agentId);
+    const walletEntries = agentWallet.filter(w => w.agentId === selectedAgent.id);
+    const myOverrides = agentOverrides.filter(o => o.agentId === selectedAgent.id);
+
+    return (
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50">← Back</button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">🤝 {selectedAgent.fullName}</h1>
+            <p className="text-sm text-gray-500">{selectedAgent.agentId} | {selectedAgent.managerDistrict} | {selectedAgent.mobile}</p>
+          </div>
+          <span className={`ml-auto px-3 py-1 rounded-full text-xs font-bold ${selectedAgent.status === "approved" ? "bg-green-100 text-green-700" : selectedAgent.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
+            {selectedAgent.status.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Transactions", value: stats.txnCount, color: "#0369a1" },
+            { label: "Total Amount", value: fmt(stats.totalTxnAmt), color: "#b45309" },
+            { label: "Commission Earned", value: fmt(stats.totalCommission), color: "#15803d" },
+            { label: "Wallet Balance", value: fmt(stats.walletBalance), color: "#7c3aed" },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+              <p className="text-xs text-gray-500 uppercase">{s.label}</p>
+              <p className="text-2xl font-bold mt-1" style={{ color: s.color }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Commission Settings */}
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-bold text-gray-800">💰 Commission Setting</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Type: <strong>{selectedAgent.commissionType === "custom" ? `Custom — ${selectedAgent.customCommissionPercent}%` : "Auto (Slab)"}</strong>
+              </p>
+            </div>
+            <button onClick={() => { setEditCommAgent(selectedAgent); setEditCommType(selectedAgent.commissionType); setEditCommPct(String(selectedAgent.customCommissionPercent)); }} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#1a2f5e" }}>✏️ மாற்று</button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 border-b border-gray-200">
+          {(["overview","txns","wallet","overrides"] as const).map(t => (
+            <button key={t} onClick={() => setDetailTab(t)} className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${detailTab === t ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+              {t === "overview" ? "📊 Overview" : t === "txns" ? "📋 Transactions" : t === "wallet" ? "💰 Wallet" : "🔧 Overrides"}
+            </button>
+          ))}
+        </div>
+
+        {detailTab === "txns" && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead style={{ background: "#0a1628" }}>
+                  <tr>{["TXN ID","Vendor","District","Amount","GST%","Commission","Status"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {agentTxns.map(t => {
+                    const comm = calcAgentCommission(selectedAgent, t.vendorCode, t.gstPercent, t.expectedAmount, agentOverrides, commissionSlabs);
+                    return (
+                      <tr key={t.txnId} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-mono text-xs text-blue-700 font-bold">{t.txnId}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-800">{t.vendorName}</td>
+                        <td className="px-4 py-3 text-gray-600">{t.district}</td>
+                        <td className="px-4 py-3 font-semibold">{fmt(t.expectedAmount)}</td>
+                        <td className="px-4 py-3">{t.gstPercent}%</td>
+                        <td className="px-4 py-3 text-green-700 font-semibold">{comm.amount > 0 ? `${fmt(comm.amount)} (${comm.percent}%)` : "—"}</td>
+                        <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${t.status === "Closed" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>{t.status}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {agentTxns.length === 0 && <p className="text-center py-8 text-gray-400">No transactions yet</p>}
+            </div>
+          </div>
+        )}
+
+        {detailTab === "wallet" && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead style={{ background: "#0a1628" }}>
+                  <tr>{["Date","Vendor","TXN","Txn Amt","GST%","Commission%","Commission","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[...walletEntries].reverse().map(w => (
+                    <tr key={w.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-3 text-xs text-gray-500">{w.date}</td>
+                      <td className="px-3 py-3 text-gray-800">{w.vendorName}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-blue-700">{w.txnId}</td>
+                      <td className="px-3 py-3">{fmt(w.billAmount)}</td>
+                      <td className="px-3 py-3">{w.gstPercent}%</td>
+                      <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${w.commissionType === "custom" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{w.commissionPercent}% ({w.commissionType})</span></td>
+                      <td className="px-3 py-3 font-bold text-green-700">{fmt(w.commissionAmount)}</td>
+                      <td className="px-3 py-3 font-bold text-gray-800">{fmt(w.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {walletEntries.length === 0 && <p className="text-center py-8 text-gray-400">No commission entries yet</p>}
+            </div>
+          </div>
+        )}
+
+        {detailTab === "overrides" && (
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <button onClick={() => setShowOverrideModal(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#7c3aed" }}>+ Custom Override சேர்</button>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead style={{ background: "#0a1628" }}>
+                    <tr>{["Vendor Code","Vendor Name","Commission%","Set By","Set At","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {myOverrides.map(o => (
+                      <tr key={o.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-mono text-blue-700">{o.vendorCode}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-800">{o.vendorName}</td>
+                        <td className="px-4 py-3"><span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">{o.commissionPercent}%</span></td>
+                        <td className="px-4 py-3 text-gray-500">{o.setBy}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">{new Date(o.setAt).toLocaleDateString('en-IN')}</td>
+                        <td className="px-4 py-3"><button onClick={() => onDeleteOverride(o.id)} className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200">🗑️</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {myOverrides.length === 0 && <p className="text-center py-8 text-gray-400">No custom overrides. All vendors use slab/auto commission.</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Override Modal */}
+        {showOverrideModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.6)" }}>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-800 text-lg">🔧 Custom Override சேர்</h3>
+                <button onClick={() => setShowOverrideModal(false)} className="text-gray-400 text-2xl">✕</button>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block font-medium">Vendor</label>
+                <select value={overrideVendorCode} onChange={e => setOverrideVendorCode(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none">
+                  <option value="">Select Vendor</option>
+                  {vendors.map(v => <option key={v.id} value={v.vendorCode}>{v.vendorName} ({v.vendorCode})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block font-medium">Commission % (Custom)</label>
+                <input type="number" step="0.1" value={overridePct} onChange={e => setOverridePct(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const vendor = vendors.find(v => v.vendorCode === overrideVendorCode);
+                    if (!vendor || !overrideVendorCode) { alert("Vendor select செய்யவும்!"); return; }
+                    onAddOverride({
+                      id: genId("OVR"),
+                      agentId: selectedAgent.id,
+                      vendorCode: overrideVendorCode,
+                      vendorName: vendor.vendorName,
+                      commissionPercent: parseFloat(overridePct) || 0,
+                      setBy: "admin",
+                      setAt: new Date().toISOString()
+                    });
+                    setShowOverrideModal(false);
+                    setOverrideVendorCode(""); setOverridePct("1");
+                  }}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white"
+                  style={{ background: "#7c3aed" }}
+                >
+                  💾 Save Override
+                </button>
+                <button onClick={() => setShowOverrideModal(false)} className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Commission Modal */}
+        {editCommAgent && (
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.6)" }}>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-800 text-lg">💰 Commission மாற்று</h3>
+                <button onClick={() => setEditCommAgent(null)} className="text-gray-400 text-2xl">✕</button>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block font-medium">Commission Type</label>
+                <div className="flex gap-3">
+                  <button onClick={() => setEditCommType("auto")} className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 ${editCommType === "auto" ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-300 text-gray-600"}`}>📊 Auto (Slab)</button>
+                  <button onClick={() => setEditCommType("custom")} className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 ${editCommType === "custom" ? "border-purple-500 text-purple-700 bg-purple-50" : "border-gray-300 text-gray-600"}`}>✏️ Custom %</button>
+                </div>
+              </div>
+              {editCommType === "custom" && (
+                <div>
+                  <label className="text-xs text-gray-600 mb-1 block font-medium">Custom Commission %</label>
+                  <input type="number" step="0.1" value={editCommPct} onChange={e => setEditCommPct(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-purple-500" />
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    onSetCommission(editCommAgent.id, editCommType, parseFloat(editCommPct) || 0);
+                    setSelectedAgent(prev => prev ? { ...prev, commissionType: editCommType, customCommissionPercent: parseFloat(editCommPct) || 0 } : null);
+                    setEditCommAgent(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white"
+                  style={{ background: "#16a34a" }}
+                >
+                  💾 Save
+                </button>
+                <button onClick={() => setEditCommAgent(null)} className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Main Agents List View ─────────────────────────────────
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">🤝 Agent Management</h1>
+          <p className="text-sm text-gray-500">{approved.length} active agents | {pending.length} pending approval</p>
+        </div>
+        {pending.length > 0 && (
+          <span className="px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-bold animate-pulse">
+            🔴 {pending.length} Pending Approval
+          </span>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        {(["list","pending","slabs"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            {t === "list" ? `👥 Agents (${approved.length})` : t === "pending" ? `⏳ Pending (${pending.length})` : "📊 Commission Slabs"}
+          </button>
+        ))}
+      </div>
+
+      {/* Pending Approvals */}
+      {tab === "pending" && (
+        <div className="space-y-4">
+          {pending.length === 0 && <p className="text-center py-12 text-gray-400">Pending approvals இல்லை</p>}
+          {pending.map(agent => (
+            <div key={agent.id} className="bg-white rounded-xl p-5 border-2 border-yellow-200 shadow-sm">
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div>
+                  <p className="font-bold text-gray-800 text-lg">{agent.fullName}</p>
+                  <p className="text-sm text-gray-500">{agent.agentId} | {agent.mobile}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Manager: <strong>{agent.managerName}</strong> ({agent.managerDistrict})
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Registered: {new Date(agent.createdAt).toLocaleDateString('en-IN')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-w-[200px]">
+                  {approveAgentId === agent.id ? (
+                    <div className="space-y-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-xs font-bold text-green-700">Commission Type செலக்ட் செய்யவும்:</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setApproveType("auto")} className={`flex-1 py-1.5 rounded text-xs font-semibold border ${approveType === "auto" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-600"}`}>Auto Slab</button>
+                        <button onClick={() => setApproveType("custom")} className={`flex-1 py-1.5 rounded text-xs font-semibold border ${approveType === "custom" ? "border-purple-500 bg-purple-50 text-purple-700" : "border-gray-300 text-gray-600"}`}>Custom %</button>
+                      </div>
+                      {approveType === "custom" && (
+                        <input type="number" step="0.1" value={approvePct} onChange={e => setApprovePct(e.target.value)} placeholder="Commission %" className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm outline-none" />
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { onApprove(agent.id, approveType, parseFloat(approvePct) || 0); setApproveAgentId(null); }}
+                          className="flex-1 py-1.5 rounded text-xs font-bold text-white bg-green-600 hover:bg-green-700"
+                        >
+                          ✅ Confirm Approve
+                        </button>
+                        <button onClick={() => setApproveAgentId(null)} className="px-3 py-1.5 rounded text-xs font-semibold text-gray-600 border border-gray-300">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={() => setApproveAgentId(agent.id)} className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-green-600 hover:bg-green-700">✅ Approve</button>
+                      <button onClick={() => onReject(agent.id)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600">❌ Reject</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Agents List */}
+      {tab === "list" && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead style={{ background: "#0a1628" }}>
+                <tr>{["Agent","Manager","District","Commission","Wallet","Transactions","Status","Actions"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {agents.filter(a => a.status !== "pending").map(agent => {
+                  const stats = getAgentStats(agent);
+                  return (
+                    <tr key={agent.id} className="hover:bg-blue-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-800">{agent.fullName}</p>
+                        <p className="text-xs text-gray-400">{agent.agentId} | {agent.mobile}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{agent.managerName}</td>
+                      <td className="px-4 py-3 text-gray-600">{agent.managerDistrict}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${agent.commissionType === "custom" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                          {agent.commissionType === "custom" ? `${agent.customCommissionPercent}% custom` : "Auto slab"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-green-700">{fmt(agent.commissionBalance)}</td>
+                      <td className="px-4 py-3 text-center"><span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{stats.txnCount}</span></td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${agent.status === "approved" ? "bg-green-100 text-green-700" : agent.status === "suspended" ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"}`}>
+                          {agent.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          <button onClick={() => { setSelectedAgent(agent); setDetailTab("overview"); }} className="px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200">👁️</button>
+                          <button onClick={() => onSuspend(agent.id)} className="px-2 py-1 rounded text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200">{agent.status === "suspended" ? "▶️" : "⏸️"}</button>
+                          <button onClick={() => { if(confirm(`Delete ${agent.fullName}?`)) onDelete(agent.id); }} className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {agents.filter(a => a.status !== "pending").length === 0 && (
+              <p className="text-center py-12 text-gray-400">No agents yet. District managers add agents from their dashboard.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Commission Slabs Editor */}
+      {tab === "slabs" && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-gray-800 text-lg">📊 Commission Slab Configuration</h2>
+              <p className="text-sm text-gray-500 mt-1">GST % → Agent commission % mapping. Admin மட்டும் மாற்றலாம்.</p>
+            </div>
+            <button
+              onClick={() => setEditSlabs(prev => [...prev, { gstPercent: 0, agentCommission: 0 }])}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "#1a2f5e" }}
+            >
+              + Row சேர்
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-sm">
+              <thead style={{ background: "#1a2f5e" }}>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">GST %</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">Agent Commission %</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">Note</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {editSlabs.map((slab, i) => (
+                  <tr key={i} className="bg-white hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      <input type="number" step="0.5" value={slab.gstPercent} onChange={e => setEditSlabs(prev => prev.map((s, idx) => idx === i ? { ...s, gstPercent: parseFloat(e.target.value) || 0 } : s))} className="w-24 px-2 py-1.5 rounded border border-gray-300 text-sm outline-none" />
+                      <span className="ml-1 text-gray-500">%</span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <input type="number" step="0.1" value={slab.agentCommission} onChange={e => setEditSlabs(prev => prev.map((s, idx) => idx === i ? { ...s, agentCommission: parseFloat(e.target.value) || 0 } : s))} className="w-24 px-2 py-1.5 rounded border border-gray-300 text-sm outline-none" />
+                      <span className="ml-1 text-gray-500">%</span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-400">
+                      {slab.agentCommission === 0 ? "🔴 Threshold — இதற்கு மேல் commission இல்லை" : `Transaction amount-ல் ${slab.agentCommission}% commission`}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editSlabs.length > 1 && (
+                        <button onClick={() => setEditSlabs(prev => prev.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 text-xl font-bold">×</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700 space-y-1">
+            <p className="font-bold">📌 சூத்திரம் (Formula):</p>
+            <p>• Transaction ஒன்று GST 4%-ல் close ஆனால் → agent commission = 0.5% of transaction amount</p>
+            <p>• Threshold row (0%) — இந்த GST% மற்றும் அதற்கு மேல் → commission கிடையாது</p>
+            <p>• Vendor-specific override இருந்தால் → slab-ஐ override செய்யும்</p>
+          </div>
+
+          <button
+            onClick={() => { onUpdateSlabs(editSlabs); alert("✅ Commission slabs saved!"); }}
+            className="px-8 py-3 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all"
+            style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}
+          >
+            💾 Save Slabs
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// END OF AGENT PART 3
+// ============================================================
+
 function SettingsPage({
   settings, onUpdateSettings, onBackup, onRestore, onClearData, storageUsed
 }: {

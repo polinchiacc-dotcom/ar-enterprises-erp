@@ -1872,15 +1872,6 @@ export default function App() {
           />
         )}
 
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// END OF PART 2
-// Next: PART 3 — DashboardPage, VendorsPage, TransactionsPage
-// ============================================================
 // ============================================================
 // APP.TSX — PART 3 of 4
 // DashboardPage, VendorsPage, TransactionsPage

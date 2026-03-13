@@ -1228,23 +1228,94 @@ export default function App() {
 
 
 // ============================================================
-// DASHBOARD PAGE
+// DISTRICT DASHBOARD — AGENT ADD SECTION FIX
+//
+// App.tsx-ல் DashboardPage function-ஐ கண்டுபிடியுங்கள்:
+//
+// function DashboardPage({
+//   isAdmin, district, transactions, vendors, bills, wallet,
+//   walletBalance, pendingClose, onConfirmClose, settings
+// }
+//
+// இதை REPLACE செய்யுங்கள் — agents, onAddAgent props சேர்க்கப்படுகின்றன
 // ============================================================
+
 function DashboardPage({
   isAdmin, district, transactions, vendors, bills, wallet,
-  walletBalance, pendingClose, onConfirmClose, settings
+  walletBalance, pendingClose, onConfirmClose, settings, agents = [], onAddAgent, user
 }: {
   isAdmin: boolean; district: string;
   transactions: Transaction[]; vendors: Vendor[]; bills: Bill[];
   wallet: WalletEntry[]; walletBalance: number;
-  pendingClose: Transaction[]; onConfirmClose: (id: string) => void; settings: any;
+  pendingClose: Transaction[]; onConfirmClose: (id: string) => void;
+  settings: any; agents?: Agent[]; onAddAgent?: (a: Agent) => void; user?: User | null;
 }) {
-  const totalExpected      = transactions.reduce((s, t) => s + t.expectedAmount, 0);
+  const totalExpected = transactions.reduce((s, t) => s + t.expectedAmount, 0);
   const totalBillsReceived = transactions.reduce((s, t) => s + t.billsReceived, 0);
-  const totalGST           = transactions.reduce((s, t) => s + t.gstAmount, 0);
-  const openTxns           = transactions.filter(t => t.status === "Open").length;
-  const closedTxns         = transactions.filter(t => t.status === "Closed").length;
-  const totalProfit        = transactions.filter(t => t.status === "Closed").reduce((s, t) => s + t.profit, 0);
+  const totalGST = transactions.reduce((s, t) => s + t.gstAmount, 0);
+  const openTxns = transactions.filter(t => t.status === "Open").length;
+  const closedTxns = transactions.filter(t => t.status === "Closed").length;
+  const totalProfit = transactions.filter(t => t.status === "Closed").reduce((s, t) => s + t.profit, 0);
+
+  // Agent Add Form State
+  const [showAgentForm, setShowAgentForm] = useState(false);
+  const [agentName, setAgentName] = useState("");
+  const [agentMobile, setAgentMobile] = useState("");
+  const [agentUsername, setAgentUsername] = useState("");
+  const [agentPassword, setAgentPassword] = useState("");
+  const [agentBank, setAgentBank] = useState("");
+  const [agentAccount, setAgentAccount] = useState("");
+  const [agentIFSC, setAgentIFSC] = useState("");
+  const [agentUPI, setAgentUPI] = useState("");
+  const [agentSaving, setAgentSaving] = useState(false);
+
+  // My agents (district manager-ஓட agents மட்டும்)
+  const myAgents = isAdmin
+    ? agents
+    : agents.filter(a => a.managerDistrict === district);
+
+  const handleAddAgent = async () => {
+    if (!agentName || !agentMobile || !agentUsername || !agentPassword) {
+      alert("❌ Name, Mobile, Username, Password தேவை!"); return;
+    }
+    if (agents.some(a => a.username === agentUsername)) {
+      alert("❌ இந்த Username ஏற்கனவே உள்ளது!"); return;
+    }
+    setAgentSaving(true);
+    try {
+      const hashedPwd = await hashPassword(agentPassword);
+      const newAgent: Agent = {
+        id: genId("AGT"),
+        agentId: genAgentId(agents),
+        username: agentUsername,
+        password: hashedPwd,
+        fullName: sanitizeInput(agentName),
+        mobile: sanitizeInput(agentMobile),
+        managerId: user?.id || "",
+        managerName: user?.username || district,
+        managerDistrict: district,
+        commissionType: "auto",
+        customCommissionPercent: 0,
+        bankName: agentBank,
+        accountNumber: agentAccount,
+        ifscCode: agentIFSC,
+        upiId: agentUPI,
+        status: "pending",
+        commissionBalance: 0,
+        createdAt: new Date().toISOString(),
+      };
+      onAddAgent?.(newAgent);
+      // Reset form
+      setAgentName(""); setAgentMobile(""); setAgentUsername("");
+      setAgentPassword(""); setAgentBank(""); setAgentAccount("");
+      setAgentIFSC(""); setAgentUPI("");
+      setShowAgentForm(false);
+      alert("✅ Agent பதிவு செய்யப்பட்டது!\n\nAdmin approval-க்காக காத்திருக்கிறது.");
+    } catch (e) {
+      alert("❌ Error saving agent!");
+    }
+    setAgentSaving(false);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -1265,20 +1336,12 @@ function DashboardPage({
             {pendingClose.map(t => {
               const profit = round2(t.expectedAmount * PROFIT_RATE);
               return (
-                <div
-                  key={t.txnId}
-                  className="flex items-center justify-between bg-white p-4 rounded-lg border border-red-200 hover:shadow-md transition-shadow"
-                >
+                <div key={t.txnId} className="flex items-center justify-between bg-white p-4 rounded-lg border border-red-200 hover:shadow-md transition-shadow">
                   <div className="flex-1">
                     <p className="font-semibold text-gray-800">{t.vendorName} — {t.district}</p>
                     <p className="text-sm text-gray-500 mt-1">
                       {t.txnId} | Expected: {fmt(t.expectedAmount)} | 8% Profit: {fmt(profit)}
                     </p>
-                    {t.closedAt && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Closed on {new Date(t.closedAt).toLocaleDateString('en-IN')}
-                      </p>
-                    )}
                   </div>
                   <button
                     onClick={() => onConfirmClose(t.txnId)}
@@ -1296,12 +1359,12 @@ function DashboardPage({
 
       {/* Stats Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Total Vendors</p>
           <p className="text-3xl font-bold mt-2" style={{ color: "#1a2f5e" }}>{vendors.length}</p>
           <p className="text-xs text-gray-400 mt-1">Active accounts</p>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Transactions</p>
           <p className="text-3xl font-bold mt-2" style={{ color: "#0369a1" }}>{transactions.length}</p>
           <p className="text-xs text-gray-400 mt-1">
@@ -1309,12 +1372,11 @@ function DashboardPage({
             <span className="text-blue-600">Closed: {closedTxns}</span>
           </p>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Total Expected</p>
           <p className="text-3xl font-bold mt-2" style={{ color: "#b45309" }}>{fmt(totalExpected)}</p>
-          <p className="text-xs text-gray-400 mt-1">Across all transactions</p>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Bills Received</p>
           <p className="text-3xl font-bold mt-2" style={{ color: "#15803d" }}>{fmt(totalBillsReceived)}</p>
           <p className="text-xs text-gray-400 mt-1">{bills.length} total bills</p>
@@ -1327,24 +1389,147 @@ function DashboardPage({
           <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 shadow-lg text-white">
             <p className="text-xs font-medium uppercase opacity-90">Total GST Amount</p>
             <p className="text-3xl font-bold mt-2">{fmt(totalGST)}</p>
-            <p className="text-xs opacity-75 mt-1">Government tax</p>
           </div>
           <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 shadow-lg text-white">
             <p className="text-xs font-medium uppercase opacity-90">💰 Wallet Balance</p>
             <p className="text-3xl font-bold mt-2">{fmt(walletBalance)}</p>
-            <p className="text-xs opacity-75 mt-1">Live running balance</p>
           </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 shadow-lg text-white">
-            <p className="text-xs font-medium uppercase opacity-90">Total Profit Earned</p>
+            <p className="text-xs font-medium uppercase opacity-90">Total Profit</p>
             <p className="text-3xl font-bold mt-2">{fmt(totalProfit)}</p>
-            <p className="text-xs opacity-75 mt-1">8% commission</p>
           </div>
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 shadow-lg text-white">
             <p className="text-xs font-medium uppercase opacity-90">Active Districts</p>
             <p className="text-3xl font-bold mt-2">
               {new Set(transactions.map(t => t.district)).size}
             </p>
-            <p className="text-xs opacity-75 mt-1">Out of {DISTRICTS.length} total</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── DISTRICT: My Agents Section ──────────────────────── */}
+      {!isAdmin && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-gray-800">🤝 My Agents</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {myAgents.filter(a => a.status === "approved").length} active |{" "}
+                {myAgents.filter(a => a.status === "pending").length} pending approval
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAgentForm(!showAgentForm)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #9f67f5)" }}
+            >
+              + New Agent
+            </button>
+          </div>
+
+          {/* Agent Add Form */}
+          {showAgentForm && (
+            <div className="p-5 border-b border-gray-100 space-y-4" style={{ background: "#faf5ff" }}>
+              <h3 className="font-bold text-purple-800">புதிய Agent பதிவு</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Full Name *</label>
+                  <input value={agentName} onChange={e => setAgentName(e.target.value)}
+                    placeholder="முழு பெயர்"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Mobile Number *</label>
+                  <input value={agentMobile} onChange={e => setAgentMobile(e.target.value)}
+                    placeholder="9876543210" maxLength={10}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Username * (login-க்கு)</label>
+                  <input value={agentUsername} onChange={e => setAgentUsername(e.target.value)}
+                    placeholder="agent_username"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Password *</label>
+                  <input type="password" value={agentPassword} onChange={e => setAgentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Bank Name</label>
+                  <input value={agentBank} onChange={e => setAgentBank(e.target.value)}
+                    placeholder="SBI / Indian Bank"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Account Number</label>
+                  <input value={agentAccount} onChange={e => setAgentAccount(e.target.value)}
+                    placeholder="Account number"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">IFSC Code</label>
+                  <input value={agentIFSC} onChange={e => setAgentIFSC(e.target.value)}
+                    placeholder="SBIN0001234"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">UPI ID</label>
+                  <input value={agentUPI} onChange={e => setAgentUPI(e.target.value)}
+                    placeholder="name@upi"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400" />
+                </div>
+              </div>
+              <div className="p-3 rounded-lg text-xs" style={{ background: "#ede9fe", border: "1px solid #c4b5fd" }}>
+                <p className="text-purple-700">ℹ️ Agent submit செய்தால் Admin approval-க்காக போகும். Admin approve செய்த பின்னரே Agent login செய்யலாம்.</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddAgent}
+                  disabled={agentSaving}
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+                  style={{ background: "#7c3aed" }}
+                >
+                  {agentSaving ? "⏳ Saving..." : "💾 Submit for Approval"}
+                </button>
+                <button
+                  onClick={() => setShowAgentForm(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 border border-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Agent List */}
+          <div className="p-4">
+            {myAgents.length === 0 ? (
+              <p className="text-center py-6 text-gray-400 text-sm">
+                இன்னும் agents இல்லை. "+ New Agent" click செய்யுங்கள்.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {myAgents.map(a => (
+                  <div key={a.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{a.fullName}</p>
+                      <p className="text-xs text-gray-500">{a.agentId} | {a.mobile}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold
+                      ${a.status === "approved" ? "bg-green-100 text-green-700" :
+                        a.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                        a.status === "suspended" ? "bg-orange-100 text-orange-700" :
+                        "bg-red-100 text-red-700"}`}>
+                      {a.status === "approved" ? "✅ Active" :
+                       a.status === "pending" ? "⏳ Pending" :
+                       a.status === "suspended" ? "⚠️ Suspended" : "❌ Rejected"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1360,13 +1545,13 @@ function DashboardPage({
             <thead style={{ background: "#f8fafc" }}>
               <tr>
                 {["TXN ID","Vendor","District","Expected","Bills","Remaining","Status"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {transactions.slice(0, 10).map(t => (
-                <tr key={t.txnId} className="hover:bg-gray-50 transition-colors">
+                <tr key={t.txnId} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">{t.txnId}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-800">{t.vendorName}</p>
@@ -1374,7 +1559,7 @@ function DashboardPage({
                   </td>
                   <td className="px-4 py-3 text-gray-600">{t.district}</td>
                   <td className="px-4 py-3 font-semibold text-gray-800">{fmt(t.expectedAmount)}</td>
-                  <td className="px-4 py-3 text-green-700 font-semibold">{fmt(t.billsReceived)}</td>
+                  <td className="px-4 py-3 text-green-700">{fmt(t.billsReceived)}</td>
                   <td className="px-4 py-3">
                     <span className={`font-semibold ${t.remainingExpected <= 0 ? 'text-green-600' : 'text-orange-600'}`}>
                       {t.remainingExpected <= 0 ? '₹0 ✅' : fmt(t.remainingExpected)}
@@ -1418,10 +1603,7 @@ function DashboardPage({
                 {wallet.slice(-5).reverse().map(w => (
                   <tr key={w.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-xs text-gray-500">{w.date}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-gray-800">{w.description}</p>
-                      {w.createdBy && <p className="text-xs text-gray-400">By: {w.createdBy}</p>}
-                    </td>
+                    <td className="px-4 py-3 text-gray-800">{w.description}</td>
                     <td className="px-4 py-3 font-semibold text-red-600">{w.debit > 0 ? fmt(w.debit) : "—"}</td>
                     <td className="px-4 py-3 font-semibold text-green-600">{w.credit > 0 ? fmt(w.credit) : "—"}</td>
                     <td className="px-4 py-3 font-bold text-gray-800">{fmt(w.balance)}</td>

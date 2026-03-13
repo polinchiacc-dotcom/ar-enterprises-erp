@@ -549,8 +549,9 @@ else if (role === "vendor") {
       district: vendor.district
     });
     return;
+  } else {
+    setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
   }
-  setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
 }
           onLogin({
             id: vendor.id,

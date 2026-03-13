@@ -528,7 +528,7 @@ const handleLogin = async () => {
         (v.gstNo && v.gstNo.trim().toUpperCase() === username.trim().toUpperCase()) ||
         v.vendorCode.trim().toUpperCase() === username.trim().toUpperCase()
       );
-      if (vendor && vendor.mobile && vendor.mobile.trim() === password.trim()) {
+    if (vendor && vendor.mobile && String(vendor.mobile).trim() === password.trim()) {
         onLogin({ id: vendor.id, username: vendor.vendorCode, password: vendor.mobile || "", role: "vendor" as any, district: vendor.district });
         return;
       }

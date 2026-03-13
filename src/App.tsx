@@ -1255,7 +1255,9 @@ function DashboardPage({
   const totalGST = transactions.reduce((s, t) => s + t.gstAmount, 0);
   const openTxns = transactions.filter(t => t.status === "Open").length;
   const closedTxns = transactions.filter(t => t.status === "Closed").length;
-  const totalProfit = transactions.filter(t => t.status === "Closed").reduce((s, t) => s + t.profit, 0);
+  const totalProfit = transactions
+  .filter(t => t.status === "Closed" || t.confirmedByAdmin)
+  .reduce((s, t) => s + (t.profit > 0 ? t.profit : round2(t.expectedAmount * PROFIT_RATE)), 0);
 
   // Agent Add Form State
   const [showAgentForm, setShowAgentForm] = useState(false);

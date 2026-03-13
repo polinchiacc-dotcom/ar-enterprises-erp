@@ -531,17 +531,17 @@ const handleLogin = async () => {
     if (vendor && vendor.mobile && String(vendor.mobile).trim() === password.trim()) {
         onLogin({ id: vendor.id, username: vendor.vendorCode, password: vendor.mobile || "", role: "vendor" as any, district: vendor.district });
         return;
+} else if (role === "vendor") {
+      const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
+      const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
+      const vendor = allVendors.find((v: any) =>
+        (v.gstNo && String(v.gstNo).trim().toUpperCase() === username.trim().toUpperCase()) ||
+        String(v.vendorCode).trim().toUpperCase() === username.trim().toUpperCase()
+      );
+      if (vendor && vendor.mobile && String(vendor.mobile).trim() === password.trim()) {
+        onLogin({ id: vendor.id, username: vendor.vendorCode, password: String(vendor.mobile) || "", role: "vendor" as any, district: vendor.district });
+        return;
       }
-setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
-    }
-  } catch (err) {
-    setError("Login error!");
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
-
   return (
     <div
       className="min-h-screen flex items-center justify-center"

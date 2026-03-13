@@ -23,6 +23,145 @@ import {
 // ============================================================
 // TYPES
 // ============================================================
+// ============================================================
+// AGENT FEATURE — PART 1 of 5
+// புதிய Types, Commission Slab, Agent Helpers
+//
+// 📌 எங்கே paste செய்வது:
+//    App.tsx PART 1-ல் "// ============ TYPES ============"
+//    section-க்கு கீழே, "interface User {" க்கு முன்னால்
+// ============================================================
+
+interface Agent {
+  id: string;
+  agentId: string;
+  username: string;
+  password: string;
+  fullName: string;
+  mobile: string;
+  managerId: string;
+  managerName: string;
+  managerDistrict: string;
+  commissionType: "auto" | "custom";
+  customCommissionPercent: number;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  status: "pending" | "approved" | "rejected" | "suspended";
+  approvedBy?: string;
+  approvedAt?: string;
+  commissionBalance: number;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+interface CommissionSlab {
+  gstPercent: number;
+  agentCommission: number;
+}
+
+interface AgentVendorOverride {
+  id: string;
+  agentId: string;
+  vendorCode: string;
+  vendorName: string;
+  commissionPercent: number;
+  setBy: string;
+  setAt: string;
+}
+
+interface AgentWalletEntry {
+  id: string;
+  agentId: string;
+  date: string;
+  description: string;
+  txnId: string;
+  vendorName: string;
+  billAmount: number;
+  gstPercent: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  commissionType: "auto" | "custom";
+  balance: number;
+}
+
+// ── Default Commission Slabs ──────────────────────────────────
+const DEFAULT_COMMISSION_SLABS: CommissionSlab[] = [
+  { gstPercent: 3,   agentCommission: 1.0 },
+  { gstPercent: 4,   agentCommission: 0.5 },
+  { gstPercent: 5,   agentCommission: 0.2 },
+  { gstPercent: 5.5, agentCommission: 0.0 },
+];
+
+// ── Commission Calculator ─────────────────────────────────────
+function calcAgentCommission(
+  agent: Agent,
+  vendorCode: string,
+  gstPercent: number,
+  transactionAmount: number,
+  overrides: AgentVendorOverride[],
+  slabs: CommissionSlab[]
+): { percent: number; amount: number; type: "auto" | "custom" } {
+
+  // 1. Vendor-specific override (highest priority)
+  const override = overrides.find(
+    o => o.agentId === agent.id && o.vendorCode === vendorCode
+  );
+  if (override) {
+    return {
+      percent: override.commissionPercent,
+      amount: round2(transactionAmount * override.commissionPercent / 100),
+      type: "custom"
+    };
+  }
+
+  // 2. Agent-level custom commission
+  if (agent.commissionType === "custom") {
+    return {
+      percent: agent.customCommissionPercent,
+      amount: round2(transactionAmount * agent.customCommissionPercent / 100),
+      type: "custom"
+    };
+  }
+
+  // 3. Auto slab — find matching slab for this GST%
+  const sortedSlabs = [...slabs].sort((a, b) => a.gstPercent - b.gstPercent);
+  // Find threshold (0% commission slab)
+  const threshold = sortedSlabs.find(s => s.agentCommission === 0);
+  if (threshold && gstPercent >= threshold.gstPercent) {
+    return { percent: 0, amount: 0, type: "auto" };
+  }
+  // Find exact match
+  const exactSlab = sortedSlabs.find(s => s.gstPercent === gstPercent);
+  if (exactSlab) {
+    return {
+      percent: exactSlab.agentCommission,
+      amount: round2(transactionAmount * exactSlab.agentCommission / 100),
+      type: "auto"
+    };
+  }
+  // Find closest lower slab
+  const lowerSlabs = sortedSlabs.filter(s => s.gstPercent < gstPercent && s.agentCommission > 0);
+  if (lowerSlabs.length > 0) {
+    const closest = lowerSlabs[lowerSlabs.length - 1];
+    return {
+      percent: closest.agentCommission,
+      amount: round2(transactionAmount * closest.agentCommission / 100),
+      type: "auto"
+    };
+  }
+  return { percent: 0, amount: 0, type: "auto" };
+}
+
+function genAgentId(existing: Agent[]): string {
+  return "AGT" + String(existing.length + 1).padStart(3, "0");
+}
+
+// ============================================================
+// END OF AGENT PART 1
+// ============================================================
+
 interface User {
   id: string; username: string; password: string;
   role: "admin" | "district"; district?: string;

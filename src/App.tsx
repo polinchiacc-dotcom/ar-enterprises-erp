@@ -532,7 +532,7 @@ const handleLogin = async () => {
         onLogin({ id: vendor.id, username: vendor.vendorCode, password: vendor.mobile || "", role: "vendor" as any, district: vendor.district });
         return;
       }
-      setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
+setError("தவறான GST No / Vendor Code அல்லது Mobile Number!");
     }
   } catch (err) {
     setError("Login error!");
@@ -540,6 +540,8 @@ const handleLogin = async () => {
   } finally {
     setLoading(false);
   }
+};
+
   return (
     <div
       className="min-h-screen flex items-center justify-center"

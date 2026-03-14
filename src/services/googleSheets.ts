@@ -9,6 +9,9 @@ export interface StorageData {
   wallet: any[];
   managedUsers: any[];
   auditLogs?: any[];
+  agents?: any[];
+  agentWallet?: any[];
+  agentOverrides?: any[];
 }
 
 export async function saveToSheets(): Promise<boolean> {
@@ -22,6 +25,7 @@ export async function saveToSheets(): Promise<boolean> {
       vendors: parsed.vendors?.length ?? 0,
       transactions: parsed.transactions?.length ?? 0,
       bills: parsed.bills?.length ?? 0,
+      agents: parsed.agents?.length ?? 0,
     });
 
     const payload = {
@@ -59,6 +63,51 @@ export async function saveToSheets(): Promise<boolean> {
         active: u.active ? 'TRUE' : 'FALSE', createdAt: u.createdAt ?? '',
       })),
       auditLogs: parsed.auditLogs ?? [],
+      agents: (parsed.agents ?? []).map((a: any) => ({
+        agentId: a.agentId ?? a.id,
+        fullName: a.fullName ?? '',
+        username: a.username ?? '',
+        password: a.password ?? '',
+        mobile: a.mobile ?? '',
+        managerId: a.managerId ?? '',
+        managerName: a.managerName ?? '',
+        managerDistrict: a.managerDistrict ?? '',
+        commissionType: a.commissionType ?? 'auto',
+        customCommissionPercent: a.customCommissionPercent ?? 0,
+        bankName: a.bankName ?? '',
+        accountNumber: a.accountNumber ?? '',
+        ifscCode: a.ifscCode ?? '',
+        upiId: a.upiId ?? '',
+        status: a.status ?? 'pending',
+        approvedBy: a.approvedBy ?? '',
+        approvedAt: a.approvedAt ?? '',
+        commissionBalance: a.commissionBalance ?? 0,
+        createdAt: a.createdAt ?? '',
+        lastLogin: a.lastLogin ?? '',
+      })),
+      agentWallet: (parsed.agentWallet ?? []).map((w: any) => ({
+        id: w.id,
+        agentId: w.agentId,
+        date: w.date,
+        description: w.description,
+        txnId: w.txnId,
+        vendorName: w.vendorName,
+        billAmount: w.billAmount,
+        gstPercent: w.gstPercent,
+        commissionPercent: w.commissionPercent,
+        commissionAmount: w.commissionAmount,
+        commissionType: w.commissionType,
+        balance: w.balance,
+      })),
+      agentOverrides: (parsed.agentOverrides ?? []).map((o: any) => ({
+        id: o.id,
+        agentId: o.agentId,
+        vendorCode: o.vendorCode,
+        vendorName: o.vendorName,
+        commissionPercent: o.commissionPercent,
+        setBy: o.setBy,
+        setAt: o.setAt,
+      })),
     };
 
     await fetch(SHEET_URL, {
@@ -100,6 +149,7 @@ export async function loadFromSheets(): Promise<boolean> {
       vendors: data.vendors?.length ?? 0,
       transactions: data.transactions?.length ?? 0,
       bills: data.bills?.length ?? 0,
+      agents: data.agents?.length ?? 0,
     });
 
     if (!data.vendors?.length && !data.transactions?.length && !data.bills?.length) {
@@ -158,6 +208,31 @@ export async function loadFromSheets(): Promise<boolean> {
         createdAt: u.createdAt ?? new Date().toISOString().split('T')[0],
       })),
       auditLogs: data.auditLogs ?? [],
+      agents: (data.agents ?? []).map((a: any) => ({
+        id: a.agentId ?? Math.random().toString(36).substr(2, 9),
+        agentId: a.agentId ?? '',
+        fullName: a.fullName ?? '',
+        username: a.username ?? '',
+        password: a.password ?? '',
+        mobile: String(a.mobile ?? ''),
+        managerId: a.managerId ?? '',
+        managerName: a.managerName ?? '',
+        managerDistrict: a.managerDistrict ?? '',
+        commissionType: a.commissionType ?? 'auto',
+        customCommissionPercent: Number(a.customCommissionPercent) || 0,
+        bankName: a.bankName ?? '',
+        accountNumber: a.accountNumber ?? '',
+        ifscCode: a.ifscCode ?? '',
+        upiId: a.upiId ?? '',
+        status: a.status ?? 'pending',
+        approvedBy: a.approvedBy ?? '',
+        approvedAt: a.approvedAt ?? '',
+        commissionBalance: Number(a.commissionBalance) || 0,
+        createdAt: a.createdAt ?? '',
+        lastLogin: a.lastLogin ?? '',
+      })),
+      agentWallet: data.agentWallet ?? [],
+      agentOverrides: data.agentOverrides ?? [],
     };
 
     localStorage.setItem(LS_KEY, JSON.stringify(storageData));

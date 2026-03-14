@@ -525,16 +525,6 @@ const handleLogin = async () => {
       const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
       const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
       const vendor = allVendors.find((v: any) =>
-        (v.gstNo && v.gstNo.trim().toUpperCase() === username.trim().toUpperCase()) ||
-        v.vendorCode.trim().toUpperCase() === username.trim().toUpperCase()
-      );
-    if (vendor && vendor.mobile && String(vendor.mobile).trim() === password.trim()) {
-        onLogin({ id: vendor.id, username: vendor.vendorCode, password: vendor.mobile || "", role: "vendor" as any, district: vendor.district });
-        return;
-} else if (role === "vendor") {
-      const stored = localStorage.getItem("AR_ERP_V3_DATA_ENCRYPTED");
-      const allVendors = stored ? (JSON.parse(stored)?.vendors || vendors) : vendors;
-      const vendor = allVendors.find((v: any) =>
         (v.gstNo && String(v.gstNo).trim().toUpperCase() === username.trim().toUpperCase()) ||
         String(v.vendorCode).trim().toUpperCase() === username.trim().toUpperCase()
       );
@@ -542,6 +532,15 @@ const handleLogin = async () => {
         onLogin({ id: vendor.id, username: vendor.vendorCode, password: String(vendor.mobile) || "", role: "vendor" as any, district: vendor.district });
         return;
       }
+      setError("தவறான Vendor credentials!");
+    }
+  } catch (e) {
+    setError("Login error!");
+  } finally {
+    setLoading(false);
+  }
+};
+
   return (
     <div
       className="min-h-screen flex items-center justify-center"
@@ -638,9 +637,7 @@ const handleLogin = async () => {
 
 // ============================================================
 // APP.TSX — PART 2 REPLACEMENT (FINAL — Build Fix + All Features)
-// இந்த முழு block-ஐ பழைய "export default function App()" block-ஆக replace செய்யவும்
 // ============================================================
-}
 export default function App() {
   const saved = loadFromStorage();
 

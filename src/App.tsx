@@ -312,9 +312,25 @@ interface StorageData {
   wallet: WalletEntry[];
   managedUsers: ManagedUser[];
   auditLogs: AuditLog[];
+  agents?: Agent[];
+  agentWallet?: AgentWalletEntry[];
+  agentOverrides?: AgentVendorOverride[];
 }
 
 const saveToStorage = (data: StorageData) => {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error("Storage save error:", e);
+  }
+};
+
+// ── Extended save with agents data ───────────────────────────
+const saveAllToStorage = (data: StorageData & {
+  agents: Agent[];
+  agentWallet: AgentWalletEntry[];
+  agentOverrides: AgentVendorOverride[];
+}) => {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(data));
   } catch (e) {
@@ -712,7 +728,14 @@ export default function App() {
     w: WalletEntry[], u: ManagedUser[], a: AuditLog[],
     ag?: Agent[], agw?: AgentWalletEntry[], ago?: AgentVendorOverride[]
   ) => {
-    saveToStorage({ vendors: v, transactions: t, bills: b, wallet: w, managedUsers: u, auditLogs: a, agents: ag, agentWallet: agw, agentOverrides: ago } as any);
+    // ✅ agents, agentWallet, agentOverrides எல்லாமும் localStorage-ல் save ஆகும்
+    saveAllToStorage({
+      vendors: v, transactions: t, bills: b, wallet: w,
+      managedUsers: u, auditLogs: a,
+      agents: ag || [],
+      agentWallet: agw || [],
+      agentOverrides: ago || []
+    });
     saveToSheets().catch(err => console.log('Sync failed:', err));
   }, []);
 

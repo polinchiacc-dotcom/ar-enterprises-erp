@@ -1,4 +1,4 @@
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzfLJVDlZH5GrPlDSqt8ws6FM1Al_GELxNElOBLPecXf7hlAhB4VR8yoAif-B0C4pBY/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbz6a9sjjpl3rF-FdCt969SIAcpEpOZvOigxfVWzHoB9-BZLvgGinsYlYRpgWvkedkys/exec';
 const API_KEY = 'AR_PUDUKKOTTAI_2025_SECRET';
 export const LS_KEY = 'AR_ERP_V3_DATA_ENCRYPTED';
 

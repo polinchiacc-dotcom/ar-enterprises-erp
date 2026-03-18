@@ -88,10 +88,17 @@ interface AgentWalletEntry {
 
 // ── Default Commission Slabs ──────────────────────────────────
 const DEFAULT_COMMISSION_SLABS: CommissionSlab[] = [
-  { gstPercent: 3,   agentCommission: 1.0 },
-  { gstPercent: 4,   agentCommission: 0.5 },
-  { gstPercent: 5,   agentCommission: 0.2 },
-  { gstPercent: 5.5, agentCommission: 0.0 },
+  { gstPercent: 1,   agentCommission: 1.0   },
+  { gstPercent: 1.5, agentCommission: 0.5   },
+  { gstPercent: 2,   agentCommission: 0.25  },
+  { gstPercent: 2.5, agentCommission: 0.1   },
+  { gstPercent: 3,   agentCommission: 1.5   },
+  { gstPercent: 3.5, agentCommission: 2.0   },
+  { gstPercent: 4,   agentCommission: 0.3   },
+  { gstPercent: 4.5, agentCommission: 0.75  },
+  { gstPercent: 5,   agentCommission: 1.25  },
+  { gstPercent: 5.5, agentCommission: 1.75  },
+  { gstPercent: 6,   agentCommission: 0.0   },
 ];
 
 // ── Commission Calculator ─────────────────────────────────────

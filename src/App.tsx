@@ -402,14 +402,14 @@ const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
 // Replace existing LoginPage function with these TWO functions
 // ============================================================
 
-// ── 1. Landing Page (முதல் பக்கம்) ──────────────────────────
-function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "district" | "agent" | "vendor") => void }) {
+// ── 1. Landing Page (முதல் பக்கம்) ──────────────────────────────
+function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "district" | "agent" | "vendor" | "fintrack") => void }) {
   return (
     <div
       className="min-h-screen flex items-center justify-center"
       style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}
     >
-      <div className="w-full max-w-lg px-6">
+      <div className="w-full max-w-2xl px-6">
         {/* Logo */}
         <div className="text-center mb-10">
           <div
@@ -423,7 +423,7 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
           <p className="text-xs text-gray-400 mt-1">உங்கள் role-ஐ தேர்ந்தெடுக்கவும்</p>
         </div>
 
-        {/* Role Buttons */}
+        {/* Role Buttons — 4 main + 1 full-width FinTrack */}
         <div className="grid grid-cols-2 gap-4">
           {/* Admin */}
           <button
@@ -443,7 +443,7 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
             className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
             style={{ background: "linear-gradient(135deg, #0c4a6e, #0369a1)", border: "1px solid rgba(56,189,248,0.3)" }}
           >
-            <div className="text-4xl mb-3">🏛️</div>
+            <div className="text-4xl mb-3">🏗️</div>
             <p className="font-bold text-white text-lg">District</p>
             <p className="text-xs text-gray-400 mt-1">District Manager access</p>
             <div className="mt-3 text-xs font-semibold text-sky-300">Login →</div>
@@ -471,6 +471,48 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
             <p className="font-bold text-white text-lg">Vendor</p>
             <p className="text-xs text-gray-400 mt-1">Vendor self-service</p>
             <div className="mt-3 text-xs font-semibold text-green-300">Login →</div>
+          </button>
+
+          {/* FinTrack AI — Full width */}
+          <button
+            onClick={() => onSelectRole("fintrack")}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #7c2d12, #b45309, #92400e)", border: "2px solid rgba(251,191,36,0.5)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">💼</div>
+                <div>
+                  <p className="font-bold text-white text-lg">FinTrack AI</p>
+                  <p className="text-xs text-yellow-200 mt-0.5">Bank Statement • Project Tracking • GST • Financial Dashboard</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>NEW ✨</span>
+                <div className="mt-2 text-xs font-semibold text-yellow-300">Enter →</div>
+              </div>
+            </div>
+          </button>
+
+          {/* Work Tracker — Full width */}
+          <button
+            onClick={() => onSelectRole("worktracker" as any)}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8, #1e40af)", border: "2px solid rgba(99,179,237,0.4)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">📋</div>
+                <div>
+                  <p className="font-bold text-white text-lg">Work Tracker</p>
+                  <p className="text-xs text-blue-200 mt-0.5">Sri Polinchi & Co • GST • ITC • Contract Works • Dashboard</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(99,179,237,0.2)", color: "#93c5fd" }}>LIVE 📡</span>
+                <div className="mt-2 text-xs font-semibold text-blue-300">View →</div>
+              </div>
+            </div>
           </button>
         </div>
 
@@ -837,6 +879,7 @@ export default function App() {
 
     if ((loggedInUser as any).role === "agent") { setPage("agent_dashboard"); return; }
     if ((loggedInUser as any).role === "vendor") { setPage("vendor_dashboard"); return; }
+    if ((loggedInUser as any).role === "fintrack") { setPage("fintrack_dashboard"); return; }
 
     if (loggedInUser.role === "district") {
       const nu = managedUsers.map(u => u.username === loggedInUser.username ? { ...u, lastLogin: new Date().toISOString() } : u);
@@ -865,6 +908,24 @@ export default function App() {
   }
 
   // ── Not logged in — Landing or Login ──────────────────────
+  // ── Work Tracker — No login needed, direct access ──────────────
+  if ((loginRole as any) === "worktracker" && !user) {
+    return <WorkTrackerPage onBack={() => setLoginRole(null)} />;
+  }
+
+  // ── FinTrack AI — No login needed, direct access ────────────────
+  if (loginRole === "fintrack" && !user) {
+    return (
+      <FinTrackDashboard
+        vendors={vendors}
+        transactions={transactions}
+        bills={bills}
+        wallet={wallet}
+        onBack={() => setLoginRole(null)}
+      />
+    );
+  }
+
   if (!user) {
     if (!loginRole) return <LandingPage onSelectRole={setLoginRole} />;
     return (
@@ -4467,6 +4528,747 @@ function SettingsPage({
       {/* Save */}
       <div className="flex justify-end">
         <button onClick={() => { onUpdateSettings(localSettings); alert("✅ Settings saved!"); }} className="px-8 py-3 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all" style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}>💾 Save Settings</button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// WORK TRACKER PAGE — Google Sheet iframe Embed
+// 📌 Sheet URL: இங்கே Publish URL paste செய்யவும்
+// ============================================================
+const WORK_TRACKER_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0goRVB9597_7t3rcwl6eyqpNFrHtTUFcdmJw3w1tkC7Y3AH2OdoWcglEbBLI5E7ELv4THX2ILQlUS/pubhtml?widget=true&headers=false";
+// ⬆️ Google Sheet → File → Share → Publish to web → Embed → URL இங்கே paste செய்யவும்
+
+function WorkTrackerPage({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState("reminder");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Sheet tabs — Google Sheet-ல் உள்ள tabs-க்கு ஏற்ப இங்கே gid புது்படிக்கவும்
+  const SHEET_TABS = [
+    { id: "reminder",       label: "📋 Reminder",          gid: "0" },
+    { id: "contract2526",   label: "📄 Contract 25-26",     gid: "" },
+    { id: "contract2425",   label: "📄 Contract 24-25",     gid: "" },
+    { id: "contract2324",   label: "📄 Contract 23-24",     gid: "" },
+    { id: "gstpayment",     label: "🧭 GST Payment",        gid: "" },
+    { id: "gstdashboard",   label: "📊 IT & GST Dashboard", gid: "" },
+    { id: "gstr2b",         label: "📊 GSTR2B",             gid: "" },
+    { id: "itc",            label: "📊 ITC",               gid: "" },
+    { id: "expense",        label: "💸 Expense Journal",    gid: "" },
+    { id: "summary",        label: "📈 Summary",            gid: "" },
+  ];
+
+  const SHEET_BASE_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";
+
+  const getEmbedUrl = (gid: string) => {
+    if (WORK_TRACKER_SHEET_URL !== "PASTE_IFRAME_URL_HERE") {
+      // Published URL உள்ளது — direct use
+      return WORK_TRACKER_SHEET_URL + (gid ? `&gid=${gid}` : "");
+    }
+    // Fallback: direct embed (view only — public sheet-க்கு மட்டும்)
+    return `https://docs.google.com/spreadsheets/d/${SHEET_BASE_ID}/htmlview?gid=${gid}&widget=true&headers=false`;
+  };
+
+  const currentTab = SHEET_TABS.find(t => t.id === activeTab) || SHEET_TABS[0];
+  const embedUrl = getEmbedUrl(currentTab.gid);
+
+  const notSetup = WORK_TRACKER_SHEET_URL === "PASTE_IFRAME_URL_HERE";
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI', sans-serif", display: "flex", flexDirection: "column" as const }}>
+
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button onClick={onBack}
+            style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>
+            ← Back to ERP
+          </button>
+          <div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>📋 Work Tracker</div>
+            <div style={{ fontSize: "11px", color: "#bfdbfe" }}>Sri Polinchi & Co — GST, ITC, Contract Works</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#93c5fd" }}>📡 Live from Google Sheets</span>
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${SHEET_BASE_ID}/edit`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}
+          >
+            ↗️ Open in Sheets
+          </a>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: "0 20px", display: "flex", gap: "2px", overflowX: "auto" as const, flexShrink: 0 }}>
+        {SHEET_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id); setIsLoading(true); }}
+            style={{
+              padding: "10px 14px",
+              border: "none",
+              background: "transparent",
+              color: activeTab === tab.id ? "#93c5fd" : "#64748b",
+              fontWeight: activeTab === tab.id ? 700 : 500,
+              fontSize: "12px",
+              cursor: "pointer",
+              borderBottom: activeTab === tab.id ? "2px solid #3b82f6" : "2px solid transparent",
+              whiteSpace: "nowrap" as const,
+              transition: "all 0.2s"
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Setup Banner — Publish URL இல்லாவிட்டால் */}
+      {notSetup && (
+        <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", margin: "12px 20px", borderRadius: "10px", padding: "12px 16px", fontSize: "13px", color: "#fbbf24", flexShrink: 0 }}>
+          <div style={{ fontWeight: 700, marginBottom: "6px" }}>⚡ Setup Required — Sheet Public URL போடவும்:</div>
+          <div style={{ fontSize: "12px", color: "#fde68a", lineHeight: 1.6 }}>
+            1️⃣ Google Sheet → <strong>File → Share → Publish to web</strong><br/>
+            2️⃣ <strong>Embed tab</strong> select → <strong>Entire Document</strong> → <strong>Publish</strong><br/>
+            3️⃣ URL copy செய்து App.tsx-ல் <code style={{background:"rgba(0,0,0,0.3)",padding:"1px 6px",borderRadius:"4px"}}>WORK_TRACKER_SHEET_URL</code>-ல் paste செய்யவும்<br/>
+            4️⃣ இதற்கிடையில் கீழே <strong>View only</strong> மோட்டில் தெரியும்
+          </div>
+        </div>
+      )}
+
+      {/* iframe */}
+      <div style={{ flex: 1, position: "relative" as const, minHeight: 0 }}>
+        {isLoading && (
+          <div style={{
+            position: "absolute" as const, inset: 0,
+            background: "#0f172a",
+            display: "flex", flexDirection: "column" as const,
+            alignItems: "center", justifyContent: "center",
+            zIndex: 10
+          }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>📊</div>
+            <div style={{ fontSize: "14px", color: "#93c5fd", fontWeight: 600 }}>Loading {currentTab.label}...</div>
+            <div style={{ fontSize: "12px", color: "#475569", marginTop: "6px" }}>Google Sheets-இலிருந்து தகவல் வருகிறது...</div>
+          </div>
+        )}
+        <iframe
+          key={activeTab}
+          src={embedUrl}
+          onLoad={() => setIsLoading(false)}
+          style={{
+            width: "100%",
+            height: "100%",
+            minHeight: "calc(100vh - 120px)",
+            border: "none",
+            background: "#fff"
+          }}
+          title={`Work Tracker — ${currentTab.label}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// FINTRACK AI DASHBOARD — Integrated with ERP Data
+// ============================================================
+function FinTrackDashboard({
+  vendors, transactions, bills, wallet, onBack
+}: {
+  vendors: Vendor[];
+  transactions: Transaction[];
+  bills: Bill[];
+  wallet: WalletEntry[];
+  onBack: () => void;
+}) {
+  const [ftPage, setFtPage] = useState<"dashboard"|"bank"|"projects"|"reports">("dashboard");
+  const [ftProjects, setFtProjects] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("AR_FINTRACK_PROJECTS") || "[]"); } catch { return []; }
+  });
+  const [ftBankTxns, setFtBankTxns] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("AR_FINTRACK_BANK") || "[]"); } catch { return []; }
+  });
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [showAddBank, setShowAddBank] = useState(false);
+  const [editProj, setEditProj] = useState<any>(null);
+
+  // ERP data-வில்ிருந்து கணக்கிடு
+  const erpTotalExpected = transactions.reduce((s,t) => s + t.expectedAmount, 0);
+  const erpTotalBills    = bills.reduce((s,b) => s + b.billAmount, 0);
+  const erpTotalGST      = transactions.reduce((s,t) => s + t.gstAmount, 0);
+  const erpWalletBal     = wallet.length > 0 ? wallet[wallet.length-1].balance : 0;
+  const erpWalletCredit  = wallet.reduce((s,w) => s + w.credit, 0);
+  const erpWalletDebit   = wallet.reduce((s,w) => s + w.debit, 0);
+
+  // FinTrack own data
+  const ftTotalCredit = ftBankTxns.reduce((s:number,t:any) => s+(t.credit||0), 0);
+  const ftTotalDebit  = ftBankTxns.reduce((s:number,t:any) => s+(t.debit||0), 0);
+  const ftTotalPending = ftProjects.reduce((s:number,p:any) => s+(p.pending||0), 0);
+  const ftContractTotal = ftProjects.reduce((s:number,p:any) => s+(p.contract||0), 0);
+
+  const saveFtProjects = (data: any[]) => {
+    setFtProjects(data);
+    localStorage.setItem("AR_FINTRACK_PROJECTS", JSON.stringify(data));
+  };
+  const saveFtBank = (data: any[]) => {
+    setFtBankTxns(data);
+    localStorage.setItem("AR_FINTRACK_BANK", JSON.stringify(data));
+  };
+
+  // Project form state
+  const [pName, setPName] = useState("");
+  const [pLoc, setPLoc] = useState("");
+  const [pContract, setPContract] = useState("");
+  const [pGst, setPGst] = useState("");
+  const [pTds, setPTds] = useState("");
+  const [pLabour, setPLabour] = useState("");
+  const [pEmd, setPEmd] = useState("");
+  const [pReceived, setPReceived] = useState("");
+  const [pKeywords, setPKeywords] = useState("");
+
+  // Bank form state
+  const [bDate, setBDate] = useState(new Date().toISOString().split("T")[0]);
+  const [bDesc, setBDesc] = useState("");
+  const [bType, setBType] = useState("credit");
+  const [bAmount, setBAmount] = useState("");
+  const [bRef, setBRef] = useState("");
+  const [bProjId, setBProjId] = useState("");
+
+  const resetProjectForm = () => {
+    setPName(""); setPLoc(""); setPContract(""); setPGst(""); setPTds("");
+    setPLabour(""); setPEmd(""); setPReceived(""); setPKeywords("");
+    setEditProj(null);
+  };
+
+  const openEditProject = (p: any) => {
+    setEditProj(p);
+    setPName(p.name||""); setPLoc(p.location||"")
+    setPContract(String(p.contract||"")); setPGst(String(p.gst||"")); setPTds(String(p.tds||""));
+    setPLabour(String(p.labour||"")); setPEmd(String(p.emd||"")); setPReceived(String(p.received||""));
+    setPKeywords(p.keywords||"");
+    setShowAddProject(true);
+  };
+
+  const saveProject = () => {
+    if (!pName || !pLoc) return;
+    const contract = parseFloat(pContract)||0;
+    const received = parseFloat(pReceived)||0;
+    const proj = {
+      id: editProj?.id || ("FTP" + Date.now().toString(36).toUpperCase()),
+      name: pName, location: pLoc,
+      contract, gst: parseFloat(pGst)||0, tds: parseFloat(pTds)||0,
+      labour: parseFloat(pLabour)||0, emd: parseFloat(pEmd)||0,
+      received, pending: Math.max(0, contract - received),
+      keywords: pKeywords, status: "active",
+      createdAt: new Date().toISOString()
+    };
+    if (editProj) {
+      saveFtProjects(ftProjects.map((p:any) => p.id === editProj.id ? proj : p));
+    } else {
+      saveFtProjects([...ftProjects, proj]);
+    }
+    resetProjectForm();
+    setShowAddProject(false);
+  };
+
+  const deleteProject = (id: string) => {
+    if (!confirm("Delete project?")) return;
+    saveFtProjects(ftProjects.filter((p:any) => p.id !== id));
+  };
+
+  const saveBank = () => {
+    if (!bDesc || !bAmount) return;
+    const amt = parseFloat(bAmount)||0;
+    const txn = {
+      id: "FTB" + Date.now().toString(36).toUpperCase(),
+      date: bDate, description: bDesc, reference: bRef,
+      credit: bType==="credit"?amt:0,
+      debit: bType==="debit"?amt:0,
+      projectId: bProjId, createdAt: new Date().toISOString()
+    };
+    const newBank = [...ftBankTxns, txn];
+    saveFtBank(newBank);
+    // If linked to a project, update received amount
+    if (bProjId && bType==="credit") {
+      const totalRec = newBank.filter((t:any)=>t.projectId===bProjId && t.credit)
+        .reduce((s:number,t:any)=>s+t.credit, 0);
+      saveFtProjects(ftProjects.map((p:any) => p.id===bProjId
+        ? {...p, received: totalRec, pending: Math.max(0, p.contract-totalRec)}
+        : p));
+    }
+    setBDesc(""); setBAmount(""); setBRef(""); setBProjId("");
+    setShowAddBank(false);
+  };
+
+  const autoDetectProject = (desc: string) => {
+    const d = desc.toLowerCase();
+    const match = ftProjects.find((p:any) =>
+      (p.keywords||"").toLowerCase().split(",").some((k:string) => k.trim() && d.includes(k.trim()))
+      || d.includes(p.name.toLowerCase())
+    );
+    if (match) setBProjId(match.id);
+  };
+
+  const navStyle = (pg: string) => ({
+    padding: "8px 16px",
+    borderRadius: "8px",
+    fontSize: "13px",
+    fontWeight: "600" as const,
+    cursor: "pointer" as const,
+    background: ftPage === pg ? "rgba(251,191,36,0.15)" : "transparent",
+    color: ftPage === pg ? "#fbbf24" : "#94a3b8",
+    border: ftPage === pg ? "1px solid rgba(251,191,36,0.3)" : "1px solid transparent",
+    transition: "all 0.2s"
+  });
+
+  const statCard = (label: string, value: string, sub: string, color: string, icon: string) => (
+    <div style={{ background: "#1e293b", borderRadius: "12px", padding: "18px", border: "1px solid #334155", position: "relative" as const, overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: color }}></div>
+      <div style={{ position: "absolute", top: "14px", right: "14px", fontSize: "26px", opacity: 0.15 }}>{icon}</div>
+      <div style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.5px" }}>{label}</div>
+      <div style={{ fontSize: "24px", fontWeight: 800, marginTop: "6px", color: "#f1f5f9" }}>{value}</div>
+      <div style={{ fontSize: "11px", color: "#475569", marginTop: "4px" }}>{sub}</div>
+    </div>
+  );
+
+  const fmtFT = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 0 });
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI', sans-serif", color: "#f1f5f9" }}>
+
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, #7c2d12, #b45309)", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12px" }}>
+            ← Back to ERP
+          </button>
+          <div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>💼 FinTrack AI</div>
+            <div style={{ fontSize: "11px", color: "#fde68a" }}>Financial & Project Tracking System</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "6px" }}>
+          {(["dashboard","bank","projects","reports"] as const).map(pg => (
+            <button key={pg} onClick={() => setFtPage(pg)} style={navStyle(pg)}>
+              {pg==="dashboard"?"📊 Dashboard":pg==="bank"?"🏦 Bank":pg==="projects"?"🏗️ Projects":"📈 Reports"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: "24px" }}>
+
+        {/* ── DASHBOARD ── */}
+        {ftPage === "dashboard" && (
+          <div>
+            {/* ERP Sync Banner */}
+            <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: "10px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#fbbf24", display: "flex", alignItems: "center", gap: "8px" }}>
+              ⚡ ERP Data Connected — Vendors: {vendors.length} | Transactions: {transactions.length} | Bills: {bills.length} | Wallet Balance: {fmtFT(erpWalletBal)}
+            </div>
+
+            {/* Stat Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
+              {statCard("ERP Wallet Credit", fmtFT(erpWalletCredit), "Total income (ERP)", "#10b981", "💰")}
+              {statCard("ERP Wallet Debit", fmtFT(erpWalletDebit), "Total expense (ERP)", "#ef4444", "📤")}
+              {statCard("FinTrack Income", fmtFT(ftTotalCredit), ftBankTxns.filter((t:any)=>t.credit).length + " credits", "#3b82f6", "🏦")}
+              {statCard("Pending Amount", fmtFT(ftTotalPending + (transactions.filter(t=>t.status==="Open").reduce((s,t)=>s+t.remainingExpected,0))), "All projects", "#f59e0b", "⏳")}
+            </div>
+
+            {/* ERP + FinTrack Combined */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+
+              {/* ERP Summary */}
+              <div style={{ background: "#1e293b", borderRadius: "12px", border: "1px solid #334155", overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #334155", fontWeight: 700, fontSize: "14px", display: "flex", justifyContent: "space-between" }}>
+                  <span>📊 ERP Transactions Summary</span>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>{transactions.length} records</span>
+                </div>
+                <div style={{ padding: "14px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #1a2942" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>Total Expected</span>
+                    <span style={{ fontWeight: 700 }}>{fmtFT(erpTotalExpected)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #1a2942" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>Bills Received</span>
+                    <span style={{ fontWeight: 700, color: "#10b981" }}>{fmtFT(erpTotalBills)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #1a2942" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>Total GST</span>
+                    <span style={{ fontWeight: 700, color: "#7c3aed" }}>{fmtFT(erpTotalGST)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
+                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>Wallet Balance</span>
+                    <span style={{ fontWeight: 700, color: "#f59e0b", fontSize: "16px" }}>{fmtFT(erpWalletBal)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* FinTrack Projects Summary */}
+              <div style={{ background: "#1e293b", borderRadius: "12px", border: "1px solid #334155", overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #334155", fontWeight: 700, fontSize: "14px", display: "flex", justifyContent: "space-between" }}>
+                  <span>🏗️ FinTrack Projects</span>
+                  <button onClick={() => { setFtPage("projects"); setShowAddProject(true); }} style={{ background: "#b45309", color: "#fff", border: "none", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer" }}>+ Add</button>
+                </div>
+                <div style={{ padding: "14px 18px" }}>
+                  {ftProjects.length === 0 ? (
+                    <div style={{ color: "#475569", fontSize: "12px", textAlign: "center" as const, padding: "20px" }}>No projects yet. Click + Add.</div>
+                  ) : ftProjects.slice(0,4).map((p:any) => {
+                    const pct = p.contract ? Math.min(100, Math.round(p.received/p.contract*100)) : 0;
+                    return (
+                      <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid #1a2942" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 600 }}>{p.name.substring(0,22)}</span>
+                          <span style={{ fontSize: "12px", color: "#ef4444" }}>{fmtFT(p.pending)} pending</span>
+                        </div>
+                        <div style={{ background: "#0f172a", borderRadius: "4px", height: "4px", marginTop: "4px" }}>
+                          <div style={{ background: pct>80?"#10b981":pct>40?"#f59e0b":"#3b82f6", height: "100%", width: pct+"%", borderRadius: "4px" }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ERP Vendors linked as reference */}
+            {vendors.length > 0 && (
+              <div style={{ marginTop: "16px", background: "#1e293b", borderRadius: "12px", border: "1px solid #334155", overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #334155", fontWeight: 700, fontSize: "14px" }}>
+                  🏢 ERP Vendors Reference ({vendors.length} vendors)
+                </div>
+                <div style={{ padding: "12px 18px", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "8px" }}>
+                  {vendors.slice(0,8).map(v => (
+                    <div key={v.id} style={{ background: "#0f172a", borderRadius: "8px", padding: "8px", fontSize: "12px" }}>
+                      <div style={{ fontWeight: 600, color: "#f1f5f9" }}>{v.vendorName.substring(0,18)}</div>
+                      <div style={{ color: "#64748b", marginTop: "2px" }}>{v.district}</div>
+                      <div style={{ color: "#fbbf24", fontSize: "11px", marginTop: "2px" }}>{v.vendorCode}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BANK STATEMENTS ── */}
+        {ftPage === "bank" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700 }}>🏦 Bank Statements</div>
+              <button onClick={() => setShowAddBank(true)} style={{ background: "#b45309", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>+ Add Transaction</button>
+            </div>
+
+            {/* Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
+              {statCard("Total Credit", fmtFT(ftTotalCredit), ftBankTxns.filter((t:any)=>t.credit).length+" entries", "#10b981", "⬇️")}
+              {statCard("Total Debit", fmtFT(ftTotalDebit), ftBankTxns.filter((t:any)=>t.debit).length+" entries", "#ef4444", "⬆️")}
+              {statCard("Net Balance", fmtFT(ftTotalCredit-ftTotalDebit), "Income - Expense", "#3b82f6", "📊")}
+            </div>
+
+            {/* Add Form */}
+            {showAddBank && (
+              <div style={{ background: "#1e293b", borderRadius: "12px", padding: "20px", border: "1px solid #334155", marginBottom: "20px" }}>
+                <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px" }}>Add Bank Transaction</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px" }}>
+                  {[{label:"Date",type:"date",val:bDate,set:setBDate},{label:"Reference",type:"text",val:bRef,set:setBRef}].map(f=>(
+                    <div key={f.label}>
+                      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>{f.label}</div>
+                      <input type={f.type} value={f.val} onChange={e=>f.set(e.target.value)}
+                        style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }} />
+                    </div>
+                  ))}
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>Type</div>
+                    <select value={bType} onChange={e=>setBType(e.target.value)}
+                      style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }}>
+                      <option value="credit">Credit (Income)</option>
+                      <option value="debit">Debit (Expense)</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: "span 2" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>Description *</div>
+                    <input type="text" value={bDesc} onChange={e=>{setBDesc(e.target.value);autoDetectProject(e.target.value);}}
+                      placeholder="e.g. NEFT from ABC Construction" style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>Amount (₹) *</div>
+                    <input type="number" value={bAmount} onChange={e=>setBAmount(e.target.value)} placeholder="0.00"
+                      style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>Link to Project</div>
+                    <select value={bProjId} onChange={e=>setBProjId(e.target.value)}
+                      style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }}>
+                      <option value="">-- None --</option>
+                      {ftProjects.map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {bProjId && (
+                  <div style={{ marginTop: "10px", fontSize: "12px", color: "#10b981", fontWeight: 600 }}>
+                    ✅ Auto-detected: {ftProjects.find((p:any)=>p.id===bProjId)?.name}
+                  </div>
+                )}
+                <div style={{ marginTop: "14px", display: "flex", gap: "8px" }}>
+                  <button onClick={saveBank} style={{ background: "#10b981", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>💾 Save</button>
+                  <button onClick={()=>setShowAddBank(false)} style={{ background: "#334155", color: "#94a3b8", border: "none", padding: "8px 20px", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction Table */}
+            <div style={{ background: "#1e293b", borderRadius: "12px", border: "1px solid #334155", overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" as const }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "#0f172a" }}>
+                      {["Date","Description","Reference","Credit","Debit","Project","Action"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ftBankTxns.length === 0 ? (
+                      <tr><td colSpan={7} style={{ textAlign: "center" as const, padding: "30px", color: "#475569" }}>No transactions yet.</td></tr>
+                    ) : [...ftBankTxns].reverse().map((t:any) => {
+                      const proj = ftProjects.find((p:any)=>p.id===t.projectId);
+                      return (
+                        <tr key={t.id} style={{ borderBottom: "1px solid #1e293b" }}>
+                          <td style={{ padding: "10px 14px", color: "#64748b", fontSize: "12px" }}>{t.date}</td>
+                          <td style={{ padding: "10px 14px", fontWeight: 600 }}>{t.description}</td>
+                          <td style={{ padding: "10px 14px", color: "#64748b", fontSize: "12px" }}>{t.reference||"—"}</td>
+                          <td style={{ padding: "10px 14px", color: "#10b981", fontWeight: 700 }}>{t.credit ? fmtFT(t.credit) : "—"}</td>
+                          <td style={{ padding: "10px 14px", color: "#ef4444", fontWeight: 700 }}>{t.debit ? fmtFT(t.debit) : "—"}</td>
+                          <td style={{ padding: "10px 14px" }}>
+                            {proj ? <span style={{ background: "rgba(59,130,246,0.15)", color: "#93c5fd", padding: "3px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 }}>{proj.name.substring(0,16)}</span>
+                              : <span style={{ color: "#ef4444", fontSize: "11px" }}>Unlinked</span>}
+                          </td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <button onClick={() => saveFtBank(ftBankTxns.filter((x:any)=>x.id!==t.id))}
+                              style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "none", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", cursor: "pointer" }}>🗑️</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── PROJECTS ── */}
+        {ftPage === "projects" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700 }}>🏗️ Projects</div>
+              <button onClick={() => { resetProjectForm(); setShowAddProject(true); }} style={{ background: "#b45309", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>+ New Project</button>
+            </div>
+
+            {/* Add/Edit Form */}
+            {showAddProject && (
+              <div style={{ background: "#1e293b", borderRadius: "12px", padding: "20px", border: "1px solid #334155", marginBottom: "20px" }}>
+                <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px" }}>{editProj ? "✏️ Edit Project" : "🏗️ New Project"}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px" }}>
+                  {([
+                    {label:"Project Name *",val:pName,set:setPName,span:2},
+                    {label:"Location *",val:pLoc,set:setPLoc},
+                    {label:"Contract Amount (₹)",val:pContract,set:setPContract,type:"number"},
+                    {label:"GST Amount (₹)",val:pGst,set:setPGst,type:"number"},
+                    {label:"TDS Amount (₹)",val:pTds,set:setPTds,type:"number"},
+                    {label:"Labour Cost (₹)",val:pLabour,set:setPLabour,type:"number"},
+                    {label:"EMD Amount (₹)",val:pEmd,set:setPEmd,type:"number"},
+                    {label:"Amount Received (₹)",val:pReceived,set:setPReceived,type:"number"},
+                    {label:"Keywords (auto-link)",val:pKeywords,set:setPKeywords,placeholder:"e.g. ABC, road, contract1"}
+                  ] as any[]).map((f:any) => (
+                    <div key={f.label} style={f.span?{gridColumn:`span ${f.span}`}:{}}>
+                      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>{f.label}</div>
+                      <input type={f.type||"text"} value={f.val} onChange={e=>f.set(e.target.value)}
+                        placeholder={f.placeholder||""}
+                        style={{ width: "100%", padding: "8px 10px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none" }} />
+                    </div>
+                  ))}
+                </div>
+                {pContract && pReceived && (
+                  <div style={{ marginTop: "10px", fontSize: "13px", color: "#ef4444", fontWeight: 700 }}>
+                    Pending: {fmtFT(Math.max(0, (parseFloat(pContract)||0)-(parseFloat(pReceived)||0)))}
+                  </div>
+                )}
+                <div style={{ marginTop: "14px", display: "flex", gap: "8px" }}>
+                  <button onClick={saveProject} style={{ background: "#10b981", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>💾 Save Project</button>
+                  <button onClick={() => { setShowAddProject(false); resetProjectForm(); }} style={{ background: "#334155", color: "#94a3b8", border: "none", padding: "8px 20px", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Projects Grid */}
+            {ftProjects.length === 0 ? (
+              <div style={{ textAlign: "center" as const, color: "#475569", padding: "40px" }}>No projects yet.</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px" }}>
+                {ftProjects.map((p:any) => {
+                  const pct = p.contract ? Math.min(100, Math.round(p.received/p.contract*100)) : 0;
+                  return (
+                    <div key={p.id} style={{ background: "#1e293b", borderRadius: "12px", padding: "18px", border: "1px solid #334155" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <div style={{ fontWeight: 700, fontSize: "14px" }}>{p.name}</div>
+                        <span style={{ background: "rgba(59,130,246,0.15)", color: "#93c5fd", padding: "2px 8px", borderRadius: "10px", fontSize: "11px" }}>{p.status}</span>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "10px" }}>📍 {p.location}</div>
+                      <div style={{ background: "#0f172a", borderRadius: "4px", height: "6px", marginBottom: "6px" }}>
+                        <div style={{ background: pct>80?"#10b981":pct>40?"#f59e0b":"#3b82f6", height: "100%", width: pct+"%", borderRadius: "4px", transition: "width 0.5s" }}></div>
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "12px" }}>{pct}% received</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "6px", marginBottom: "12px" }}>
+                        {[
+                          {l:"Contract",v:p.contract,c:"#f1f5f9"},
+                          {l:"Received",v:p.received,c:"#10b981"},
+                          {l:"Pending",v:p.pending,c:"#ef4444"}
+                        ].map(s=>(
+                          <div key={s.l} style={{ background: "#0f172a", borderRadius: "8px", padding: "6px", textAlign: "center" as const }}>
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>{s.l}</div>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: s.c, marginTop: "2px" }}>{fmtFT(s.v)}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
+                        {p.gst ? <span style={{ background: "rgba(245,158,11,0.1)", color: "#fbbf24", fontSize: "10px", padding: "2px 7px", borderRadius: "8px" }}>GST: {fmtFT(p.gst)}</span> : null}
+                        {p.tds ? <span style={{ background: "rgba(100,116,139,0.1)", color: "#94a3b8", fontSize: "10px", padding: "2px 7px", borderRadius: "8px" }}>TDS: {fmtFT(p.tds)}</span> : null}
+                      </div>
+                      <div style={{ marginTop: "10px", display: "flex", gap: "6px" }}>
+                        <button onClick={() => openEditProject(p)} style={{ flex: 1, background: "#1a2f5e", color: "#93c5fd", border: "none", padding: "6px", borderRadius: "6px", fontSize: "12px", cursor: "pointer" }}>✏️ Edit</button>
+                        <button onClick={() => deleteProject(p.id)} style={{ flex: 1, background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "none", padding: "6px", borderRadius: "6px", fontSize: "12px", cursor: "pointer" }}>🗑️ Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── REPORTS ── */}
+        {ftPage === "reports" && (
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "20px" }}>📈 Financial Reports</div>
+
+            {/* GST + TDS Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+              <div style={{ background: "#1e293b", borderRadius: "12px", padding: "18px", border: "1px solid #334155" }}>
+                <div style={{ fontWeight: 700, marginBottom: "12px" }}>🧭 GST Summary</div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1a2942" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>ERP GST Total</span>
+                  <span style={{ fontWeight: 700, color: "#7c3aed" }}>{fmtFT(erpTotalGST)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1a2942" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>FinTrack Projects GST</span>
+                  <span style={{ fontWeight: 700, color: "#7c3aed" }}>{fmtFT(ftProjects.reduce((s:number,p:any)=>s+(p.gst||0),0))}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>Combined GST</span>
+                  <span style={{ fontWeight: 800, color: "#a78bfa", fontSize: "16px" }}>{fmtFT(erpTotalGST + ftProjects.reduce((s:number,p:any)=>s+(p.gst||0),0))}</span>
+                </div>
+              </div>
+              <div style={{ background: "#1e293b", borderRadius: "12px", padding: "18px", border: "1px solid #334155" }}>
+                <div style={{ fontWeight: 700, marginBottom: "12px" }}>📊 Net Financial Position</div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1a2942" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>Total Income</span>
+                  <span style={{ fontWeight: 700, color: "#10b981" }}>{fmtFT(erpWalletCredit + ftTotalCredit)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1a2942" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>Total Expense</span>
+                  <span style={{ fontWeight: 700, color: "#ef4444" }}>{fmtFT(erpWalletDebit + ftTotalDebit)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>Net Profit/Loss</span>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: (erpWalletCredit+ftTotalCredit)>(erpWalletDebit+ftTotalDebit)?"#10b981":"#ef4444" }}>
+                    {fmtFT((erpWalletCredit+ftTotalCredit)-(erpWalletDebit+ftTotalDebit))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Project-wise Report Table */}
+            <div style={{ background: "#1e293b", borderRadius: "12px", border: "1px solid #334155", overflow: "hidden" }}>
+              <div style={{ padding: "14px 18px", borderBottom: "1px solid #334155", fontWeight: 700, fontSize: "14px" }}>🏗️ Project-wise Financial Report</div>
+              <div style={{ overflowX: "auto" as const }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "#0f172a" }}>
+                      {["#","Project","Location","Contract","GST","TDS","Labour","EMD","Received","Pending","Progress"].map(h=>(
+                        <th key={h} style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ftProjects.length === 0 ? (
+                      <tr><td colSpan={11} style={{ textAlign: "center" as const, padding: "30px", color: "#475569" }}>No projects.</td></tr>
+                    ) : ftProjects.map((p:any, i:number) => {
+                      const pct = p.contract ? Math.min(100, Math.round(p.received/p.contract*100)) : 0;
+                      return (
+                        <tr key={p.id} style={{ borderBottom: "1px solid #1a2942" }}>
+                          <td style={{ padding: "10px 12px", color: "#64748b" }}>{i+1}</td>
+                          <td style={{ padding: "10px 12px", fontWeight: 700 }}>{p.name}</td>
+                          <td style={{ padding: "10px 12px", color: "#64748b", fontSize: "12px" }}>{p.location}</td>
+                          <td style={{ padding: "10px 12px" }}>{fmtFT(p.contract)}</td>
+                          <td style={{ padding: "10px 12px", color: "#a78bfa" }}>{fmtFT(p.gst)}</td>
+                          <td style={{ padding: "10px 12px", color: "#fbbf24" }}>{fmtFT(p.tds)}</td>
+                          <td style={{ padding: "10px 12px", color: "#94a3b8" }}>{fmtFT(p.labour)}</td>
+                          <td style={{ padding: "10px 12px", color: "#94a3b8" }}>{fmtFT(p.emd)}</td>
+                          <td style={{ padding: "10px 12px", color: "#10b981", fontWeight: 700 }}>{fmtFT(p.received)}</td>
+                          <td style={{ padding: "10px 12px", color: "#ef4444", fontWeight: 700 }}>{fmtFT(p.pending)}</td>
+                          <td style={{ padding: "10px 12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <div style={{ background: "#0f172a", borderRadius: "4px", height: "6px", width: "60px" }}>
+                                <div style={{ background: pct>80?"#10b981":pct>40?"#f59e0b":"#3b82f6", height: "100%", width: pct+"%", borderRadius: "4px" }}></div>
+                              </div>
+                              <span style={{ fontSize: "11px", color: "#64748b" }}>{pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ERP Open Transactions */}
+            {transactions.filter(t=>t.status==="Open").length > 0 && (
+              <div style={{ marginTop: "16px", background: "#1e293b", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.2)", overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #334155", fontWeight: 700, fontSize: "14px", color: "#ef4444" }}>
+                  ⚠️ ERP Open Transactions (Pending Close)
+                </div>
+                <div style={{ overflowX: "auto" as const }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ background: "#0f172a" }}>
+                        {["TXN ID","Vendor","District","Expected","Remaining","Status"].map(h=>(
+                          <th key={h} style={{ padding: "8px 12px", textAlign: "left" as const, fontSize: "11px", color: "#64748b" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.filter(t=>t.status==="Open").map(t=>(
+                        <tr key={t.txnId} style={{ borderBottom: "1px solid #1a2942" }}>
+                          <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#93c5fd" }}>{t.txnId}</td>
+                          <td style={{ padding: "8px 12px", fontWeight: 600 }}>{t.vendorName}</td>
+                          <td style={{ padding: "8px 12px", color: "#64748b" }}>{t.district}</td>
+                          <td style={{ padding: "8px 12px" }}>{fmtFT(t.expectedAmount)}</td>
+                          <td style={{ padding: "8px 12px", color: "#ef4444", fontWeight: 700 }}>{fmtFT(t.remainingExpected)}</td>
+                          <td style={{ padding: "8px 12px" }}><span style={{ background: "rgba(59,130,246,0.15)", color: "#93c5fd", padding: "2px 8px", borderRadius: "10px", fontSize: "11px" }}>Open</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

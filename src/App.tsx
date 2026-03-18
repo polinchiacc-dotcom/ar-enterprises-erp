@@ -5494,91 +5494,51 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       const bankRows = await loadBankCSV();
       const allBank: any[] = [];
 
-      // DEBUG: Print first 5 rows to understand structure
-      console.log("=== BANK RAW ROWS (first 20) ===");
-      bankRows.slice(0, 20).forEach((r, i) => {
-        console.log(`Row ${i}:`, r.slice(0,8).join(" | "));
-      });
+      // ✅ EXACT Column Structure (confirmed from console debug):
+      // [0]=empty [1]=Date [2]=Description [3]empty [4]empty
+      // [5]=Debit amount ("#60,000.00") OR empty
+      // [6]=Credit amount ("$ 684751.00") OR Running Balance (after debit)
+      // [7]=Running Balance (after credit) OR empty
+      //
+      // CREDIT row: col5=empty, col6="$ amount", col7="$ balance"
+      // DEBIT  row: col5="#amount", col6="$ balance", col7=empty
+      //
+      // Date format: "03/07/22" = MM/DD/YY (US format, older entries)
+      //              "02-04-2024" = DD-MM-YYYY (Indian format, newer)
 
-      // Bank Statement has these columns (from actual data seen):
-      // Date | Description | (empty) | (empty) | Debit | Credit | Running Balance
-      // Amounts format: "  $ 684751.00  " or "#684751" etc.
+      // Data starts at row 5 (after header at row 4)
+      const bankDataStart = 5;
 
-      // Strategy: scan ALL rows, try to parse date from col 0
-      // If date parses + any amount in cols 4-6 exists → it's a data row
-
-      let bankColDate = 0, bankColDesc = 1, bankColDebit = 4, bankColCredit = 5, bankColBalance = 6;
-      let bankHRow = -1;
-
-      // First: find header row to get correct column positions
-      for (let i = 0; i < Math.min(30, bankRows.length); i++) {
-        const row = bankRows[i].map(c => String(c || "").replace(/"/g,"").toLowerCase().trim());
-        const dateIdx   = row.findIndex(c => c === "date");
-        const creditIdx = row.findIndex(c => c === "credit");
-        const debitIdx  = row.findIndex(c => c === "debit");
-        if (dateIdx >= 0 && creditIdx >= 0) {
-          bankHRow    = i;
-          bankColDate = dateIdx;
-          bankColCredit = creditIdx;
-          if (debitIdx >= 0) bankColDebit = debitIdx;
-          // Find description column (first non-empty string col after date)
-          const descIdx = row.findIndex((c, idx) => idx > dateIdx && c.length > 0 && c !== "debit" && c !== "credit" && !c.includes("balance"));
-          if (descIdx >= 0) bankColDesc = descIdx;
-          // Balance = last meaningful column
-          const balIdx = row.findIndex(c => c.includes("balance") || c.includes("running"));
-          if (balIdx >= 0) bankColBalance = balIdx;
-          console.log(`✅ Bank header @ row ${i}: Date=${bankColDate} Desc=${bankColDesc} Debit=${bankColDebit} Credit=${bankColCredit} Bal=${bankColBalance}`);
-          console.log(`   Headers: ${row.slice(0,8).join(" | ")}`);
-          break;
-        }
-      }
-
-      if (bankHRow === -1) {
-        console.warn("⚠️ Header not found by 'date'+'credit' — trying flexible scan");
-        // Flexible: just scan all rows for date-parseable rows
-        bankHRow = 0;
-      }
-
-      // Parse data rows
-      for (let i = bankHRow + 1; i < bankRows.length; i++) {
+      for (let i = bankDataStart; i < bankRows.length; i++) {
         const r = bankRows[i].map(c => String(c || "").replace(/"/g, "").trim());
-        if (!r || r.length < 4) continue;
+        if (!r || r.length < 6) continue;
 
-        const dateVal = r[bankColDate];
+        // Col 1 = Date
+        const dateVal = r[1];
         if (!dateVal || dateVal.length < 5) continue;
 
-        const parsedDate = parseDate(dateVal);
-        if (!parsedDate) continue;
+        // Parse date
+        // "MM/DD/YY" (US short) OR "DD-MM-YYYY" / "DD/MM/YYYY" (Indian long)
+        let parsedDate: Date | null = null;
+        const shortDate = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+        const longDate  = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+        if (shortDate) {
+          // MM/DD/YY → e.g. 03/07/22 = March 7, 2022
+          parsedDate = new Date(2000 + +shortDate[3], +shortDate[1] - 1, +shortDate[2]);
+        } else if (longDate) {
+          // DD-MM-YYYY → e.g. 02-04-2024 = April 2, 2024
+          parsedDate = new Date(+longDate[3], +longDate[2] - 1, +longDate[1]);
+        }
+        if (!parsedDate || isNaN(parsedDate.getTime())) continue;
 
-        const credit  = parseAmt(r[bankColCredit]);
-        const debit   = parseAmt(r[bankColDebit]);
-        const balance = bankColBalance < r.length ? parseAmt(r[bankColBalance]) : 0;
+        const desc = (r[2] || "").replace(/\s+/g, " ").trim();
+        const col5 = r[5] || "";
+        const col6 = r[6] || "";
+        const col7 = r[7] || "";
 
-        if (!credit && !debit) continue;
-
-        allBank.push({
-          rowIndex: i,
-          date: parsedDate,
-          dateStr: fmtDate(parsedDate),
-          description: (r[bankColDesc] || "").replace(/\s+/g, " "),
-          debit, credit, balance,
-          matchStatus: "UNMATCHED", matchedContract: null
-        });
-      }
-
-      const bankCredits2 = allBank.filter(b => b.credit > 0);
-      console.log(`✅ Bank final: ${allBank.length} rows, ${bankCredits2.length} credits, ${allBank.filter(b=>b.debit>0).length} debits`);
-      if (bankCredits2.length > 0) {
-        console.log(`   First credit: ${bankCredits2[0].dateStr} | ${bankCredits2[0].credit} | ${bankCredits2[0].description.substring(0,60)}`);
-        console.log(`   Last credit:  ${bankCredits2[bankCredits2.length-1].dateStr} | ${bankCredits2[bankCredits2.length-1].credit}`);
-      } else {
-        console.error("❌ NO CREDITS FOUND! Check column indices above.");
-        // Emergency: dump row 20-25 to see actual data format
-        console.log("Sample data rows:");
-        bankRows.slice(bankHRow+1, bankHRow+5).forEach((r,i) => {
-          console.log(`  Data row ${bankHRow+1+i}:`, r.slice(0,8).map((c,j)=>`[${j}]${c}`).join(" "));
-        });
-      }
+        // Determine debit / credit / balance
+        // Col5 has '#' prefix → it's a debit amount
+        // Col6 has '
 
       // Reconcile
       const usedBank = new Set<number>();
@@ -5860,6 +5820,296 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+
+// ============================================================
+// END OF PART 4 — App.tsx complete!
+// ============================================================ prefix → it's either credit amount or running balance
+        // Col7 has '
+
+      // Reconcile
+      const usedBank = new Set<number>();
+      const usedContract = new Set<number>();
+      const reconcileResults: any[] = [];
+
+      // DEBUG: Bank credits உள்ளதா என்று சரிபார்க்க
+      const bankCredits = allBank.filter(b => b.credit > 0);
+      console.log(`Bank loaded: ${allBank.length} rows, ${bankCredits.length} credits`);
+      console.log(`Contracts loaded: ${allContracts.length}`);
+      if (allContracts.length > 0) {
+        console.log(`First contract: amt=${allContracts[0].receiptAmount} date=${allContracts[0].receiptDateStr}`);
+      }
+      if (bankCredits.length > 0) {
+        console.log(`First bank credit: amt=${bankCredits[0].credit} date=${bankCredits[0].dateStr}`);
+      }
+
+      // Pass 1: Exact match — same amount + date within 3 days
+      allContracts.forEach((c, ci) => {
+        if (!c.receiptAmount) return;
+        const bankMatch = allBank.find((b, bi) => {
+          if (usedBank.has(bi) || !b.credit) return false;
+          // Amount match: ₹1 tolerance
+          const amtMatch = Math.abs(b.credit - c.receiptAmount) <= 1;
+          // Date match: ±3 days
+          const dateMatch = c.receiptDate && b.date ?
+            Math.abs(c.receiptDate.getTime() - b.date.getTime()) <= 3 * 86400000 : false;
+          return amtMatch && dateMatch;
+        });
+        if (bankMatch) {
+          const bi = allBank.indexOf(bankMatch);
+          usedBank.add(bi); usedContractSet(ci, usedContract);
+          allBank[bi].matchStatus = "MATCHED"; allBank[bi].matchedContract = c;
+          allContracts[ci].matchStatus = "MATCHED"; allContracts[ci].matchedBank = bankMatch;
+          reconcileResults.push({
+            status: "MATCHED", matchType: "Exact (Date+Amount)",
+            workName: c.workName, sheet: c.sheetName,
+            contractDate: c.receiptDateStr, bankDate: bankMatch.dateStr,
+            contractAmt: c.receiptAmount, bankAmt: bankMatch.credit,
+            diff: Math.abs(bankMatch.credit - c.receiptAmount),
+            bankDesc: bankMatch.description, party: c.party
+          });
+        }
+      });
+
+      // Pass 2: Amount-only match (date இல்லாதவை அல்லது date ±15 days)
+      allContracts.forEach((c, ci) => {
+        if (usedContract.has(ci) || !c.receiptAmount) return;
+        const bankMatch = allBank.find((b, bi) => {
+          if (usedBank.has(bi) || !b.credit) return false;
+          const amtMatch = Math.abs(b.credit - c.receiptAmount) <= 1;
+          if (!amtMatch) return false;
+          // Date இல்லாவிட்டாலும் amount match ஆனால் partial
+          if (!c.receiptDate || !b.date) return amtMatch;
+          // Date within 15 days
+          return Math.abs(c.receiptDate.getTime() - b.date.getTime()) <= 15 * 86400000;
+        });
+        if (bankMatch) {
+          const bi = allBank.indexOf(bankMatch);
+          usedBank.add(bi); usedContractSet(ci, usedContract);
+          allBank[bi].matchStatus = "PARTIAL"; allBank[bi].matchedContract = c;
+          allContracts[ci].matchStatus = "PARTIAL"; allContracts[ci].matchedBank = bankMatch;
+          reconcileResults.push({
+            status: "PARTIAL", matchType: "Amount Only",
+            workName: c.workName, sheet: c.sheetName,
+            contractDate: c.receiptDateStr, bankDate: bankMatch.dateStr,
+            contractAmt: c.receiptAmount, bankAmt: bankMatch.credit,
+            diff: Math.abs(bankMatch.credit - c.receiptAmount),
+            bankDesc: bankMatch.description, party: c.party
+          });
+        }
+      });
+
+      // Pass 3: Unmatched
+      allContracts.forEach((c, ci) => {
+        if (!usedContract.has(ci)) {
+          reconcileResults.push({
+            status: "UNMATCHED", matchType: "No Match",
+            workName: c.workName, sheet: c.sheetName,
+            contractDate: c.receiptDateStr, bankDate: null,
+            contractAmt: c.receiptAmount, bankAmt: 0,
+            diff: c.receiptAmount, bankDesc: null, party: c.party
+          });
+        }
+      });
+
+      setContractData(allContracts);
+      setBankData(allBank);
+      setResults(reconcileResults);
+      setLoaded(true);
+    } catch (e) {
+      console.error("Reconciliation error:", e);
+    }
+    setLoading(false);
+  };
+
+  // Helper: add to Set
+  const usedContractSet = (ci: number, set: Set<number>) => set.add(ci);
+
+  const matched   = results.filter(r => r.status === "MATCHED");
+  const partial   = results.filter(r => r.status === "PARTIAL");
+  const unmatched = results.filter(r => r.status === "UNMATCHED");
+  const unmatchedBank = bankData.filter(b => b.credit > 0 && b.matchStatus === "UNMATCHED");
+  const matchPct  = results.length ? Math.round((matched.length / results.length) * 100) : 0;
+  const totalContractAmt = results.reduce((s, r) => s + (r.contractAmt||0), 0);
+  const matchedAmt = matched.reduce((s, r) => s + (r.contractAmt||0), 0);
+
+  const cardStyle = (color: string) => ({
+    background: "#1e293b", borderRadius: "12px", padding: "18px",
+    border: `1px solid #334155`, position: "relative" as const, overflow: "hidden" as const
+  });
+
+  const tabBtn = (id: typeof activeTab, label: string, count: number, color: string) => (
+    <button key={id} onClick={() => setActiveTab(id)} style={{
+      padding: "8px 16px", border: "none", background: "transparent",
+      color: activeTab === id ? color : "#64748b",
+      fontWeight: activeTab === id ? 700 : 500, fontSize: "13px",
+      cursor: "pointer", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent",
+      whiteSpace: "nowrap" as const, transition: "all 0.2s"
+    }}>
+      {label} <span style={{ background: activeTab===id?color:"#334155", color: activeTab===id?"#fff":"#94a3b8", padding: "1px 6px", borderRadius: "10px", fontSize: "11px", marginLeft: "4px" }}>{count}</span>
+    </button>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI', sans-serif", color: "#f1f5f9" }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>
+            ← Back
+          </button>
+          <div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>🔄 Bank Reconciliation</div>
+            <div style={{ fontSize: "11px", color: "#bfdbfe" }}>Contract Work ⇔ Bank Statement Auto Match</div>
+          </div>
+        </div>
+        <button onClick={runReconciliation} disabled={loading} style={{
+          background: loading ? "#334155" : "linear-gradient(135deg, #10b981, #059669)",
+          border: "none", color: "#fff", padding: "8px 20px", borderRadius: "8px",
+          cursor: loading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 700
+        }}>
+          {loading ? "🔄 Loading..." : loaded ? "↻ Re-run" : "▶️ Run Reconciliation"}
+        </button>
+      </div>
+
+      <div style={{ padding: "24px" }}>
+        {!loaded && !loading && (
+          <div style={{ textAlign: "center" as const, padding: "60px 20px" }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔄</div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#f1f5f9", marginBottom: "8px" }}>Bank Reconciliation Tool</div>
+            <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "24px", maxWidth: "500px", margin: "0 auto 24px", lineHeight: 1.6 }}>
+              Contract Work sheets-ல் உள்ள Receipt Amount-ஐ Bank Statement Credits-உடன் தானாகவே match செய்யும்.
+              ✅ Exact match (Date + Amount) &nbsp; ⚠️ Partial (Amount only) &nbsp; ❌ Unmatched
+            </div>
+            <button onClick={runReconciliation} style={{
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              border: "none", color: "#fff", padding: "12px 32px",
+              borderRadius: "10px", cursor: "pointer", fontSize: "15px", fontWeight: 700
+            }}>▶️ Start Reconciliation</button>
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ textAlign: "center" as const, padding: "60px" }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>🔄</div>
+            <div style={{ fontSize: "14px", color: "#93c5fd" }}>Google Sheets data load ஆகிருகிறது...</div>
+            <div style={{ fontSize: "12px", color: "#475569", marginTop: "8px" }}>Contract work tabs + Bank Statement பார்க்கிறோம்</div>
+          </div>
+        )}
+
+        {loaded && !loading && (
+          <div>
+            {/* Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
+              {[
+                { label: "Match Rate", value: matchPct + "%", sub: `${matched.length} of ${results.length}`, color: "#10b981" },
+                { label: "✅ Matched", value: matched.length, sub: fmtR(matchedAmt), color: "#10b981" },
+                { label: "⚠️ Partial", value: partial.length, sub: "Amount match only", color: "#f59e0b" },
+                { label: "❌ Unmatched", value: unmatched.length, sub: fmtR(totalContractAmt - matchedAmt), color: "#ef4444" },
+              ].map(s => (
+                <div key={s.label} style={cardStyle(s.color)}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: s.color }}></div>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, textTransform: "uppercase" as const }}>{s.label}</div>
+                  <div style={{ fontSize: "28px", fontWeight: 800, color: s.color, marginTop: "4px" }}>{s.value}</div>
+                  <div style={{ fontSize: "11px", color: "#475569", marginTop: "2px" }}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Match % bar */}
+            <div style={{ background: "#1e293b", borderRadius: "10px", padding: "14px 18px", marginBottom: "20px", border: "1px solid #334155" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600 }}>Overall Match Rate</span>
+                <span style={{ fontWeight: 800, color: matchPct > 80 ? "#10b981" : matchPct > 50 ? "#f59e0b" : "#ef4444" }}>{matchPct}%</span>
+              </div>
+              <div style={{ background: "#0f172a", borderRadius: "4px", height: "12px" }}>
+                <div style={{ height: "100%", borderRadius: "4px", width: matchPct + "%", background: matchPct > 80 ? "#10b981" : matchPct > 50 ? "#f59e0b" : "#ef4444", transition: "width 1s" }}></div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "11px", color: "#475569" }}>
+                <span>Contract Total: {fmtR(totalContractAmt)}</span>
+                <span>Matched: {fmtR(matchedAmt)}</span>
+                <span>Unmatched: {fmtR(totalContractAmt - matchedAmt)}</span>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", display: "flex", gap: "2px", overflowX: "auto" as const, marginBottom: "16px", borderRadius: "10px 10px 0 0" }}>
+              {tabBtn("summary",   "📊 Summary",   results.length, "#3b82f6")}
+              {tabBtn("matched",   "✅ Matched",   matched.length, "#10b981")}
+              {tabBtn("unmatched", "❌ Unmatched", unmatched.length, "#ef4444")}
+              {tabBtn("bank",      "🏦 Unmatched Bank", unmatchedBank.length, "#f59e0b")}
+            </div>
+
+            {/* Table */}
+            <div style={{ background: "#1e293b", borderRadius: "0 0 12px 12px", border: "1px solid #334155", overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" as const }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ background: "#0f172a" }}>
+                      {(activeTab !== "bank" ? [
+                        "Status", "Work Name", "Sheet", "Contract Date", "Bank Date",
+                        "Contract Amt", "Bank Credit", "Diff", "Bank Description"
+                      ] : ["Date", "Description", "Credit Amount"]).map((h: string) => (
+                        <th key={h} style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeTab !== "bank" ? (
+                      (activeTab === "matched" ? [...matched, ...partial] :
+                       activeTab === "unmatched" ? unmatched : results
+                      ).map((r: any, i: number) => (
+                        <tr key={i} style={{ borderBottom: "1px solid #1a2942" }}>
+                          <td style={{ padding: "8px 12px", whiteSpace: "nowrap" as const }}>
+                            <span style={{
+                              background: r.status==="MATCHED"?"rgba(16,185,129,0.15)":r.status==="PARTIAL"?"rgba(245,158,11,0.15)":"rgba(239,68,68,0.15)",
+                              color: r.status==="MATCHED"?"#10b981":r.status==="PARTIAL"?"#f59e0b":"#ef4444",
+                              padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 700
+                            }}>
+                              {r.status==="MATCHED"?"✅":r.status==="PARTIAL"?"⚠️":"❌"} {r.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: "8px 12px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, fontWeight: 600, color: "#f1f5f9" }}>{r.workName || "—"}</td>
+                          <td style={{ padding: "8px 12px", color: "#64748b", fontSize: "11px", whiteSpace: "nowrap" as const }}>{r.sheet?.replace("Contract work ","")?.replace("Contract Work ","")}</td>
+                          <td style={{ padding: "8px 12px", color: "#94a3b8", whiteSpace: "nowrap" as const }}>{r.contractDate || "—"}</td>
+                          <td style={{ padding: "8px 12px", color: r.bankDate ? "#93c5fd" : "#ef4444", whiteSpace: "nowrap" as const }}>{r.bankDate || "❌ None"}</td>
+                          <td style={{ padding: "8px 12px", fontWeight: 700, color: "#f1f5f9", whiteSpace: "nowrap" as const }}>{fmtR(r.contractAmt)}</td>
+                          <td style={{ padding: "8px 12px", fontWeight: 700, color: r.bankAmt ? "#10b981" : "#475569", whiteSpace: "nowrap" as const }}>{r.bankAmt ? fmtR(r.bankAmt) : "—"}</td>
+                          <td style={{ padding: "8px 12px", color: r.diff < 2 ? "#10b981" : "#f59e0b", whiteSpace: "nowrap" as const }}>{r.diff < 2 ? "✓" : fmtR(r.diff)}</td>
+                          <td style={{ padding: "8px 12px", color: "#64748b", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{r.bankDesc || "—"}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      unmatchedBank.map((b: any, i: number) => (
+                        <tr key={i} style={{ borderBottom: "1px solid #1a2942" }}>
+                          <td style={{ padding: "8px 12px", color: "#f59e0b", whiteSpace: "nowrap" as const }}>{b.dateStr}</td>
+                          <td style={{ padding: "8px 12px", color: "#f1f5f9", fontWeight: 600 }}>{b.description}</td>
+                          <td style={{ padding: "8px 12px", fontWeight: 700, color: "#10b981", whiteSpace: "nowrap" as const }}>{fmtR(b.credit)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                {((activeTab !== "bank" && results.length === 0) || (activeTab === "bank" && unmatchedBank.length === 0)) && (
+                  <div style={{ textAlign: "center" as const, padding: "30px", color: "#475569" }}>No records found.</div>
+                )}
+              </div>
+            </div>
+
+            {/* Note */}
+            <div style={{ marginTop: "12px", background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#93c5fd" }}>
+              💡 <strong>Google Apps Script</strong>-ல் auto-highlight feature-உம் உள்ளது — Sheet-ல் ✅ Green / ⚠️ Yellow / ❌ Red color-coding ஆகும்.
+              <br/><code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 6px", borderRadius: "4px" }}>F:\AR Enterprises\GoogleAppsScript_Reconciliation.txt</code> — Google Sheets Apps Script-ல் paste செய்யவும்
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// END OF APP.TSX
+// ============================================================
 
 // ============================================================
 // END OF PART 4 — App.tsx complete!

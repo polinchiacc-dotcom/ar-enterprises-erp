@@ -5314,7 +5314,10 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<"summary"|"matched"|"unmatched"|"bank">("summary");
   const [loaded, setLoaded] = useState(false);
 
-  const SHEET_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";
+  // Sheet IDs
+  const SHEET_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";  // Contract Work sheets
+  // Bank Statement — same sheet or published CSV URL
+  const BANK_SHEET_PUBLISHED_ID = "2PACX-1vT4U0YKYbaJwmt4I7MW2O4ITS-8YImAHpNLFCS9M_9BbF5qO2Hi-s1R59osAEQXc_RhnpRv9yZUgnRK";
 
   // Sheet GID map — Google Sheet-ல் tab click செய்து URL-ல் gid பார்க்கவும்
   const SHEET_TABS: Record<string, string> = {
@@ -5427,8 +5430,62 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // Load Bank Statement
-      const bankRows = await loadSheetCSV("Polinchi%20B%2FS%201712");
+      // Load Bank Statement — try multiple URLs
+      // AR_ERP_Pudukkottai published sheet-ல் "Polinchi B/S 1712" tab இருக்கிறது
+      // gid = tab-specific ID. Tab name-ஐ URL-encode செய்தும் try செய்கிறோம்
+      const loadBankCSV = async (): Promise<string[][]> => {
+        // 📌 இங்கே இருக்கும் வழிமுறைகள்:
+        // 1. AR_ERP_Pudukkottai published sheet — "Polinchi B/S 1712" tab gid
+        //    Google Sheet → "Polinchi B/S 1712" tab click → URL-ல் gid=XXXXXXXXX பார்க்கவும்
+        //    பிறகு இல் கீழே BANK_GID-ஐ update செய்யவும்
+        const BANK_GID = "2024650928"; // ✅ "Polinchi B/S 1712" tab gid
+        // Sri Polinchi sheet-ல் "Polinchi B/S 1712" tab உள்ளது — gid=2024650928
+        // AR_ERP_Pudukkottai published sheet-ஐ use செய்கிறோம் (bank sheet-ஐ publish செய்திருக்கலாம்)
+        const urls = [
+          // ✅ #1 BEST: AR_ERP_Pudukkottai — gid=2024650928 (Polinchi B/S 1712)
+          `https://docs.google.com/spreadsheets/d/e/${BANK_SHEET_PUBLISHED_ID}/pub?output=csv&gid=${BANK_GID}`,
+          // ✅ #2: Same Sri Polinchi sheet — gviz (public share ஆகிஇருந்தால் works)
+          `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Polinchi%20B%2FS%201712`,
+          // ✅ #3: By gid
+          `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${BANK_GID}`,
+          // ✅ #4: AR_ERP_Pudukkottai — sheet name param
+          `https://docs.google.com/spreadsheets/d/e/${BANK_SHEET_PUBLISHED_ID}/pub?output=csv&sheet=Polinchi%20B%2FS%201712`,
+        ];
+        const parseCSV = (text: string): string[][] =>
+          text.split("\n").map(line => {
+            const cols: string[] = [];
+            let cur = "", inQ = false;
+            for (const ch of line) {
+              if (ch === '"') inQ = !inQ;
+              else if (ch === "," && !inQ) { cols.push(cur); cur = ""; }
+              else cur += ch;
+            }
+            cols.push(cur);
+            return cols;
+          });
+        for (const url of urls) {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) { console.log(`HTTP ${res.status} for ${url}`); continue; }
+            const text = await res.text();
+            if (!text || text.length < 100 || text.includes('<!DOCTYPE') || text.includes('<html')) {
+              console.log(`Invalid response from ${url}`);
+              continue;
+            }
+            const rows = parseCSV(text);
+            // Validate: check if it looks like bank data (has date-like content)
+            const hasData = rows.some(r => r.some(c => /\d{2}[\/-]\d{2}[\/-]\d{4}|\d{4}/.test(c)));
+            if (rows.length > 5 && hasData) {
+              console.log(`✅ Bank CSV loaded: ${rows.length} rows from ${url}`);
+              return rows;
+            }
+            console.log(`Loaded but no valid data from ${url}, rows=${rows.length}`);
+          } catch(e) { console.log(`❌ Failed: ${url}`, e); }
+        }
+        console.error("❌ All bank URLs failed! Sheet may not be published.");
+        return [];
+      };
+      const bankRows = await loadBankCSV();
       const allBank: any[] = [];
       let bankHRow = 0;
       let bankColDate = 0, bankColDesc = 1, bankColDebit = 4, bankColCredit = 5, bankColBalance = 6;

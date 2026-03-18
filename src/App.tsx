@@ -5333,18 +5333,32 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     return Math.abs(parseFloat(s) || 0);
   };
 
-  // Parse date string
+  // Parse date string — always DD/MM/YYYY or DD-MM-YYYY format
   const parseDate = (val: any): Date | null => {
     if (!val) return null;
-    const s = String(val).trim();
-    // DD/MM/YYYY or DD-MM-YYYY
+    const s = String(val).trim().replace(/"/g, "");
+    if (!s || s === "-" || s === "" || s === "null") return null;
+    // DD/MM/YYYY or DD-MM-YYYY (Indian format — day first)
     const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-    if (m1) return new Date(+m1[3], +m1[2]-1, +m1[1]);
-    // MM/DD/YY
-    const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-    if (m2) return new Date(2000 + +m2[3], +m2[1]-1, +m2[2]);
-    const native = new Date(s);
-    return isNaN(native.getTime()) ? null : native;
+    if (m1) {
+      const day = +m1[1], month = +m1[2], year = +m1[3];
+      // Validate: day 1-31, month 1-12
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+        return new Date(year, month - 1, day);
+      }
+    }
+    // DD-Mon-YYYY (e.g. 02-Apr-2024)
+    const m2 = s.match(/^(\d{1,2})-([A-Za-z]{3})-?(\d{2,4})$/);
+    if (m2) {
+      const months: Record<string,number> = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+      const mon = months[m2[2].toLowerCase()];
+      const year = +m2[3] < 100 ? 2000 + +m2[3] : +m2[3];
+      if (mon !== undefined) return new Date(year, mon, +m2[1]);
+    }
+    // YYYY-MM-DD (ISO format)
+    const m3 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m3) return new Date(+m3[1], +m3[2]-1, +m3[3]);
+    return null;
   };
 
   const fmtDate = (d: Date | null): string => {
@@ -5399,7 +5413,8 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
           const r = rows[i];
           const workName = r[workCol]?.replace(/"/g, "").trim();
           const receiptAmt = amtCol >= 0 ? parseAmt(r[amtCol]) : 0;
-          const receiptDate = dateCol >= 0 ? parseDate(r[dateCol]?.replace(/"/g, "")) : null;
+          const receiptDateRaw = dateCol >= 0 ? r[dateCol]?.replace(/"/g, "").trim() : "";
+          const receiptDate = receiptDateRaw ? parseDate(receiptDateRaw) : null;
           if (!receiptAmt || receiptAmt === 0) continue;
           allContracts.push({
             rowIndex: i, sheetName: name, workName: workName || "",
@@ -5416,21 +5431,39 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       const bankRows = await loadSheetCSV("Polinchi%20B%2FS%201712");
       const allBank: any[] = [];
       let bankHRow = 0;
+      let bankColDate = 0, bankColDesc = 1, bankColDebit = 4, bankColCredit = 5, bankColBalance = 6;
+
+      // Find header row and column indices
       for (let i = 0; i < Math.min(20, bankRows.length); i++) {
-        if (bankRows[i].some(c => c.replace(/"/g,"").toLowerCase() === "date")) {
-          bankHRow = i; break;
+        const row = bankRows[i].map(c => c.replace(/"/g,"").toLowerCase().trim());
+        if (row.some(c => c === "date" || c === "running balance" || c === "credit")) {
+          bankHRow = i;
+          row.forEach((h, idx) => {
+            if (h === "date") bankColDate = idx;
+            if (h.includes("description") || h === "particulars") bankColDesc = idx;
+            if (h === "debit" || h.includes("debit")) bankColDebit = idx;
+            if (h === "credit" || h.includes("credit") && !h.includes("debit")) bankColCredit = idx;
+            if (h.includes("balance") || h.includes("running")) bankColBalance = idx;
+          });
+          break;
         }
       }
+
       for (let i = bankHRow + 1; i < bankRows.length; i++) {
         const r = bankRows[i].map(c => c.replace(/"/g, "").trim());
-        if (!r[0]) continue;
-        const credit = parseAmt(r[5]);
-        const debit = parseAmt(r[4]);
-        if (!r[0] && !credit && !debit) continue;
+        const dateVal = r[bankColDate];
+        if (!dateVal || dateVal === "-" || dateVal === "") continue;
+        const parsedDate = parseDate(dateVal);
+        const credit = parseAmt(r[bankColCredit]);
+        const debit  = parseAmt(r[bankColDebit]);
+        if (!credit && !debit) continue;
         allBank.push({
-          rowIndex: i, date: parseDate(r[0]), dateStr: r[0],
-          description: r[1] || "",
-          debit, credit, balance: parseAmt(r[6]),
+          rowIndex: i,
+          date: parsedDate,
+          dateStr: parsedDate ? fmtDate(parsedDate) : dateVal,
+          description: r[bankColDesc] || "",
+          debit, credit,
+          balance: parseAmt(r[bankColBalance]),
           matchStatus: "UNMATCHED", matchedContract: null
         });
       }
@@ -5440,14 +5473,27 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       const usedContract = new Set<number>();
       const reconcileResults: any[] = [];
 
-      // Pass 1: Exact match (amount + date ±5 days)
+      // DEBUG: Bank credits உள்ளதா என்று சரிபார்க்க
+      const bankCredits = allBank.filter(b => b.credit > 0);
+      console.log(`Bank loaded: ${allBank.length} rows, ${bankCredits.length} credits`);
+      console.log(`Contracts loaded: ${allContracts.length}`);
+      if (allContracts.length > 0) {
+        console.log(`First contract: amt=${allContracts[0].receiptAmount} date=${allContracts[0].receiptDateStr}`);
+      }
+      if (bankCredits.length > 0) {
+        console.log(`First bank credit: amt=${bankCredits[0].credit} date=${bankCredits[0].dateStr}`);
+      }
+
+      // Pass 1: Exact match — same amount + date within 3 days
       allContracts.forEach((c, ci) => {
         if (!c.receiptAmount) return;
         const bankMatch = allBank.find((b, bi) => {
           if (usedBank.has(bi) || !b.credit) return false;
-          const amtMatch = Math.abs(b.credit - c.receiptAmount) < 2;
+          // Amount match: ₹1 tolerance
+          const amtMatch = Math.abs(b.credit - c.receiptAmount) <= 1;
+          // Date match: ±3 days
           const dateMatch = c.receiptDate && b.date ?
-            Math.abs(c.receiptDate.getTime() - b.date.getTime()) < 5 * 86400000 : false;
+            Math.abs(c.receiptDate.getTime() - b.date.getTime()) <= 3 * 86400000 : false;
           return amtMatch && dateMatch;
         });
         if (bankMatch) {
@@ -5466,12 +5512,17 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         }
       });
 
-      // Pass 2: Amount-only match
+      // Pass 2: Amount-only match (date இல்லாதவை அல்லது date ±15 days)
       allContracts.forEach((c, ci) => {
         if (usedContract.has(ci) || !c.receiptAmount) return;
         const bankMatch = allBank.find((b, bi) => {
           if (usedBank.has(bi) || !b.credit) return false;
-          return Math.abs(b.credit - c.receiptAmount) < 2;
+          const amtMatch = Math.abs(b.credit - c.receiptAmount) <= 1;
+          if (!amtMatch) return false;
+          // Date இல்லாவிட்டாலும் amount match ஆனால் partial
+          if (!c.receiptDate || !b.date) return amtMatch;
+          // Date within 15 days
+          return Math.abs(c.receiptDate.getTime() - b.date.getTime()) <= 15 * 86400000;
         });
         if (bankMatch) {
           const bi = allBank.indexOf(bankMatch);

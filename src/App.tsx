@@ -5329,11 +5329,17 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
   const fmtR = (n: number) => "₹" + (n||0).toLocaleString("en-IN", { minimumFractionDigits: 0 });
 
   // Parse amount from cell value
+  // Handles: 684751 | $684751 | $ 684751.00 | ₹6,84,751 | #60,000.00 | "  $ 684751.00  "
   const parseAmt = (val: any): number => {
     if (!val && val !== 0) return 0;
     if (typeof val === "number") return Math.abs(val);
-    const s = String(val).replace(/[$₹,\s#]/g, "").trim();
-    return Math.abs(parseFloat(s) || 0);
+    const s = String(val)
+      .replace(/[$₹₹,\s#\x00-\x1f\x7f]/g, "") // remove $, ₹, commas, spaces, control chars
+      .replace(/[^0-9.-]/g, "")                        // keep only digits, dot, minus
+      .trim();
+    if (!s) return 0;
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : Math.abs(n);
   };
 
   // Parse date string — always DD/MM/YYYY or DD-MM-YYYY format
@@ -5487,41 +5493,90 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       };
       const bankRows = await loadBankCSV();
       const allBank: any[] = [];
-      let bankHRow = 0;
-      let bankColDate = 0, bankColDesc = 1, bankColDebit = 4, bankColCredit = 5, bankColBalance = 6;
 
-      // Find header row and column indices
-      for (let i = 0; i < Math.min(20, bankRows.length); i++) {
-        const row = bankRows[i].map(c => c.replace(/"/g,"").toLowerCase().trim());
-        if (row.some(c => c === "date" || c === "running balance" || c === "credit")) {
-          bankHRow = i;
-          row.forEach((h, idx) => {
-            if (h === "date") bankColDate = idx;
-            if (h.includes("description") || h === "particulars") bankColDesc = idx;
-            if (h === "debit" || h.includes("debit")) bankColDebit = idx;
-            if (h === "credit" || h.includes("credit") && !h.includes("debit")) bankColCredit = idx;
-            if (h.includes("balance") || h.includes("running")) bankColBalance = idx;
-          });
+      // DEBUG: Print first 5 rows to understand structure
+      console.log("=== BANK RAW ROWS (first 20) ===");
+      bankRows.slice(0, 20).forEach((r, i) => {
+        console.log(`Row ${i}:`, r.slice(0,8).join(" | "));
+      });
+
+      // Bank Statement has these columns (from actual data seen):
+      // Date | Description | (empty) | (empty) | Debit | Credit | Running Balance
+      // Amounts format: "  $ 684751.00  " or "#684751" etc.
+
+      // Strategy: scan ALL rows, try to parse date from col 0
+      // If date parses + any amount in cols 4-6 exists → it's a data row
+
+      let bankColDate = 0, bankColDesc = 1, bankColDebit = 4, bankColCredit = 5, bankColBalance = 6;
+      let bankHRow = -1;
+
+      // First: find header row to get correct column positions
+      for (let i = 0; i < Math.min(30, bankRows.length); i++) {
+        const row = bankRows[i].map(c => String(c || "").replace(/"/g,"").toLowerCase().trim());
+        const dateIdx   = row.findIndex(c => c === "date");
+        const creditIdx = row.findIndex(c => c === "credit");
+        const debitIdx  = row.findIndex(c => c === "debit");
+        if (dateIdx >= 0 && creditIdx >= 0) {
+          bankHRow    = i;
+          bankColDate = dateIdx;
+          bankColCredit = creditIdx;
+          if (debitIdx >= 0) bankColDebit = debitIdx;
+          // Find description column (first non-empty string col after date)
+          const descIdx = row.findIndex((c, idx) => idx > dateIdx && c.length > 0 && c !== "debit" && c !== "credit" && !c.includes("balance"));
+          if (descIdx >= 0) bankColDesc = descIdx;
+          // Balance = last meaningful column
+          const balIdx = row.findIndex(c => c.includes("balance") || c.includes("running"));
+          if (balIdx >= 0) bankColBalance = balIdx;
+          console.log(`✅ Bank header @ row ${i}: Date=${bankColDate} Desc=${bankColDesc} Debit=${bankColDebit} Credit=${bankColCredit} Bal=${bankColBalance}`);
+          console.log(`   Headers: ${row.slice(0,8).join(" | ")}`);
           break;
         }
       }
 
+      if (bankHRow === -1) {
+        console.warn("⚠️ Header not found by 'date'+'credit' — trying flexible scan");
+        // Flexible: just scan all rows for date-parseable rows
+        bankHRow = 0;
+      }
+
+      // Parse data rows
       for (let i = bankHRow + 1; i < bankRows.length; i++) {
-        const r = bankRows[i].map(c => c.replace(/"/g, "").trim());
+        const r = bankRows[i].map(c => String(c || "").replace(/"/g, "").trim());
+        if (!r || r.length < 4) continue;
+
         const dateVal = r[bankColDate];
-        if (!dateVal || dateVal === "-" || dateVal === "") continue;
+        if (!dateVal || dateVal.length < 5) continue;
+
         const parsedDate = parseDate(dateVal);
-        const credit = parseAmt(r[bankColCredit]);
-        const debit  = parseAmt(r[bankColDebit]);
+        if (!parsedDate) continue;
+
+        const credit  = parseAmt(r[bankColCredit]);
+        const debit   = parseAmt(r[bankColDebit]);
+        const balance = bankColBalance < r.length ? parseAmt(r[bankColBalance]) : 0;
+
         if (!credit && !debit) continue;
+
         allBank.push({
           rowIndex: i,
           date: parsedDate,
-          dateStr: parsedDate ? fmtDate(parsedDate) : dateVal,
-          description: r[bankColDesc] || "",
-          debit, credit,
-          balance: parseAmt(r[bankColBalance]),
+          dateStr: fmtDate(parsedDate),
+          description: (r[bankColDesc] || "").replace(/\s+/g, " "),
+          debit, credit, balance,
           matchStatus: "UNMATCHED", matchedContract: null
+        });
+      }
+
+      const bankCredits2 = allBank.filter(b => b.credit > 0);
+      console.log(`✅ Bank final: ${allBank.length} rows, ${bankCredits2.length} credits, ${allBank.filter(b=>b.debit>0).length} debits`);
+      if (bankCredits2.length > 0) {
+        console.log(`   First credit: ${bankCredits2[0].dateStr} | ${bankCredits2[0].credit} | ${bankCredits2[0].description.substring(0,60)}`);
+        console.log(`   Last credit:  ${bankCredits2[bankCredits2.length-1].dateStr} | ${bankCredits2[bankCredits2.length-1].credit}`);
+      } else {
+        console.error("❌ NO CREDITS FOUND! Check column indices above.");
+        // Emergency: dump row 20-25 to see actual data format
+        console.log("Sample data rows:");
+        bankRows.slice(bankHRow+1, bankHRow+5).forEach((r,i) => {
+          console.log(`  Data row ${bankHRow+1+i}:`, r.slice(0,8).map((c,j)=>`[${j}]${c}`).join(" "));
         });
       }
 

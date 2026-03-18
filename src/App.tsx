@@ -5636,11 +5636,10 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
                 <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "12px" }}>
                   <thead>
                     <tr style={{ background: "#0f172a" }}>
-                      {activeTab !== "bank" ? [
+                      {(activeTab !== "bank" ? [
                         "Status", "Work Name", "Sheet", "Contract Date", "Bank Date",
                         "Contract Amt", "Bank Credit", "Diff", "Bank Description"
-                      ] : ["Date", "Description", "Credit Amount"]}
-                      .map((h: string) => (
+                      ] : ["Date", "Description", "Credit Amount"]).map((h: string) => (
                         <th key={h} style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>{h}</th>
                       ))}
                     </tr>

@@ -515,6 +515,27 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
             </div>
           </button>
 
+          {/* Auditor — Full width */}
+          <button
+            onClick={() => onSelectRole("auditor" as any)}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #2e1065, #4c1d95, #5b21b6)", border: "2px solid rgba(167,139,250,0.4)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">🧑‍💼</div>
+                <div>
+                  <p className="font-bold text-white text-lg">Auditor</p>
+                  <p className="text-xs text-purple-200 mt-0.5">IT & GST Dashboard • GSTR-2B • ITC Register</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>NEW 🆕</span>
+                <div className="mt-2 text-xs font-semibold text-purple-300">Enter →</div>
+              </div>
+            </div>
+          </button>
+
           {/* Work Tracker — Full width */}
           <button
             onClick={() => onSelectRole("worktracker" as any)}
@@ -538,6 +559,326 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-8">🔒 AR Enterprises ERP V3.0 — Secured</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AUDITOR PAGE — IT & GST | GSTR-2B | ITC
+// ============================================================
+const AUDITOR_SCRIPT_URL = ""; // ⬅ Deploy செய்த பிறகு URL இங்கே பொடுங்கள்
+const AUDITOR_API_KEY = "AR_AUDITOR_2025_SECRET";
+
+const GST_CLIENTS = [
+  { name: "SRI POLINCHI & CO",   gstin: "33AEQFS3938D1ZU", gst: true },
+  { name: "Raju Malaiyappan",     gstin: "33AXDPM2713N1ZH", gst: true },
+  { name: "Arivoly",              gstin: "33ASRPA6713H1ZU", gst: true },
+  { name: "Vasundra Traders",     gstin: "",                gst: true },
+];
+
+const FY_OPTIONS = ["2025-26","2024-25","2023-24"];
+const MONTHS_GST = ["April","May","June","July","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+
+function AuditorPage({ onBack }: { onBack: () => void }) {
+  const [tab, setTab] = useState<"gst"|"gstr2b"|"itc">("gst");
+  const tabStyle = (id: string, color: string) => ({
+    padding: "12px 20px", border: "none", background: "transparent",
+    color: tab === id ? color : "#64748b",
+    fontWeight: tab === id ? 700 : 500, fontSize: "13px", cursor: "pointer",
+    borderBottom: tab === id ? `2px solid ${color}` : "2px solid transparent",
+  });
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI',sans-serif", color: "#f1f5f9" }}>
+      <div style={{ background: "linear-gradient(135deg,#4c1d95,#6d28d9)", padding: "12px 24px", display: "flex", alignItems: "center", gap: "12px" }}>
+        <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>🧑‍💼 Auditor Dashboard</div>
+          <div style={{ fontSize: "11px", color: "#ddd6fe" }}>IT & GST | GSTR-2B | ITC — Sri Polinchi & Co</div>
+        </div>
+      </div>
+      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", display: "flex", padding: "0 24px" }}>
+        <button style={tabStyle("gst","#8b5cf6")}    onClick={() => setTab("gst")}>📊 IT & GST Dashboard</button>
+        <button style={tabStyle("gstr2b","#06b6d4")} onClick={() => setTab("gstr2b")}>📋 GSTR-2B</button>
+        <button style={tabStyle("itc","#10b981")}    onClick={() => setTab("itc")}>💰 ITC Register</button>
+      </div>
+      <div style={{ padding: "24px" }}>
+        {tab === "gst"    && <GSTFilingTab />}
+        {tab === "gstr2b" && <GSTR2BTab />}
+        {tab === "itc"    && <ITCTab />}
+      </div>
+    </div>
+  );
+}
+
+function GSTFilingTab() {
+  const [client, setClient] = useState(GST_CLIENTS[0].gstin);
+  const [fy, setFy]         = useState("2025-26");
+  const [rType, setRType]   = useState("GSTR-1");
+  const [month, setMonth]   = useState("April");
+  const [date, setDate]     = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState("");
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+
+  const polinchiData: Record<string,string> = {
+    "April_GSTR-1":"17/06/2025",  "April_GSTR-3B":"17/06/2025",
+    "May_GSTR-1":"20/06/2025",    "May_GSTR-3B":"20/06/2025",
+    "June_GSTR-1":"22/07/2025",   "June_GSTR-3B":"12/08/2025",
+    "July_GSTR-1":"28/08/2025",   "July_GSTR-3B":"29/08/2025",
+    "Aug_GSTR-1":"29/09/2025",    "Aug_GSTR-3B":"04/10/2025",
+    "Sep_GSTR-1":"06/11/2025",    "Sep_GSTR-3B":"10/11/2025",
+    "Oct_GSTR-1":"11/11/2025",    "Oct_GSTR-3B":"07/01/2026",
+    "Nov_GSTR-1":"07/01/2026",    "Nov_GSTR-3B":"07/01/2026",
+    "Dec_GSTR-1":"11/01/2026",    "Dec_GSTR-3B":"19/01/2026",
+    "Jan_GSTR-1":"19/02/2026",    "Jan_GSTR-3B":"05/03/2026",
+    "Feb_GSTR-1":"10/03/2026",    "Feb_GSTR-3B":"",
+  };
+
+  const handleSave = async () => {
+    if (!date) { setMsg("❌ Date கொடுக்கவும்!"); return; }
+    if (!AUDITOR_SCRIPT_URL) { setMsg("⚠️ Apps Script URL கொடுக்கவும்!"); return; }
+    setSaving(true); setMsg("");
+    try {
+      const res = await fetch(AUDITOR_SCRIPT_URL, { method:"POST", body: JSON.stringify({
+        apiKey:AUDITOR_API_KEY, action:"saveGSTFiling",
+        gstin:client, name: GST_CLIENTS.find(c=>c.gstin===client)?.name||"",
+        fy, returnType:rType, month, filingDate:date
+      })});
+      const j = await res.json();
+      setMsg(j.success ? "✅ Saved! " + (j.message||"") : "❌ " + (j.error||""));
+    } catch { setMsg("❌ Error!"); }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155",marginBottom:"20px" }}>
+        <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#a78bfa" }}>➕ New Filing Entry</h2>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px" }}>
+          <div><label style={lbl}>Client</label>
+            <select value={client} onChange={e=>setClient(e.target.value)} style={inp as any}>
+              {GST_CLIENTS.filter(c=>c.gst).map(c=><option key={c.gstin} value={c.gstin}>{c.name}</option>)}
+            </select></div>
+          <div><label style={lbl}>FY</label>
+            <select value={fy} onChange={e=>setFy(e.target.value)} style={inp as any}>
+              {FY_OPTIONS.map(f=><option key={f}>{f}</option>)}
+            </select></div>
+          <div><label style={lbl}>Return Type</label>
+            <select value={rType} onChange={e=>setRType(e.target.value)} style={inp as any}>
+              <option>GSTR-1</option><option>GSTR-3B</option>
+            </select></div>
+          <div><label style={lbl}>Month</label>
+            <select value={month} onChange={e=>setMonth(e.target.value)} style={inp as any}>
+              {MONTHS_GST.map(m=><option key={m}>{m}</option>)}
+            </select></div>
+          <div><label style={lbl}>Filing Date</label>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp as any}/></div>
+          <div style={{ display:"flex",alignItems:"flex-end" }}>
+            <button onClick={handleSave} disabled={saving} style={{ width:"100%",padding:"9px",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>
+              {saving?"⏳ Saving...":"💾 Save"}</button></div>
+        </div>
+        {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
+      </div>
+
+      <div style={{ background:"#1e293b",borderRadius:"12px",border:"1px solid #334155",overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px",borderBottom:"1px solid #334155" }}>
+          <h2 style={{ fontSize:"14px",fontWeight:700,color:"#a78bfa" }}>📊 SRI POLINCHI & CO — FY 2025-26</h2>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"12px" }}>
+            <thead><tr style={{ background:"#0f172a" }}>
+              {["Month","GSTR-1","GSTR-3B","Status"].map(h=>
+                <th key={h} style={{ padding:"10px 12px",textAlign:"left" as const,color:"#64748b",fontWeight:700 }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {MONTHS_GST.map(m => {
+                const g1=polinchiData[m+"_GSTR-1"]||"", g3=polinchiData[m+"_GSTR-3B"]||"";
+                const both=g1&&g3, none=!g1&&!g3;
+                return (<tr key={m} style={{ borderBottom:"1px solid #1a2942" }}>
+                  <td style={{ padding:"8px 12px",fontWeight:600,color:"#f1f5f9" }}>{m} {m==="Jan"||m==="Feb"||m==="Mar"?"2026":"2025"}</td>
+                  <td style={{ padding:"8px 12px" }}>{g1?<span style={{ color:"#10b981",fontWeight:600 }}>✅ {g1}</span>:<span style={{ color:"#ef4444" }}>❌ Pending</span>}</td>
+                  <td style={{ padding:"8px 12px" }}>{g3?<span style={{ color:"#10b981",fontWeight:600 }}>✅ {g3}</span>:<span style={{ color:"#ef4444" }}>❌ Pending</span>}</td>
+                  <td style={{ padding:"8px 12px" }}><span style={{ padding:"2px 10px",borderRadius:"10px",fontSize:"11px",fontWeight:700,background:both?"rgba(16,185,129,0.15)":none?"rgba(239,68,68,0.15)":"rgba(245,158,11,0.15)",color:both?"#10b981":none?"#ef4444":"#f59e0b" }}>{both?"✅ Filed":none?"❌ Pending":"⚠️ Partial"}</span></td>
+                </tr>);
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GSTR2BTab() {
+  const [fy, setFy]         = useState("2025-26");
+  const [period, setPeriod] = useState("April");
+  const [paste, setPaste]   = useState("");
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState("");
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+
+  const handleParse = () => {
+    if (!paste.trim()) { setMsg("❌ Data paste செய்யவும்!"); return; }
+    const lines = paste.trim().split("\n").filter(l=>l.trim());
+    const first = lines[0].toLowerCase();
+    const start = (first.includes("gstin")||first.includes("trade")||first.includes("invoice")) ? 1 : 0;
+    const rows: any[] = [];
+    for (let i=start; i<lines.length; i++) {
+      const c = lines[i].split("\t").map(x=>x.trim());
+      if (c.length < 4) continue;
+      rows.push({ gstin:c[0]||"", tradeName:c[1]||"", invoiceNo:c[2]||"", invoiceDate:c[3]||"",
+        taxableValue:parseFloat((c[4]||"").replace(/[^0-9.]/g,""))||0,
+        igst:parseFloat((c[5]||"").replace(/[^0-9.]/g,""))||0,
+        cgst:parseFloat((c[6]||"").replace(/[^0-9.]/g,""))||0,
+        sgst:parseFloat((c[7]||"").replace(/[^0-9.]/g,""))||0 });
+    }
+    setParsed(rows); setMsg(`✅ ${rows.length} rows parsed`);
+  };
+
+  const handleSave = async () => {
+    if (!parsed.length) { setMsg("❌ Parse செய்யவும்!"); return; }
+    if (!AUDITOR_SCRIPT_URL) { setMsg("⚠️ Script URL கொடுக்கவும்!"); return; }
+    setSaving(true); setMsg("");
+    try {
+      const res = await fetch(AUDITOR_SCRIPT_URL, { method:"POST", body: JSON.stringify({ apiKey:AUDITOR_API_KEY, action:"saveGSTR2B", fy, period, rows:parsed })});
+      const j = await res.json();
+      if (j.success) { setMsg(`✅ ${j.count} rows saved!`); setParsed([]); setPaste(""); }
+      else setMsg("❌ " + (j.error||""));
+    } catch { setMsg("❌ Error!"); }
+    setSaving(false);
+  };
+
+  const ti=parsed.reduce((s,r)=>s+r.igst,0), tc=parsed.reduce((s,r)=>s+r.cgst,0), ts=parsed.reduce((s,r)=>s+r.sgst,0);
+  const f2=(n:number)=>"₹"+n.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  return (
+    <div>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155",marginBottom:"20px" }}>
+        <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#06b6d4" }}>📋 GSTR-2B Bulk Import</h2>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px" }}>
+          <div><label style={lbl}>FY</label><select value={fy} onChange={e=>setFy(e.target.value)} style={inp as any}>{FY_OPTIONS.map(f=><option key={f}>{f}</option>)}</select></div>
+          <div><label style={lbl}>Period</label><select value={period} onChange={e=>setPeriod(e.target.value)} style={inp as any}>{MONTHS_GST.map(m=><option key={m}>{m}</option>)}</select></div>
+        </div>
+        <div style={{ marginBottom:"12px" }}>
+          <label style={lbl}>📋 Data Paste (எக்ஸல்/Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
+          <div style={{ fontSize:"11px",color:"#475569",marginBottom:"6px" }}>Format: GSTIN | Trade Name | Invoice No | Date | Taxable | IGST | CGST | SGST</div>
+          <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={7}
+            placeholder="Excel-லிருந்து copy செய்து இங்கே paste செய்யவும்..."
+            style={{ ...inp as any, resize:"vertical" }}/>
+        </div>
+        <div style={{ display:"flex",gap:"10px" }}>
+          <button onClick={handleParse} style={{ padding:"8px 20px",background:"#0e7490",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>🔍 Parse</button>
+          <button onClick={handleSave} disabled={saving||!parsed.length} style={{ padding:"8px 20px",background:parsed.length?"#0891b2":"#334155",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:parsed.length?"pointer":"not-allowed",fontSize:"13px" }}>
+            {saving?"⏳...":`💾 Save ${parsed.length} Rows`}</button>
+        </div>
+        {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
+      </div>
+      {parsed.length>0 && (
+        <div style={{ background:"#1e293b",borderRadius:"12px",border:"1px solid #334155",overflow:"hidden" }}>
+          <div style={{ padding:"12px 18px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+            <h3 style={{ fontSize:"13px",fontWeight:700,color:"#06b6d4" }}>Preview — {parsed.length} rows</h3>
+            <div style={{ display:"flex",gap:"16px",fontSize:"12px" }}>
+              <span>IGST: <strong style={{ color:"#06b6d4" }}>{f2(ti)}</strong></span>
+              <span>CGST: <strong style={{ color:"#06b6d4" }}>{f2(tc)}</strong></span>
+              <span>SGST: <strong style={{ color:"#06b6d4" }}>{f2(ts)}</strong></span>
+              <span>Total: <strong style={{ color:"#10b981" }}>{f2(ti+tc+ts)}</strong></span>
+            </div>
+          </div>
+          <div style={{ overflowX:"auto",maxHeight:"280px",overflowY:"auto" }}>
+            <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"11px" }}>
+              <thead style={{ position:"sticky" as const,top:0,background:"#0f172a" }}>
+                <tr>{["GSTIN","Trade Name","Invoice No","Date","Taxable","IGST","CGST","SGST","Total"].map(h=>
+                  <th key={h} style={{ padding:"8px 10px",textAlign:"left" as const,color:"#64748b",fontWeight:700,whiteSpace:"nowrap" as const }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.slice(0,50).map((r,i)=>(
+                  <tr key={i} style={{ borderBottom:"1px solid #1a2942" }}>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8",fontFamily:"monospace" }}>{r.gstin}</td>
+                    <td style={{ padding:"6px 10px",color:"#f1f5f9",fontWeight:600,maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const }}>{r.tradeName}</td>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8" }}>{r.invoiceNo}</td>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8" }}>{r.invoiceDate}</td>
+                    <td style={{ padding:"6px 10px" }}>{f2(r.taxableValue)}</td>
+                    <td style={{ padding:"6px 10px",color:"#06b6d4" }}>{f2(r.igst)}</td>
+                    <td style={{ padding:"6px 10px",color:"#06b6d4" }}>{f2(r.cgst)}</td>
+                    <td style={{ padding:"6px 10px",color:"#06b6d4" }}>{f2(r.sgst)}</td>
+                    <td style={{ padding:"6px 10px",color:"#10b981",fontWeight:700 }}>{f2(r.igst+r.cgst+r.sgst)}</td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ITCTab() {
+  const [client, setClient] = useState(GST_CLIENTS[0].gstin);
+  const [fy, setFy]         = useState("2025-26");
+  const [period, setPeriod] = useState("April");
+  const [igst, setIgst]     = useState("");
+  const [cgst, setCgst]     = useState("");
+  const [sgst, setSgst]     = useState("");
+  const [open, setOpen]     = useState("");
+  const [rev, setRev]       = useState("");
+  const [notes, setNotes]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState("");
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+  const total=(parseFloat(igst)||0)+(parseFloat(cgst)||0)+(parseFloat(sgst)||0);
+  const net=total-(parseFloat(rev)||0);
+
+  const handleSave = async () => {
+    if (!igst&&!cgst&&!sgst) { setMsg("❌ Amount கொடுக்கவும்!"); return; }
+    if (!AUDITOR_SCRIPT_URL) { setMsg("⚠️ Script URL கொடுக்கவும்!"); return; }
+    setSaving(true); setMsg("");
+    try {
+      const res = await fetch(AUDITOR_SCRIPT_URL, { method:"POST", body: JSON.stringify({
+        apiKey:AUDITOR_API_KEY, action:"saveITC", gstin:client,
+        name:GST_CLIENTS.find(c=>c.gstin===client)?.name||"",
+        fy, period, igst:parseFloat(igst)||0, cgst:parseFloat(cgst)||0, sgst:parseFloat(sgst)||0,
+        openingITC:parseFloat(open)||0, reversals:parseFloat(rev)||0, netITC:net, notes
+      })});
+      const j = await res.json();
+      if (j.success) { setMsg("✅ ITC saved!"); setIgst(""); setCgst(""); setSgst(""); setOpen(""); setRev(""); setNotes(""); }
+      else setMsg("❌ " + (j.error||""));
+    } catch { setMsg("❌ Error!"); }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155" }}>
+        <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#10b981" }}>💰 ITC Register Entry</h2>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px" }}>
+          <div><label style={lbl}>Client</label><select value={client} onChange={e=>setClient(e.target.value)} style={inp as any}>{GST_CLIENTS.filter(c=>c.gst).map(c=><option key={c.gstin} value={c.gstin}>{c.name}</option>)}</select></div>
+          <div><label style={lbl}>FY</label><select value={fy} onChange={e=>setFy(e.target.value)} style={inp as any}>{FY_OPTIONS.map(f=><option key={f}>{f}</option>)}</select></div>
+          <div><label style={lbl}>Period</label><select value={period} onChange={e=>setPeriod(e.target.value)} style={inp as any}>{MONTHS_GST.map(m=><option key={m}>{m}</option>)}</select></div>
+          <div><label style={lbl}>Opening ITC</label><input type="number" value={open} onChange={e=>setOpen(e.target.value)} placeholder="0" style={inp as any}/></div>
+          <div><label style={lbl}>IGST (₹)</label><input type="number" value={igst} onChange={e=>setIgst(e.target.value)} placeholder="0" style={inp as any}/></div>
+          <div><label style={lbl}>CGST (₹)</label><input type="number" value={cgst} onChange={e=>setCgst(e.target.value)} placeholder="0" style={inp as any}/></div>
+          <div><label style={lbl}>SGST (₹)</label><input type="number" value={sgst} onChange={e=>setSgst(e.target.value)} placeholder="0" style={inp as any}/></div>
+          <div><label style={lbl}>Reversals</label><input type="number" value={rev} onChange={e=>setRev(e.target.value)} placeholder="0" style={inp as any}/></div>
+          <div><label style={lbl}>Notes</label><input type="text" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional" style={inp as any}/></div>
+        </div>
+        {(igst||cgst||sgst) && (
+          <div style={{ marginTop:"16px",background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:"10px",padding:"12px 16px",display:"flex",gap:"20px" }}>
+            <span style={{ fontSize:"12px" }}>Total: <strong style={{ color:"#10b981" }}>₹{total.toLocaleString("en-IN")}</strong></span>
+            <span style={{ fontSize:"12px" }}>Reversals: <strong style={{ color:"#ef4444" }}>₹{(parseFloat(rev)||0).toLocaleString("en-IN")}</strong></span>
+            <span style={{ fontSize:"12px" }}>Net ITC: <strong style={{ color:"#10b981",fontSize:"15px" }}>₹{net.toLocaleString("en-IN")}</strong></span>
+          </div>
+        )}
+        <div style={{ marginTop:"16px" }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding:"10px 28px",background:"linear-gradient(135deg,#059669,#10b981)",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>
+            {saving?"⏳ Saving...":"💾 Save ITC"}</button>
+        </div>
+        {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
       </div>
     </div>
   );
@@ -929,6 +1270,11 @@ export default function App() {
   }
 
   // ── Not logged in — Landing or Login ──────────────────────
+  // ── Auditor — No login needed, direct access
+  if ((loginRole as any) === "auditor" && !user) {
+    return <AuditorPage onBack={() => setLoginRole(null)} />;
+  }
+
   // ── Work Tracker — No login needed, direct access ──────────────
   if ((loginRole as any) === "worktracker" && !user) {
     return <WorkTrackerPage onBack={() => setLoginRole(null)} />;
@@ -4566,7 +4912,9 @@ function SettingsPage({
 // NOTE: ReconciliationPage-ஐ App() function-ல் main render-ல்
 // WorkTrackerPage return-க்கு கீழே சேர்க்கவும்:
 // if (currentView === 'reconciliation') return <ReconciliationPage onBack={() => setCurrentView('landing')} />;
-const WORK_TRACKER_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4U0YKYbaJwmt4I7MW2O4ITS-8YImAHpNLFCS9M_9BbF5qO2Hi-s1R59osAEQXc_RhnpRv9yZUgnRK/pubhtml?widget=true&headers=false";
+// Work Tracker — Sri Polinchi & Co sheet direct embed
+// WORK_TRACKER_SHEET_URL is not used — using SHEET_BASE_ID directly
+const WORK_TRACKER_SHEET_URL = "PASTE_IFRAME_URL_HERE"; // disabled — using SHEET_BASE_ID below
 // ⬆️ Google Sheet → File → Share → Publish to web → Embed → URL இங்கே paste செய்யவும்
 
 function WorkTrackerPage({ onBack }: { onBack: () => void }) {
@@ -4574,20 +4922,25 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Sheet tabs — Google Sheet-ல் உள்ள tabs-க்கு ஏற்ப இங்கே gid புது்படிக்கவும்
+  // ✅ Sri Polinchi & Co Sheet — ALL GIDs confirmed from URLs
   const SHEET_TABS = [
-    { id: "reminder",       label: "📋 Reminder",          gid: "0" },
-    { id: "contract2526",   label: "📄 Contract 25-26",     gid: "" },
-    { id: "contract2425",   label: "📄 Contract 24-25",     gid: "" },
-    { id: "contract2324",   label: "📄 Contract 23-24",     gid: "" },
-    { id: "gstpayment",     label: "🧭 GST Payment",        gid: "" },
-    { id: "gstdashboard",   label: "📊 IT & GST Dashboard", gid: "" },
-    { id: "gstr2b",         label: "📊 GSTR2B",             gid: "" },
-    { id: "itc",            label: "📊 ITC",               gid: "" },
-    { id: "expense",        label: "💸 Expense Journal",    gid: "" },
-    { id: "summary",        label: "📈 Summary",            gid: "" },
+    { id: "reminder",       label: "📋 Reminder",                       gid: "699572601"  },
+    { id: "contract2526",   label: "📄 Contract work 2025-26",           gid: "2095804161" },
+    { id: "contract2425",   label: "📄 Contract work 2024-25",           gid: "1782489685" },
+    { id: "contract2324",   label: "📄 Contract Work FY 23-24",          gid: "1882690159" },
+    { id: "bankstatement",  label: "🏦 Polinchi B/S 1712",               gid: "2024650928" },
+    { id: "gstpayment",     label: "🧭 GST Tax Payment",                 gid: "52991868"   },
+    { id: "gstdashboard",   label: "📊 IT & GST Dashboard",             gid: "1705023565" },
+    { id: "gstr2b",         label: "📊 GSTR2B",                         gid: "0"          },
+    { id: "itc",            label: "📊 ITC",                             gid: "218057996"  },
+    { id: "tneb",           label: "⚡ TNEB",                              gid: "386475729"  },
+    { id: "expense",        label: "💸 2024-25 Expense Journal",         gid: "43655213"   },
+    { id: "summary",        label: "📈 2024-25 Summary",                 gid: "568987361"  },
+    { id: "malaiyappangstr",label: "📊 Malaiyappan GSTR 2B",           gid: "1200513245" },
+    { id: "arivolygstr",    label: "📊 Arivoly GSTR 2B",               gid: "1247199772" },
   ];
 
-  const SHEET_BASE_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";
+  const SHEET_BASE_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw"; // Sri Polinchi & Co
 
   const getEmbedUrl = (gid: string) => {
     if (WORK_TRACKER_SHEET_URL !== "PASTE_IFRAME_URL_HERE") {

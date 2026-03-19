@@ -567,8 +567,9 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
 // ============================================================
 // AUDITOR PAGE — IT & GST | GSTR-2B | ITC
 // ============================================================
-const AUDITOR_SCRIPT_URL = ""; // ⬅ Deploy செய்த பிறகு URL இங்கே பொடுங்கள்
-const AUDITOR_API_KEY = "AR_AUDITOR_2025_SECRET";
+// Auditor — ERP Apps Script-ஐயே use செய்கிறோம் (same SHEET_URL)
+const AUDITOR_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6a9sjjpl3rF-FdCt969SIAcpEpOZvOigxfVWzHoB9-BZLvgGinsYlYRpgWvkedkys/exec";
+const AUDITOR_API_KEY = "AR_PUDUKKOTTAI_2025_SECRET"; // same as ERP API key
 
 const GST_CLIENTS = [
   { name: "SRI POLINCHI & CO",   gstin: "33AEQFS3938D1ZU", gst: true },

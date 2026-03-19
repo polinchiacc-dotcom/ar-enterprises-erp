@@ -5342,31 +5342,53 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     return isNaN(n) ? 0 : Math.abs(n);
   };
 
-  // Parse date string — always DD/MM/YYYY or DD-MM-YYYY format
+  // Parse date string — handles multiple formats
   const parseDate = (val: any): Date | null => {
     if (!val) return null;
     const s = String(val).trim().replace(/"/g, "");
     if (!s || s === "-" || s === "" || s === "null") return null;
+
+    const MONTHS: Record<string,number> = {
+      jan:0,feb:1,mar:2,apr:3,may:4,jun:5,
+      jul:6,aug:7,sep:8,oct:9,nov:10,dec:11
+    };
+
     // DD/MM/YYYY or DD-MM-YYYY (Indian format — day first)
     const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
     if (m1) {
       const day = +m1[1], month = +m1[2], year = +m1[3];
-      // Validate: day 1-31, month 1-12
-      if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12)
         return new Date(year, month - 1, day);
-      }
     }
-    // DD-Mon-YYYY (e.g. 02-Apr-2024)
-    const m2 = s.match(/^(\d{1,2})-([A-Za-z]{3})-?(\d{2,4})$/);
+
+    // DD-Mon-YYYY or DD-Mon-YY (e.g. 08-Apr-2025 or 08-Apr-25)
+    const m2 = s.match(/^(\d{1,2})[- ]([A-Za-z]{3})[- ]?(\d{2,4})$/);
     if (m2) {
-      const months: Record<string,number> = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-      const mon = months[m2[2].toLowerCase()];
+      const mon = MONTHS[m2[2].toLowerCase()];
       const year = +m2[3] < 100 ? 2000 + +m2[3] : +m2[3];
       if (mon !== undefined) return new Date(year, mon, +m2[1]);
     }
+
+    // Mon-DD-YYYY or Mon DD, YYYY (e.g. Apr-08-2025)
+    const m3 = s.match(/^([A-Za-z]{3})[- ](\d{1,2})[,- ]*(\d{4})$/);
+    if (m3) {
+      const mon = MONTHS[m3[1].toLowerCase()];
+      if (mon !== undefined) return new Date(+m3[3], mon, +m3[2]);
+    }
+
     // YYYY-MM-DD (ISO format)
-    const m3 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m3) return new Date(+m3[1], +m3[2]-1, +m3[3]);
+    const m4 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m4) return new Date(+m4[1], +m4[2]-1, +m4[3]);
+
+    // DD/MM/YY short (Bank Statement — MM/DD/YY handled separately in bank loop)
+    const m5 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    if (m5) {
+      // Try DD/MM/YY first (Indian)
+      const d = +m5[1], mo = +m5[2], yr = 2000 + +m5[3];
+      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12)
+        return new Date(yr, mo - 1, d);
+    }
+
     return null;
   };
 

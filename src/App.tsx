@@ -5370,7 +5370,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     }
 
     // Mon-DD-YYYY or Mon DD, YYYY (e.g. Apr-08-2025)
-    const m3 = s.match(/^([A-Za-z]{3})[- ](\d{1,2})[,- ]*(\d{4})$/);
+    const m3 = s.match(/^([A-Za-z]{3})[- ](\d{1,2})[ ,]*(\d{4})$/);
     if (m3) {
       const mon = MONTHS[m3[1].toLowerCase()];
       if (mon !== undefined) return new Date(+m3[3], mon, +m3[2]);

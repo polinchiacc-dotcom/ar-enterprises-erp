@@ -5412,23 +5412,51 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         const headers = rows[hRow].map(h => h.toLowerCase().replace(/["\s]/g, ""));
         const col = (k: string) => headers.findIndex(h => h.includes(k));
         const workCol    = col("workname") !== -1 ? col("workname") : col("works") !== -1 ? col("works") : 1;
-        const dateCol    = col("receiptdate") !== -1 ? col("receiptdate") : col("date");
-        const amtCol     = col("receiptamount") !== -1 ? col("receiptamount") : col("receiveblea") !== -1 ? col("receiveblea") : -1;
+        const amtCol     = col("receiptamount") !== -1 ? col("receiptamount") : col("receiveblea") !== -1 ? col("receiveblea") : col("receivable") !== -1 ? col("receivable") : -1;
         const taxCol     = col("taxablevalue");
         const gstCol     = col("18%gst") !== -1 ? col("18%gst") : col("gst");
         const partyCol   = col("party");
+        // Date — receipt date column first, otherwise any column with date
+        const receiptDateCol = col("receiptdate") !== -1 ? col("receiptdate") : col("date");
 
         for (let i = hRow + 1; i < rows.length; i++) {
           const r = rows[i];
           const workName = r[workCol]?.replace(/"/g, "").trim();
           const receiptAmt = amtCol >= 0 ? parseAmt(r[amtCol]) : 0;
-          const receiptDateRaw = dateCol >= 0 ? r[dateCol]?.replace(/"/g, "").trim() : "";
-          const receiptDate = receiptDateRaw ? parseDate(receiptDateRaw) : null;
           if (!receiptAmt || receiptAmt === 0) continue;
+
+          // ✅ Date strategy: receipt date column-ல் இல்லாவிட்டால்,
+          // எந்த column-லும் date format (அதாவது DD/MM/YYYY அல்லது DD-MM-YYYY) இருந்தாலும் எடுத்துக்கோள்
+          let receiptDate: Date | null = null;
+          let receiptDateStr = "";
+
+          // First try the dedicated receipt date column
+          if (receiptDateCol >= 0 && r[receiptDateCol]) {
+            const raw = r[receiptDateCol].replace(/"/g, "").trim();
+            receiptDate = parseDate(raw);
+            receiptDateStr = fmtDate(receiptDate);
+          }
+
+          // If no date found, scan ALL columns for any parseable date
+          if (!receiptDate) {
+            for (let ci = 0; ci < r.length; ci++) {
+              const cell = (r[ci] || "").replace(/"/g, "").trim();
+              // Must look like a date: DD/MM/YYYY or DD-MM-YYYY
+              if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(cell)) {
+                const parsed = parseDate(cell);
+                if (parsed) {
+                  receiptDate = parsed;
+                  receiptDateStr = fmtDate(parsed);
+                  break;
+                }
+              }
+            }
+          }
+
           allContracts.push({
             rowIndex: i, sheetName: name, workName: workName || "",
             party: partyCol >= 0 ? r[partyCol]?.replace(/"/g, "") : "",
-            receiptAmount: receiptAmt, receiptDate, receiptDateStr: fmtDate(receiptDate),
+            receiptAmount: receiptAmt, receiptDate, receiptDateStr,
             taxableValue: taxCol >= 0 ? parseAmt(r[taxCol]) : 0,
             gstAmount: gstCol >= 0 ? parseAmt(r[gstCol]) : 0,
             matchStatus: "UNMATCHED", matchedBank: null

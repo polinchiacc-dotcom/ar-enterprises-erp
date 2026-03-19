@@ -5494,81 +5494,39 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       const bankRows = await loadBankCSV();
       const allBank: any[] = [];
 
-      // ✅ EXACT Column Structure (confirmed from console debug):
-      // [0]=empty [1]=Date [2]=Description [3]empty [4]empty
-      // [5]=Debit amount ("#60,000.00") OR empty
-      // [6]=Credit amount ("$ 684751.00") OR Running Balance (after debit)
-      // [7]=Running Balance (after credit) OR empty
-      //
-      // CREDIT row: col5=empty, col6="$ amount", col7="$ balance"
-      // DEBIT  row: col5="#amount", col6="$ balance", col7=empty
-      //
-      // Date format: "03/07/22" = MM/DD/YY (US format, older entries)
-      //              "02-04-2024" = DD-MM-YYYY (Indian format, newer)
-
-      // Data starts at row 5 (after header at row 4)
-      const bankDataStart = 5;
-
-      for (let i = bankDataStart; i < bankRows.length; i++) {
-        const r = bankRows[i].map(c => String(c || "").replace(/"/g, "").trim());
+      // ✅ Bank column structure (confirmed):
+      // CREDIT: col1=date col2=desc col5='' col6='$ amount' col7='$ balance'
+      // DEBIT:  col1=date col2=desc col5='#amount' col6='$ balance' col7=''
+      for (let i = 5; i < bankRows.length; i++) {
+        const r = bankRows[i].map((c: string) => String(c || "").replace(/"/g, "").trim());
         if (!r || r.length < 6) continue;
-
-        // Col 1 = Date
         const dateVal = r[1];
         if (!dateVal || dateVal.length < 5) continue;
-
-        // Parse date
-        // "MM/DD/YY" (US short) OR "DD-MM-YYYY" / "DD/MM/YYYY" (Indian long)
         let parsedDate: Date | null = null;
-        const shortDate = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-        const longDate  = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-        if (shortDate) {
-          // MM/DD/YY → e.g. 03/07/22 = March 7, 2022
-          parsedDate = new Date(2000 + +shortDate[3], +shortDate[1] - 1, +shortDate[2]);
-        } else if (longDate) {
-          // DD-MM-YYYY → e.g. 02-04-2024 = April 2, 2024
-          parsedDate = new Date(+longDate[3], +longDate[2] - 1, +longDate[1]);
-        }
+        const sd = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+        const ld = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+        if (sd) parsedDate = new Date(2000 + +sd[3], +sd[1] - 1, +sd[2]);
+        else if (ld) parsedDate = new Date(+ld[3], +ld[2] - 1, +ld[1]);
         if (!parsedDate || isNaN(parsedDate.getTime())) continue;
-
         const desc = (r[2] || "").replace(/\s+/g, " ").trim();
-        const col5 = (r[5] || "").trim();
-        const col6 = (r[6] || "").trim();
-        const col7 = (r[7] || "").trim();
-
-        // ✅ CREDIT row: col5=empty, col6='$ amount', col7='$ balance'
-        // ✅ DEBIT  row: col5='#amount', col6='$ balance', col7=empty
+        const c5 = (r[5] || "").trim();
+        const c6 = (r[6] || "").trim();
+        const c7 = (r[7] || "").trim();
         let credit = 0, debit = 0, balance = 0;
-        if (col5 === "" && col6.includes("$") && col7.includes("$")) {
-          credit  = parseAmt(col6);
-          balance = parseAmt(col7);
-        } else if (col5.includes("#")) {
-          debit   = parseAmt(col5);
-          balance = parseAmt(col6);
-        } else if (col5 === "" && col6.includes("$")) {
-          credit  = parseAmt(col6);
-          balance = parseAmt(col7);
-        } else {
-          continue;
-        }
+        if (c5 === "" && c6.includes("$") && c7.includes("$")) {
+          credit = parseAmt(c6); balance = parseAmt(c7);
+        } else if (c5.includes("#")) {
+          debit = parseAmt(c5); balance = parseAmt(c6);
+        } else if (c5 === "" && c6.includes("$")) {
+          credit = parseAmt(c6);
+        } else { continue; }
         if (!credit && !debit) continue;
-
-        allBank.push({
-          rowIndex: i,
-          date: parsedDate,
-          dateStr: fmtDate(parsedDate),
-          description: desc,
-          debit, credit, balance,
-          matchStatus: "UNMATCHED", matchedContract: null
-        });
-      } // end bank loop
-
-      const bankCr = allBank.filter(b => b.credit > 0);
+        allBank.push({ rowIndex: i, date: parsedDate, dateStr: fmtDate(parsedDate), description: desc, debit, credit, balance, matchStatus: "UNMATCHED", matchedContract: null });
+      }
+      const bankCr = allBank.filter((b: any) => b.credit > 0);
       console.log(`✅ Bank: ${allBank.length} rows, ${bankCr.length} credits`);
-      if (bankCr.length > 0)
-        console.log(`   First credit: ${bankCr[0].dateStr} | ₹${bankCr[0].credit} | ${bankCr[0].description.substring(0,50)}`);
-      else
-        console.error("❌ 0 credits! Sample row5:", bankRows[5]?.slice(0,8).join("|"));
+      if (bankCr.length > 0) console.log(`First credit: ${bankCr[0].dateStr} | ₹${bankCr[0].credit}`);
+      else console.error("❌ 0 credits");
 
       // Reconcile
       const usedBank = new Set<number>();

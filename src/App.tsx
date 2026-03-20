@@ -581,7 +581,7 @@ const GST_CLIENTS = [
 const FY_OPTIONS = ["2025-26","2024-25","2023-24"];
 const MONTHS_GST = ["April","May","June","July","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 
-function AuditorPage({ onBack }: { onBack: () => void }) {
+function AuditorPage({ onBack, onGSTR2BVerified }: { onBack: () => void; onGSTR2BVerified?: (billNos: string[]) => void }) {
   const [tab, setTab] = useState<"gst"|"gstr2b"|"itc">("gst");
   const tabStyle = (id: string, color: string) => ({
     padding: "12px 20px", border: "none", background: "transparent",
@@ -605,7 +605,7 @@ function AuditorPage({ onBack }: { onBack: () => void }) {
       </div>
       <div style={{ padding: "24px" }}>
         {tab === "gst"    && <GSTFilingTab />}
-        {tab === "gstr2b" && <GSTR2BTab />}
+        {tab === "gstr2b" && <GSTR2BTab onVerified={onGSTR2BVerified} />}
         {tab === "itc"    && <ITCTab />}
       </div>
     </div>
@@ -712,15 +712,85 @@ function GSTFilingTab() {
   );
 }
 
-function GSTR2BTab() {
-  const [fy, setFy]         = useState("2025-26");
-  const [period, setPeriod] = useState("April");
-  const [paste, setPaste]   = useState("");
-  const [parsed, setParsed] = useState<any[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg]       = useState("");
+// Sri Polinchi Sheet GSTR2B tab
+const POLINCHI_SHEET_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";
+const GSTR2B_GID = "0"; // GSTR2B sheet gid=0
+
+function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void }) {
+  const [fy, setFy]           = useState("2025-26");
+  const [period, setPeriod]   = useState("Jan");
+  const [paste, setPaste]     = useState("");
+  const [parsed, setParsed]   = useState<any[]>([]);
+  const [sheetData, setSheetData] = useState<any[]>([]);
+  const [loadMode, setLoadMode]   = useState<"sheet"|"paste">("sheet");
+  const [loading, setLoading]     = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState("");
   const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
   const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+
+  // Sheet-லிருந்து GSTR2B data load செய்யும்
+  const loadFromSheet = async () => {
+    setLoading(true); setMsg(""); setSheetData([]);
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GSTR2B_GID}`;
+      const res = await fetch(url);
+      const csv = await res.text();
+      const lines = csv.trim().split('\n').filter(l => l.trim());
+      if (lines.length < 2) { setMsg('⚠️ Sheet-ல் data இல்லை'); setLoading(false); return; }
+
+      // Parse CSV — detect headers from first row
+      const parseCSVLine = (line: string) => {
+        const result: string[] = [];
+        let current = ''; let inQuotes = false;
+        for (const ch of line) {
+          if (ch === '"') { inQuotes = !inQuotes; }
+          else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["' ]/g,''));
+      // Column index detection
+      const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
+      const iGstin    = ci(['gstin','gst']);
+      const iTrade    = ci(['trade','name','supplier']);
+      const iInvNo    = ci(['invoice','invno','bill']);
+      const iInvDate  = ci(['date']);
+      const iTaxable  = ci(['taxable','value']);
+      const iIGST     = ci(['igst']);
+      const iCGST     = ci(['cgst']);
+      const iSGST     = ci(['sgst']);
+      const iPeriod   = ci(['period','month']);
+
+      const rows: any[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (cols.length < 4) continue;
+        const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(/"/g,'').trim() : '';
+        const toNum = (s: string) => parseFloat(s.replace(/[^0-9.-]/g,''))||0;
+        rows.push({
+          period:      get(iPeriod) || period,
+          gstin:       get(iGstin),
+          tradeName:   get(iTrade),
+          invoiceNo:   get(iInvNo),
+          invoiceDate: get(iInvDate),
+          taxableValue:toNum(get(iTaxable)),
+          igst:        toNum(get(iIGST)),
+          cgst:        toNum(get(iCGST)),
+          sgst:        toNum(get(iSGST)),
+        });
+      }
+      setSheetData(rows);
+      setMsg(`✅ ${rows.length} rows loaded from GSTR2B sheet`);
+      // Sheet load ஆனதும் bill numbers ERP-க்கு தெரியப்படுத்து
+      const billNos = rows.map((r: any) => String(r.invoiceNo).trim()).filter(Boolean);
+      if (onVerified && billNos.length > 0) onVerified(billNos);
+    } catch(e) { setMsg('❌ Load failed! Sheet public-ஆக இருக்க வேண்டும்.'); }
+    setLoading(false);
+  };
 
   const handleParse = () => {
     if (!paste.trim()) { setMsg("❌ Data paste செய்யவும்!"); return; }
@@ -747,41 +817,79 @@ function GSTR2BTab() {
     try {
       const res = await fetch(AUDITOR_SCRIPT_URL, { method:"POST", body: JSON.stringify({ apiKey:AUDITOR_API_KEY, action:"saveGSTR2B", fy, period, rows:parsed })});
       const j = await res.json();
-      if (j.success) { setMsg(`✅ ${j.count} rows saved!`); setParsed([]); setPaste(""); }
+      if (j.success) {
+        setMsg(`✅ ${j.count} rows saved!`);
+        // Bill numbers extract செய்து ERP-க்கு தெரியப்படுத்து
+        const billNos = displayData.map(r => String(r.invoiceNo).trim()).filter(Boolean);
+        if (onVerified && billNos.length > 0) onVerified(billNos);
+        setParsed([]); setPaste("");
+      }
       else setMsg("❌ " + (j.error||""));
     } catch { setMsg("❌ Error!"); }
     setSaving(false);
   };
 
-  const ti=parsed.reduce((s,r)=>s+r.igst,0), tc=parsed.reduce((s,r)=>s+r.cgst,0), ts=parsed.reduce((s,r)=>s+r.sgst,0);
   const f2=(n:number)=>"₹"+n.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const displayData = loadMode === "sheet" ? sheetData : parsed;
+  const ti=displayData.reduce((s,r)=>s+(Number(r.igst)||0),0);
+  const tc=displayData.reduce((s,r)=>s+(Number(r.cgst)||0),0);
+  const ts=displayData.reduce((s,r)=>s+(Number(r.sgst)||0),0);
 
   return (
     <div>
       <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155",marginBottom:"20px" }}>
-        <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#06b6d4" }}>📋 GSTR-2B Bulk Import</h2>
+        <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#06b6d4" }}>📋 GSTR-2B</h2>
+
+        {/* Mode Toggle */}
+        <div style={{ display:"flex",gap:"8px",marginBottom:"16px" }}>
+          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#0e7490":"#1e293b",color:loadMode==="sheet"?"#fff":"#64748b",border:loadMode==="sheet"?"none":"1px solid #334155" as any }}>
+            📊 Load from Sheet
+          </button>
+          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#0e7490":"#1e293b",color:loadMode==="paste"?"#fff":"#64748b",border:loadMode==="paste"?"none":"1px solid #334155" as any }}>
+            ➕ Paste New Data
+          </button>
+        </div>
+
         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px" }}>
           <div><label style={lbl}>FY</label><select value={fy} onChange={e=>setFy(e.target.value)} style={inp as any}>{FY_OPTIONS.map(f=><option key={f}>{f}</option>)}</select></div>
           <div><label style={lbl}>Period</label><select value={period} onChange={e=>setPeriod(e.target.value)} style={inp as any}>{MONTHS_GST.map(m=><option key={m}>{m}</option>)}</select></div>
         </div>
-        <div style={{ marginBottom:"12px" }}>
-          <label style={lbl}>📋 Data Paste (எக்ஸல்/Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
-          <div style={{ fontSize:"11px",color:"#475569",marginBottom:"6px" }}>Format: GSTIN | Trade Name | Invoice No | Date | Taxable | IGST | CGST | SGST</div>
-          <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={7}
-            placeholder="Excel-லிருந்து copy செய்து இங்கே paste செய்யவும்..."
-            style={{ ...inp as any, resize:"vertical" }}/>
-        </div>
-        <div style={{ display:"flex",gap:"10px" }}>
-          <button onClick={handleParse} style={{ padding:"8px 20px",background:"#0e7490",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>🔍 Parse</button>
-          <button onClick={handleSave} disabled={saving||!parsed.length} style={{ padding:"8px 20px",background:parsed.length?"#0891b2":"#334155",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:parsed.length?"pointer":"not-allowed",fontSize:"13px" }}>
-            {saving?"⏳...":`💾 Save ${parsed.length} Rows`}</button>
-        </div>
+
+        {/* Mode: Load from Sheet */}
+        {loadMode === "sheet" && (
+          <div>
+            <div style={{ fontSize:"12px",color:"#64748b",marginBottom:"10px" }}>
+              📄 Sri Polinchi Google Sheet → <strong style={{ color:"#06b6d4" }}>GSTR2B</strong> tab-லிருந்து நேரடியாக load ஆகும்
+            </div>
+            <button onClick={loadFromSheet} disabled={loading} style={{ padding:"9px 24px",background:"linear-gradient(135deg,#0e7490,#0891b2)",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>
+              {loading ? "⏳ Loading..." : "🔄 Load GSTR2B from Sheet"}
+            </button>
+          </div>
+        )}
+
+        {/* Mode: Paste */}
+        {loadMode === "paste" && (
+          <div>
+            <div style={{ marginBottom:"12px" }}>
+              <label style={lbl}>📋 Data Paste (எக்ஸல்/Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
+              <div style={{ fontSize:"11px",color:"#475569",marginBottom:"6px" }}>Format: Period | GSTIN | Trade Name | Invoice No | Date | Taxable | IGST | CGST | SGST</div>
+              <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={7}
+                placeholder="Sheet-லிருந்து copy செய்து இங்கே paste செய்யவும்..."
+                style={{ ...inp as any, resize:"vertical" }}/>
+            </div>
+            <div style={{ display:"flex",gap:"10px" }}>
+              <button onClick={handleParse} style={{ padding:"8px 20px",background:"#0e7490",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>🔍 Parse</button>
+              <button onClick={handleSave} disabled={saving||!parsed.length} style={{ padding:"8px 20px",background:parsed.length?"#0891b2":"#334155",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:parsed.length?"pointer":"not-allowed",fontSize:"13px" }}>
+                {saving?"⏳...":`💾 Save ${parsed.length} Rows`}</button>
+            </div>
+          </div>
+        )}
         {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
       </div>
-      {parsed.length>0 && (
+      {displayData.length>0 && (
         <div style={{ background:"#1e293b",borderRadius:"12px",border:"1px solid #334155",overflow:"hidden" }}>
           <div style={{ padding:"12px 18px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-            <h3 style={{ fontSize:"13px",fontWeight:700,color:"#06b6d4" }}>Preview — {parsed.length} rows</h3>
+            <h3 style={{ fontSize:"13px",fontWeight:700,color:"#06b6d4" }}>Preview — {displayData.length} rows</h3>
             <div style={{ display:"flex",gap:"16px",fontSize:"12px" }}>
               <span>IGST: <strong style={{ color:"#06b6d4" }}>{f2(ti)}</strong></span>
               <span>CGST: <strong style={{ color:"#06b6d4" }}>{f2(tc)}</strong></span>
@@ -797,7 +905,7 @@ function GSTR2BTab() {
                 </tr>
               </thead>
               <tbody>
-                {parsed.slice(0,50).map((r,i)=>(
+                {displayData.slice(0,100).map((r,i)=>(
                   <tr key={i} style={{ borderBottom:"1px solid #1a2942" }}>
                     <td style={{ padding:"6px 10px",color:"#94a3b8",fontFamily:"monospace" }}>{r.gstin}</td>
                     <td style={{ padding:"6px 10px",color:"#f1f5f9",fontWeight:600,maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const }}>{r.tradeName}</td>
@@ -1091,6 +1199,13 @@ export default function App() {
   const [agentWallet, setAgentWallet]     = useState<AgentWalletEntry[]>((saved as any)?.agentWallet || []);
   const [agentOverrides, setAgentOverrides] = useState<AgentVendorOverride[]>((saved as any)?.agentOverrides || []);
   const [commissionSlabs, setCommissionSlabs] = useState<CommissionSlab[]>(savedSlabs);
+  // GSTR2B Verified Bill Numbers — Auditor-ல் paste செய்த பிறகு ERP sheet-ல் save ஆகும்
+  const [gstr2bVerified, setGstr2bVerified] = useState<Set<string>>(() => {
+    try {
+      const s = localStorage.getItem('AR_GSTR2B_VERIFIED');
+      return s ? new Set(JSON.parse(s)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [settings, setSettings]           = useState({
     autoBackup: true, backupFrequency: 7,
@@ -1273,7 +1388,16 @@ export default function App() {
   // ── Not logged in — Landing or Login ──────────────────────
   // ── Auditor — No login needed, direct access
   if ((loginRole as any) === "auditor" && !user) {
-    return <AuditorPage onBack={() => setLoginRole(null)} />;
+    return <AuditorPage
+      onBack={() => setLoginRole(null)}
+      onGSTR2BVerified={(billNos) => {
+        setGstr2bVerified(prev => {
+          const next = new Set([...prev, ...billNos]);
+          localStorage.setItem('AR_GSTR2B_VERIFIED', JSON.stringify([...next]));
+          return next;
+        });
+      }}
+    />;
   }
 
   // ── Work Tracker — No login needed, direct access ──────────────
@@ -1524,6 +1648,7 @@ export default function App() {
           <BillsPage
             isAdmin={isAdmin} district={district}
             bills={myBills} transactions={myTxns} vendors={myVendors}
+            gstr2bVerified={gstr2bVerified}
             onAdd={async (bill) => {
               const val = await validateData(billSchema, { billNumber: bill.billNumber, billAmount: bill.billAmount, billDate: bill.billDate });
               if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
@@ -2658,7 +2783,7 @@ function TransactionsPage({
 // ============================================================
 function BillsPage({
   isAdmin, district, bills, transactions, vendors,
-  onAdd, onBulkAdd, onUpdate, onDelete
+  onAdd, onBulkAdd, onUpdate, onDelete, gstr2bVerified
 }: {
   isAdmin: boolean; district: string;
   bills: Bill[]; transactions: Transaction[]; vendors: Vendor[];
@@ -2666,6 +2791,7 @@ function BillsPage({
   onBulkAdd: (bills: Bill[]) => void;
   onUpdate: (b: Bill) => void;
   onDelete: (id: string) => void;
+  gstr2bVerified?: Set<string>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);

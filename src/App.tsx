@@ -1571,7 +1571,7 @@ export default function App() {
               const ua = [...agents, newAgent]; setAgents(ua);
               saveData(vendors, transactions, bills, wallet, managedUsers, auditLogs, ua, agentWallet, agentOverrides);
             }}
-           
+            gstr2bVerified={gstr2bVerified}
             user={user}
           />
         )}
@@ -1620,6 +1620,15 @@ export default function App() {
             onClose={(txnId) => {
               const txn = transactions.find(t => t.txnId === txnId);
               if (!txn) return;
+              // ✅ GSTR2B Verification Check — எல்லா bills verified ஆகாமல் close ஆகாது
+              const txnBills = bills.filter(b => b.txnId === txnId);
+              if (txnBills.length === 0) { alert("❌ ஒரு bill கூட இல்லை! Bills சேர்த பிறகு close செய்யவும்."); return; }
+              const unverifiedBills = txnBills.filter(b => !gstr2bVerified.has(String(b.billNumber).trim()));
+              if (unverifiedBills.length > 0) {
+                const nums = unverifiedBills.map(b => b.billNumber).join(', ');
+                alert(`❌ GSTR2B Verification Pending!\n\nஇந்த bills verify ஆகவில்லை:\n${nums}\n\nAuditor GSTR2B பக்தத்தில் load செய்த பிறகு close செய்யவும்.`);
+                return;
+              }
               const gstBal = round2(txn.gstAmount - txn.advanceAmount);
               if (gstBal > 0) addWalletEntry(`GST Balance — ${txn.vendorName} (${txnId})`, gstBal, 0, "gst", txnId);
               const nt = transactions.map(t => t.txnId === txnId ? { ...t, status: "PendingClose" as const, closedByDistrict: true, remainingExpected: 0 } : t);
@@ -1814,13 +1823,15 @@ export default function App() {
 
 function DashboardPage({
   isAdmin, district, transactions, vendors, bills, wallet,
-  walletBalance, pendingClose, onConfirmClose, settings, agents = [], onAddAgent, user
+  walletBalance, pendingClose, onConfirmClose, settings, agents = [], onAddAgent, user,
+  gstr2bVerified
 }: {
   isAdmin: boolean; district: string;
   transactions: Transaction[]; vendors: Vendor[]; bills: Bill[];
   wallet: WalletEntry[]; walletBalance: number;
   pendingClose: Transaction[]; onConfirmClose: (id: string) => void;
   settings: any; agents?: Agent[]; onAddAgent?: (a: Agent) => void; user?: User | null;
+  gstr2bVerified?: Set<string>;
 }) {
   const totalExpected = transactions.reduce((s, t) => s + t.expectedAmount, 0);
   const totalBillsReceived = transactions.reduce((s, t) => s + t.billsReceived, 0);
@@ -1899,6 +1910,49 @@ function DashboardPage({
         </h1>
         <p className="text-sm text-gray-500">Multi-District ERP V3.0 — Real-time Analytics</p>
       </div>
+
+      {/* GSTR2B Pending Bills Alert */}
+      {isAdmin && (() => {
+        const pendingBills = bills.filter(b => !gstr2bVerified?.has(String(b.billNumber).trim()));
+        const pendingTxns = [...new Set(pendingBills.map(b => b.txnId))];
+        if (pendingBills.length === 0) return null;
+        return (
+          <div className="rounded-xl p-5 border-2" style={{ background: "#fffbeb", borderColor: "#fbbf24" }}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-amber-700 text-lg">
+                ⏳ GSTR2B Verification Pending ({pendingBills.length} bills, {pendingTxns.length} transactions)
+              </h2>
+              <span className="text-xs text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-semibold">
+                Auditor → GSTR2B பக்கத்தில் Load செய்யவும்
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+              {pendingTxns.slice(0, 10).map(txnId => {
+                const txn = transactions.find(t => t.txnId === txnId);
+                const txnPendingBills = pendingBills.filter(b => b.txnId === txnId);
+                return (
+                  <div key={txnId} className="flex items-center justify-between bg-white p-3 rounded-lg border border-amber-200">
+                    <div>
+                      <span className="font-mono text-xs text-amber-700 font-bold">{txnId}</span>
+                      <span className="text-gray-600 text-sm ml-2">{txn?.vendorName}</span>
+                    </div>
+                    <div className="flex gap-1 flex-wrap justify-end">
+                      {txnPendingBills.map(b => (
+                        <span key={b.id} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-mono">
+                          {b.billNumber}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {pendingTxns.length > 10 && (
+              <p className="text-xs text-amber-600 mt-2">... மேலும் {pendingTxns.length - 10} transactions pending</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Pending Close Alert */}
       {isAdmin && pendingClose.length > 0 && (
@@ -2444,7 +2498,7 @@ function VendorsPage({
 // ============================================================
 function TransactionsPage({
   isAdmin, district, transactions, vendors, bills,
-  onAdd, onClose, onUpdate, onDelete
+  onAdd, onClose, onUpdate, onDelete, gstr2bVerified
 }: {
   isAdmin: boolean; district: string;
   transactions: Transaction[]; vendors: Vendor[]; bills: Bill[];
@@ -2452,6 +2506,7 @@ function TransactionsPage({
   onClose: (id: string) => void;
   onUpdate: (t: Transaction) => void;
   onDelete: (id: string) => void;
+  gstr2bVerified?: Set<string>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
@@ -2614,6 +2669,9 @@ function TransactionsPage({
               {filtered.map(t => {
                 const txnBills = bills.filter(b => b.txnId === t.txnId);
                 const canClose = t.remainingExpected <= 0 && t.status === "Open";
+                // GSTR2B verification status
+                const pendingGSTR2B = txnBills.filter(b => !gstr2bVerified?.has(String(b.billNumber).trim()));
+                const allGSTR2BVerified = txnBills.length > 0 && pendingGSTR2B.length === 0;
                 return (
                   <tr key={t.txnId} className={`hover:bg-gray-50 transition-colors ${t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
                     <td className="px-3 py-3 font-mono text-xs text-blue-700 font-bold">{t.txnId}</td>
@@ -2652,12 +2710,21 @@ function TransactionsPage({
                         )}
                         <button onClick={() => onDelete(t.txnId)} className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200">🗑️</button>
                         {!isAdmin && t.status === "Open" && (
-                          <button
-                            onClick={() => setConfirmClose(t.txnId)}
-                            className={`px-2 py-1 rounded text-xs font-bold text-white whitespace-nowrap ${canClose ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 hover:bg-gray-500"}`}
-                          >
-                            {canClose ? "✅ Close" : "⚠️ Force"}
-                          </button>
+                          <div className="flex flex-col gap-1 items-center">
+                            <button
+                              onClick={() => setConfirmClose(t.txnId)}
+                              className={`px-2 py-1 rounded text-xs font-bold text-white whitespace-nowrap ${canClose ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 hover:bg-gray-500"}`}
+                            >
+                              {canClose ? "✅ Close" : "⚠️ Force"}
+                            </button>
+                            {txnBills.length > 0 && (
+                              <span className={`text-xs font-semibold ${
+                                allGSTR2BVerified ? "text-green-600" : "text-amber-500"
+                              }`}>
+                                {allGSTR2BVerified ? "✅ GSTR2B" : `⏳ ${pendingGSTR2B.length} pending`}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -3097,15 +3164,31 @@ function BillsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(b => (
-                <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+              {filtered.map(b => {
+                const isVerified = gstr2bVerified?.has(String(b.billNumber).trim());
+                const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
+                return (
+                <tr key={b.id} className={`transition-colors ${rowBg}`}>
                   <td className="px-3 py-3 font-mono text-xs text-blue-700 font-bold">{b.id}</td>
                   <td className="px-3 py-3 font-mono text-xs text-gray-600">{b.txnId}</td>
                   <td className="px-3 py-3">
                     <p className="font-semibold text-gray-800">{b.vendorName}</p>
                     <p className="text-xs text-gray-400">{b.vendorCode}</p>
                   </td>
-                  <td className="px-3 py-3 text-gray-800 font-medium">{b.billNumber}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-800">{b.billNumber}</span>
+                      {isAdmin && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          isVerified
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-600"
+                        }`}>
+                          {isVerified ? "✅ GSTR2B" : "⏳ Pending"}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{b.billDate}</td>
                   <td className="px-3 py-3 font-semibold text-gray-800">{fmt(b.billAmount)}</td>
                   <td className="px-3 py-3 text-gray-600">{b.gstPercent}%</td>
@@ -3118,7 +3201,8 @@ function BillsPage({
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
             {filtered.length > 0 && (
               <tfoot style={{ background: "#1a2f5e" }}>

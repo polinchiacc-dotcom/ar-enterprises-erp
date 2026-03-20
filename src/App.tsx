@@ -1199,13 +1199,30 @@ export default function App() {
   const [agentWallet, setAgentWallet]     = useState<AgentWalletEntry[]>((saved as any)?.agentWallet || []);
   const [agentOverrides, setAgentOverrides] = useState<AgentVendorOverride[]>((saved as any)?.agentOverrides || []);
   const [commissionSlabs, setCommissionSlabs] = useState<CommissionSlab[]>(savedSlabs);
-  // GSTR2B Verified Bill Numbers — Auditor-ல் paste செய்த பிறகு ERP sheet-ல் save ஆகும்
+  // GSTR2B Verified Bill Numbers — Auditor-ல் paste செய்த பிறகு save ஆகும்
+  // பழைய bills எல்லாம் auto-verified — புதிய bills மட்டும் check செய்யும்
+  const GSTR2B_FEATURE_START = localStorage.getItem('AR_GSTR2B_FEATURE_START') || (() => {
+    // முதல் முறை load ஆகும்போது இப்போதைய date ஸேவ் செய்யும்
+    const today = new Date().toISOString();
+    localStorage.setItem('AR_GSTR2B_FEATURE_START', today);
+    return today;
+  })();
   const [gstr2bVerified, setGstr2bVerified] = useState<Set<string>>(() => {
     try {
       const s = localStorage.getItem('AR_GSTR2B_VERIFIED');
       return s ? new Set(JSON.parse(s)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
+  // Feature start date — இதற்கு முன்பாக add ஆன bills auto-verified
+  const gstr2bFeatureStart = new Date(GSTR2B_FEATURE_START);
+  // ஒரு bill verify ஆகவேண்டுமா என்று check செய்யும் helper
+  const isBillVerified = (bill: Bill): boolean => {
+    // பழைய bill (feature start-க்கு முன்) — auto-verified
+    const billDate = new Date(bill.createdAt || bill.billDate || '2020-01-01');
+    if (billDate < gstr2bFeatureStart) return true;
+    // புதிய bill — manually verified ஆகியிருக்கவேண்டும்
+    return gstr2bVerified.has(String(bill.billNumber).trim());
+  };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [settings, setSettings]           = useState({
     autoBackup: true, backupFrequency: 7,
@@ -1623,10 +1640,10 @@ export default function App() {
               // ✅ GSTR2B Verification Check — எல்லா bills verified ஆகாமல் close ஆகாது
               const txnBills = bills.filter(b => b.txnId === txnId);
               if (txnBills.length === 0) { alert("❌ ஒரு bill கூட இல்லை! Bills சேர்த பிறகு close செய்யவும்."); return; }
-              const unverifiedBills = txnBills.filter(b => !gstr2bVerified.has(String(b.billNumber).trim()));
+              const unverifiedBills = txnBills.filter(b => !isBillVerified(b));
               if (unverifiedBills.length > 0) {
                 const nums = unverifiedBills.map(b => b.billNumber).join(', ');
-                alert(`❌ GSTR2B Verification Pending!\n\nஇந்த bills verify ஆகவில்லை:\n${nums}\n\nAuditor GSTR2B பக்தத்தில் load செய்த பிறகு close செய்யவும்.`);
+                alert(`❌ GSTR2B Verification Pending!\n\nஇந்த bills verify ஆகவில்லை:\n${nums}\n\nAuditor GSTR2B பக்கத்தில் load செய்த பிறகு close செய்யவும்.`);
                 return;
               }
               const gstBal = round2(txn.gstAmount - txn.advanceAmount);
@@ -1911,9 +1928,19 @@ function DashboardPage({
         <p className="text-sm text-gray-500">Multi-District ERP V3.0 — Real-time Analytics</p>
       </div>
 
-      {/* GSTR2B Pending Bills Alert */}
-      {isAdmin && (() => {
-        const pendingBills = bills.filter(b => !gstr2bVerified?.has(String(b.billNumber).trim()));
+      {/* GSTR2B Pending Bills Alert — Admin + District Manager */}
+      {(() => {
+        // Feature start date-லிருந்து மட்டும் check செய்யும் — பழைய bills auto-verified
+        const featureStart = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
+        const isBillVerifiedLocal = (b: Bill) => {
+          const bd = new Date(b.createdAt || b.billDate || '2020-01-01');
+          if (bd < featureStart) return true;
+          return gstr2bVerified?.has(String(b.billNumber).trim()) || false;
+        };
+        // District Manager-க்கு அவர்கள் district மட்டும் காட்டும்
+        const pendingBills = bills
+          .filter(b => isAdmin ? true : b.district === district)
+          .filter(b => !isBillVerifiedLocal(b));
         const pendingTxns = [...new Set(pendingBills.map(b => b.txnId))];
         if (pendingBills.length === 0) return null;
         return (
@@ -1922,9 +1949,24 @@ function DashboardPage({
               <h2 className="font-bold text-amber-700 text-lg">
                 ⏳ GSTR2B Verification Pending ({pendingBills.length} bills, {pendingTxns.length} transactions)
               </h2>
-              <span className="text-xs text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-semibold">
-                Auditor → GSTR2B பக்கத்தில் Load செய்யவும்
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-semibold">
+                  {isAdmin ? 'Auditor → GSTR2B பக்கத்தில் Load செய்யவும்' : 'உங்கள் Admin-ஐ தொடர்பு கொள்ளவும்'}
+                </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      if (confirm('பழைய bills எல்லாம் verified-ஆக மாறவும் (இந்த date-க்கு முந்தையவை). தொடரவுமா?')) {
+                        localStorage.setItem('AR_GSTR2B_FEATURE_START', new Date().toISOString());
+                        window.location.reload();
+                      }
+                    }}
+                    className="text-xs text-amber-700 underline hover:text-amber-900"
+                  >
+                    ↺ Reset Date
+                  </button>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
               {pendingTxns.slice(0, 10).map(txnId => {
@@ -2669,8 +2711,13 @@ function TransactionsPage({
               {filtered.map(t => {
                 const txnBills = bills.filter(b => b.txnId === t.txnId);
                 const canClose = t.remainingExpected <= 0 && t.status === "Open";
-                // GSTR2B verification status
-                const pendingGSTR2B = txnBills.filter(b => !gstr2bVerified?.has(String(b.billNumber).trim()));
+                // GSTR2B verification status — பழைய bills auto-verified
+                const featureStartTP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
+                const isTxnBillVerified = (b: Bill) => {
+                  const bd = new Date(b.createdAt || b.billDate || '2020-01-01');
+                  return bd < featureStartTP ? true : (gstr2bVerified?.has(String(b.billNumber).trim()) || false);
+                };
+                const pendingGSTR2B = txnBills.filter(b => !isTxnBillVerified(b));
                 const allGSTR2BVerified = txnBills.length > 0 && pendingGSTR2B.length === 0;
                 return (
                   <tr key={t.txnId} className={`hover:bg-gray-50 transition-colors ${t.status === "PendingClose" ? "bg-red-50" : t.status === "Closed" ? "bg-green-50" : ""}`}>
@@ -3165,7 +3212,10 @@ function BillsPage({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(b => {
-                const isVerified = gstr2bVerified?.has(String(b.billNumber).trim());
+                // பழைய bills auto-verified; புதிய bills manually verified
+                const featureStartBP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
+                const billCreated = new Date(b.createdAt || b.billDate || '2020-01-01');
+                const isVerified = billCreated < featureStartBP ? true : (gstr2bVerified?.has(String(b.billNumber).trim()) || false);
                 const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
                 return (
                 <tr key={b.id} className={`transition-colors ${rowBg}`}>

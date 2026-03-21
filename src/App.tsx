@@ -1217,11 +1217,16 @@ export default function App() {
   const gstr2bFeatureStart = new Date(GSTR2B_FEATURE_START);
   // ஒரு bill verify ஆகவேண்டுமா என்று check செய்யும் helper
   const isBillVerified = (bill: Bill): boolean => {
-    // பழைய bill (feature start-க்கு முன்) — auto-verified
-    const billDate = new Date(bill.createdAt || bill.billDate || '2020-01-01');
-    if (billDate < gstr2bFeatureStart) return true;
-    // புதிய bill — manually verified ஆகியிருக்கவேண்டும்
-    return gstr2bVerified.has(String(bill.billNumber).trim());
+    // GSTR2B sheet-ல் manually verified ஆனால் எப்போதும் ✅
+    if (gstr2bVerified.has(String(bill.billNumber).trim())) return true;
+    // createdAt மட்டும் பார்க்கவும் — billDate அல்ல
+    // createdAt இல்லாட்டால் புதிய bill ஆக consider செய்யும்
+    if (!bill.createdAt) return false;
+    // createdAt feature start-க்கு முன் ஆனால் auto-verified
+    const created = new Date(bill.createdAt);
+    if (created < gstr2bFeatureStart) return true;
+    // புதிய bill — manually verified ஆகாத் தனழியாக பெள்ளையாகாது
+    return false;
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [settings, setSettings]           = useState({
@@ -1933,9 +1938,9 @@ function DashboardPage({
         // Feature start date-லிருந்து மட்டும் check செய்யும் — பழைய bills auto-verified
         const featureStart = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
         const isBillVerifiedLocal = (b: Bill) => {
-          const bd = new Date(b.createdAt || b.billDate || '2020-01-01');
-          if (bd < featureStart) return true;
-          return gstr2bVerified?.has(String(b.billNumber).trim()) || false;
+          if (gstr2bVerified?.has(String(b.billNumber).trim())) return true;
+          if (!b.createdAt) return false;
+          return new Date(b.createdAt) < featureStart;
         };
         // District Manager-க்கு அவர்கள் district மட்டும் காட்டும்
         const pendingBills = bills
@@ -2711,12 +2716,11 @@ function TransactionsPage({
               {filtered.map(t => {
                 const txnBills = bills.filter(b => b.txnId === t.txnId);
                 const canClose = t.remainingExpected <= 0 && t.status === "Open";
-                // GSTR2B verification status — பழைய bills auto-verified
                 const featureStartTP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
-                const isTxnBillVerified = (b: Bill) => {
-                  const bd = new Date(b.createdAt || b.billDate || '2020-01-01');
-                  return bd < featureStartTP ? true : (gstr2bVerified?.has(String(b.billNumber).trim()) || false);
-                };
+                const isTxnBillVerified = (b: Bill) =>
+                  gstr2bVerified?.has(String(b.billNumber).trim()) ? true
+                  : !b.createdAt ? false
+                  : new Date(b.createdAt) < featureStartTP;
                 const pendingGSTR2B = txnBills.filter(b => !isTxnBillVerified(b));
                 const allGSTR2BVerified = txnBills.length > 0 && pendingGSTR2B.length === 0;
                 return (
@@ -3212,10 +3216,11 @@ function BillsPage({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(b => {
-                // பழைய bills auto-verified; புதிய bills manually verified
                 const featureStartBP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
-                const billCreated = new Date(b.createdAt || b.billDate || '2020-01-01');
-                const isVerified = billCreated < featureStartBP ? true : (gstr2bVerified?.has(String(b.billNumber).trim()) || false);
+                const isVerified = gstr2bVerified?.has(String(b.billNumber).trim())
+                  ? true
+                  : !b.createdAt ? false
+                  : new Date(b.createdAt) < featureStartBP;
                 const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
                 return (
                 <tr key={b.id} className={`transition-colors ${rowBg}`}>

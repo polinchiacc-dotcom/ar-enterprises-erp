@@ -730,80 +730,95 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
   const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
 
   // Sheet-லிருந்து GSTR2B data load செய்யும்
+  // Sri Polinchi GSTR2B - அனைத்து periods
+  const GSTR2B_ALL_GIDS = [
+    { gid: '0',          label: 'GSTR2B (main)' },
+    { gid: '1132151197', label: 'Period 2' },
+    { gid: '1566794920', label: 'Period 3' },
+    { gid: '681701269',  label: 'Period 4' },
+    { gid: '1428826016', label: 'Period 5' },
+    { gid: '56479217',   label: 'Period 6' },
+  ];
+
   const loadFromSheet = async () => {
     setLoading(true); setMsg(""); setSheetData([]);
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GSTR2B_GID}`;
-      const res = await fetch(url);
-      const csv = await res.text();
-      const lines = csv.trim().split('\n').filter(l => l.trim());
-      if (lines.length < 2) { setMsg('⚠️ Sheet-ல் data இல்லை'); setLoading(false); return; }
-
-      // Parse CSV — detect headers from first row
-      const parseCSVLine = (line: string) => {
-        const result: string[] = [];
-        let current = ''; let inQuotes = false;
-        for (const ch of line) {
-          if (ch === '"') { inQuotes = !inQuotes; }
-          else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
-          else { current += ch; }
-        }
-        result.push(current.trim());
-        return result;
-      };
-
-      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["' ]/g,''));
-      // Column index detection
-      const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
-      const iGstin    = ci(['gstin','gst']);
-      const iTrade    = ci(['trade','name','supplier']);
-      const iInvNo    = ci(['invoice','invno','bill']);
-      const iInvDate  = ci(['date']);
-      const iTaxable  = ci(['taxable','value']);
-      const iIGST     = ci(['igst']);
-      const iCGST     = ci(['cgst']);
-      const iSGST     = ci(['sgst']);
-      const iPeriod   = ci(['period','month']);
-
-      const rows: any[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCSVLine(lines[i]);
-        if (cols.length < 4) continue;
-        const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(/"/g,'').trim() : '';
-        const toNum = (s: string) => parseFloat(s.replace(/[^0-9.-]/g,''))||0;
-        rows.push({
-          period:      get(iPeriod) || period,
-          gstin:       get(iGstin),
-          tradeName:   get(iTrade),
-          invoiceNo:   get(iInvNo),
-          invoiceDate: get(iInvDate),
-          taxableValue:toNum(get(iTaxable)),
-          igst:        toNum(get(iIGST)),
-          cgst:        toNum(get(iCGST)),
-          sgst:        toNum(get(iSGST)),
-        });
+      // எல்லா GIDs-ஐயும் load செய்
+      let allRows: any[] = [];
+      for (const sheet of GSTR2B_ALL_GIDS) {
+        try {
+          const url = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${sheet.gid}`;
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const csv = await res.text();
+          const sheetRows = parseGSTR2BCSV(csv);
+          allRows = [...allRows, ...sheetRows];
+          setMsg(`⏳ Loading... ${allRows.length} rows (${sheet.label})`);
+        } catch { /* skip failed sheet */ }
       }
-      setSheetData(rows);
-      setMsg(`✅ ${rows.length} rows loaded from GSTR2B sheet`);
-      // GSTR2B rows-ஐ AR_GSTR2B_ROWS-ல் save செய் (GSTIN+date+amount match-க்காக)
-      const gstr2bRowsToSave = rows.map((r: any) => ({
+      setSheetData(allRows);
+      setMsg(`✅ ${allRows.length} rows loaded from all GSTR2B sheets`);
+      // Save to localStorage
+      const gstr2bRowsToSave = allRows.map((r: any) => ({
         gstin: String(r.gstin || '').trim(),
         date: String(r.invoiceDate || '').trim(),
+        invoiceNo: String(r.invoiceNo || '').trim(),
         taxableValue: Number(r.taxableValue) || 0,
         igst: Number(r.igst) || 0,
         cgst: Number(r.cgst) || 0,
         sgst: Number(r.sgst) || 0,
       })).filter((r: any) => r.gstin && r.taxableValue > 0);
-      // Existing rows-க்கு merge செய்
-      try {
-        const existing = JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS') || '[]');
-        const merged = [...existing, ...gstr2bRowsToSave];
-        localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(merged));
-      } catch { localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(gstr2bRowsToSave)); }
-      if (onVerified) onVerified(rows.map((r:any) => String(r.invoiceNo)).filter(Boolean));
+      localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(gstr2bRowsToSave));
+      if (onVerified) onVerified(allRows.map((r:any) => String(r.invoiceNo)).filter(Boolean));
     } catch(e) { setMsg('❌ Load failed! Sheet public-ஆக இருக்க வேண்டும்.'); }
     setLoading(false);
   };
+
+  // CSV parse helper — தனி function-ஆக extract செய்
+  const parseGSTR2BCSV = (csv: string): any[] => {
+    const url_dummy = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=DUMMY`;
+    const lines = csv.trim().split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const parseCSVLine = (line: string) => {
+      const result: string[] = [];
+      let current = ''; let inQuotes = false;
+      for (const ch of line) {
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+        else { current += ch; }
+      }
+      result.push(current.trim());
+      return result;
+    };
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["' ]/g,''));
+    const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
+    const iGstin   = ci(['gstin','gst']);
+    const iTrade   = ci(['trade','name','supplier']);
+    const iInvNo   = ci(['invoice','invno','bill']);
+    const iInvDate = ci(['date']);
+    const iTaxable = ci(['taxable','value']);
+    const iIGST    = ci(['igst']);
+    const iCGST    = ci(['cgst']);
+    const iSGST    = ci(['sgst']);
+    const rows: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < 4) continue;
+      const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(/"/g,'').trim() : '';
+      const toNum = (s: string) => parseFloat(s.replace(/[^0-9.-]/g,''))||0;
+      const gstin = get(iGstin);
+      if (!gstin || gstin.length < 10) continue; // skip invalid rows
+      rows.push({
+        gstin, tradeName: get(iTrade), invoiceNo: get(iInvNo),
+        invoiceDate: get(iInvDate),
+        taxableValue: toNum(get(iTaxable)),
+        igst: toNum(get(iIGST)), cgst: toNum(get(iCGST)), sgst: toNum(get(iSGST)),
+      });
+    }
+    return rows;
+  };
+
+
 
   const handleParse = () => {
     if (!paste.trim()) { setMsg("❌ Data paste செய்யவும்!"); return; }
@@ -1276,10 +1291,10 @@ export default function App() {
 
   // முக்கியமான helper: ஒரு bill verified ஆகியிருக்கிறதா என்று check செய்யும்
   const isBillVerified = (bill: Bill): boolean => {
-    // createdAt இல்லாட்டால் dummy bill — pending
-    if (!bill.createdAt) return false;
+    // createdAt இல்லாட்டால் billDate பார்க்கவும் — dummy bills-க்கு GSTR2B match தேவை
+    const effectiveDate = bill.createdAt ? new Date(bill.createdAt) : new Date(bill.billDate || '2020-01-01');
     // Feature start-க்கு முன் add ஆன bill — auto-verified
-    if (new Date(bill.createdAt) < gstr2bFeatureStart) return true;
+    if (effectiveDate < gstr2bFeatureStart) return true;
     // Admin/District manually verified ஆகியிருக்கிறதா?
     if (gstr2bVerified.has(String(bill.billNumber).trim())) return true;
     // GSTR2B rows இல்லையெனில் pending
@@ -1297,7 +1312,12 @@ export default function App() {
       if (row.invoiceNo && String(row.invoiceNo).trim() &&
           String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
       // 2வது: Amount match ±2% + date ±45 days
-      const amtMatch = Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02;
+      // GSTR2B taxableValue = total amount (bill × 1.18) ஆக இருக்கலாம் — இரண்டு வ஻ியிலும் compare செய்
+      const amtMatch =
+        Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02 || // direct taxable match
+        Math.abs(row.taxableValue - billAmt * 1.18) / Math.max(billAmt * 1.18, 1) < 0.02 || // total match
+        Math.abs(row.taxableValue - billAmt * 1.04) / Math.max(billAmt * 1.04, 1) < 0.02 || // 4% GST total
+        Math.abs(row.taxableValue - billAmt * 1.05) / Math.max(billAmt * 1.05, 1) < 0.02;   // 5% GST total
       if (!amtMatch) return false;
       const rowDate = parseTamilDate(row.date);
       if (!rowDate) return true;
@@ -2015,8 +2035,8 @@ function DashboardPage({
         const featureStart = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
         const gstr2bRowsLocal: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
         const isBillVerifiedLocal = (b: Bill) => {
-          if (!b.createdAt) return false;
-          if (new Date(b.createdAt) < featureStart) return true;
+          const effDate = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
+          if (effDate < featureStart) return true;
           if (gstr2bVerified?.has(String(b.billNumber).trim())) return true;
           if (gstr2bRowsLocal.length === 0) return false;
           const v = vendors.find(x => x.vendorCode === b.vendorCode);
@@ -2029,7 +2049,11 @@ function DashboardPage({
             if (row.gstin?.trim() !== gstin) return false;
             if (row.invoiceNo && String(row.invoiceNo).trim() &&
                 String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
-            if (Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) >= 0.02) return false;
+            const amtOk = Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) < 0.02 ||
+              Math.abs(row.taxableValue - bAmt * 1.18) / Math.max(bAmt * 1.18,1) < 0.02 ||
+              Math.abs(row.taxableValue - bAmt * 1.04) / Math.max(bAmt * 1.04,1) < 0.02 ||
+              Math.abs(row.taxableValue - bAmt * 1.05) / Math.max(bAmt * 1.05,1) < 0.02;
+            if (!amtOk) return false;
             const rd = parseTamilDate(row.date);
             if (!rd) return true;
             return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
@@ -2815,8 +2839,8 @@ function TransactionsPage({
                 const featureStartTP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
                 const gstr2bRowsTP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
                 const isTxnBillVerified = (b: Bill) => {
-                  if (!b.createdAt) return false;
-                  if (new Date(b.createdAt) < featureStartTP) return true;
+                  const effTP = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
+                  if (effTP < featureStartTP) return true;
                   if (gstr2bRowsTP.length === 0) return false;
                   const vTP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
                   const gstinTP = (vTP as any)?.gstNo?.trim() || '';
@@ -2824,7 +2848,14 @@ function TransactionsPage({
                   const bDateMs = new Date(b.billDate).getTime();
                   return gstr2bRowsTP.some((row:any) => {
                     if (row.gstin?.trim() !== gstinTP) return false;
-                    if (Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) >= 0.02) return false;
+                    if (row.invoiceNo && String(row.invoiceNo).trim() &&
+                        String(row.invoiceNo).trim().toLowerCase() === String(b.billNumber).trim().toLowerCase()) return true;
+                    const a = b.billAmount;
+                    const amtOk = Math.abs(row.taxableValue-a)/Math.max(a,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.18)/Math.max(a*1.18,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.04)/Math.max(a*1.04,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.05)/Math.max(a*1.05,1)<0.02;
+                    if (!amtOk) return false;
                     const rd = parseTamilDate(row.date);
                     if (!rd) return true;
                     return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
@@ -3327,8 +3358,8 @@ function BillsPage({
               {filtered.map(b => {
                 const featureStartBP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
                 const gstr2bRowsBP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
-                const isVerified = !b.createdAt ? false
-                  : new Date(b.createdAt) < featureStartBP ? true
+                const effDateBP = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
+                const isVerified = effDateBP < featureStartBP ? true
                   : gstr2bRowsBP.length === 0 ? false
                   : (() => {
                     const vBP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
@@ -3337,7 +3368,14 @@ function BillsPage({
                     const bDateMs = new Date(b.billDate).getTime();
                     return gstr2bRowsBP.some((row:any) => {
                       if (row.gstin?.trim() !== gstinBP) return false;
-                      if (Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) >= 0.02) return false;
+                      if (row.invoiceNo && String(row.invoiceNo).trim() &&
+                          String(row.invoiceNo).trim().toLowerCase() === String(b.billNumber).trim().toLowerCase()) return true;
+                      const a = b.billAmount;
+                      const amtOk = Math.abs(row.taxableValue-a)/Math.max(a,1)<0.02||
+                        Math.abs(row.taxableValue-a*1.18)/Math.max(a*1.18,1)<0.02||
+                        Math.abs(row.taxableValue-a*1.04)/Math.max(a*1.04,1)<0.02||
+                        Math.abs(row.taxableValue-a*1.05)/Math.max(a*1.05,1)<0.02;
+                      if (!amtOk) return false;
                       const rd = parseTamilDate(row.date);
                       if (!rd) return true;
                       return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;

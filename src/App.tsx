@@ -785,9 +785,22 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       }
       setSheetData(rows);
       setMsg(`✅ ${rows.length} rows loaded from GSTR2B sheet`);
-      // Sheet load ஆனதும் bill numbers ERP-க்கு தெரியப்படுத்து
-      const billNos = rows.map((r: any) => String(r.invoiceNo).trim()).filter(Boolean);
-      if (onVerified && billNos.length > 0) onVerified(billNos);
+      // GSTR2B rows-ஐ AR_GSTR2B_ROWS-ல் save செய் (GSTIN+date+amount match-க்காக)
+      const gstr2bRowsToSave = rows.map((r: any) => ({
+        gstin: String(r.gstin || '').trim(),
+        date: String(r.invoiceDate || '').trim(),
+        taxableValue: Number(r.taxableValue) || 0,
+        igst: Number(r.igst) || 0,
+        cgst: Number(r.cgst) || 0,
+        sgst: Number(r.sgst) || 0,
+      })).filter((r: any) => r.gstin && r.taxableValue > 0);
+      // Existing rows-க்கு merge செய்
+      try {
+        const existing = JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS') || '[]');
+        const merged = [...existing, ...gstr2bRowsToSave];
+        localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(merged));
+      } catch { localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(gstr2bRowsToSave)); }
+      if (onVerified) onVerified(rows.map((r:any) => String(r.invoiceNo)).filter(Boolean));
     } catch(e) { setMsg('❌ Load failed! Sheet public-ஆக இருக்க வேண்டும்.'); }
     setLoading(false);
   };
@@ -819,9 +832,18 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       const j = await res.json();
       if (j.success) {
         setMsg(`✅ ${j.count} rows saved!`);
-        // Bill numbers extract செய்து ERP-க்கு தெரியப்படுத்து
-        const billNos = displayData.map(r => String(r.invoiceNo).trim()).filter(Boolean);
-        if (onVerified && billNos.length > 0) onVerified(billNos);
+        // GSTR2B rows localStorage-ல் save செய்
+        const newRows = displayData.map(r => ({
+          gstin: String(r.gstin||'').trim(),
+          date: String(r.invoiceDate||'').trim(),
+          taxableValue: Number(r.taxableValue)||0,
+          igst: Number(r.igst)||0, cgst: Number(r.cgst)||0, sgst: Number(r.sgst)||0,
+        })).filter(r => r.gstin && r.taxableValue > 0);
+        try {
+          const existing = JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]');
+          localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify([...existing, ...newRows]));
+        } catch { localStorage.setItem('AR_GSTR2B_ROWS', JSON.stringify(newRows)); }
+        if (onVerified) onVerified(displayData.map(r => String(r.invoiceNo)).filter(Boolean));
         setParsed([]); setPaste("");
       }
       else setMsg("❌ " + (j.error||""));
@@ -1215,18 +1237,40 @@ export default function App() {
   });
   // Feature start date — இதற்கு முன்பாக add ஆன bills auto-verified
   const gstr2bFeatureStart = new Date(GSTR2B_FEATURE_START);
-  // ஒரு bill verify ஆகவேண்டுமா என்று check செய்யும் helper
+
+  // GSTR2B data structure — Auditor paste செய்த rows: { gstin, date, taxableValue, igst, cgst, sgst }
+  // gstr2bVerified இப்போது JSON string Set-ஆக உள்ளது — புதிய approach: rows array
+  const gstr2bRows: Array<{gstin:string, date:string, taxableValue:number, igst:number, cgst:number, sgst:number}> = (() => {
+    try {
+      const s = localStorage.getItem('AR_GSTR2B_ROWS');
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
+  })();
+
+  // Bill verify helper — GSTIN + Amount match (date flexible ±30 days)
   const isBillVerified = (bill: Bill): boolean => {
-    // GSTR2B sheet-ல் manually verified ஆனால் எப்போதும் ✅
-    if (gstr2bVerified.has(String(bill.billNumber).trim())) return true;
-    // createdAt மட்டும் பார்க்கவும் — billDate அல்ல
-    // createdAt இல்லாட்டால் புதிய bill ஆக consider செய்யும்
+    // createdAt இல்லாட்டால் புதிய bill — verify தேவை
     if (!bill.createdAt) return false;
-    // createdAt feature start-க்கு முன் ஆனால் auto-verified
-    const created = new Date(bill.createdAt);
-    if (created < gstr2bFeatureStart) return true;
-    // புதிய bill — manually verified ஆகாத் தனழியாக பெள்ளையாகாது
-    return false;
+    // Feature start-க்கு முன் createdAt ஆனால் auto-verified
+    if (new Date(bill.createdAt) < gstr2bFeatureStart) return true;
+    // GSTR2B rows இல்லையா என்றால் pending
+    if (gstr2bRows.length === 0) return false;
+    // Vendor GSTIN எடுக்கவும்
+    const vendor = vendors.find(v => v.vendorCode === bill.vendorCode);
+    const vendorGstin = (vendor as any)?.gstNo?.trim() || '';
+    if (!vendorGstin) return false;
+    // Bill amount (taxable = billAmount without GST)
+    const billAmt = bill.billAmount;
+    const billDateMs = new Date(bill.billDate).getTime();
+    // GSTR2B row-ல் match செய்: GSTIN match + amount ±1% + date ±45 days
+    return gstr2bRows.some(row => {
+      if (row.gstin.trim() !== vendorGstin) return false;
+      const amtMatch = Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02; // 2% tolerance
+      if (!amtMatch) return false;
+      const rowDateMs = new Date(row.date).getTime();
+      const daysDiff = Math.abs(billDateMs - rowDateMs) / (1000 * 60 * 60 * 24);
+      return daysDiff <= 45; // 45 days tolerance
+    });
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [settings, setSettings]           = useState({
@@ -1937,10 +1981,21 @@ function DashboardPage({
       {(() => {
         // Feature start date-லிருந்து மட்டும் check செய்யும் — பழைய bills auto-verified
         const featureStart = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
+        const gstr2bRowsLocal: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
         const isBillVerifiedLocal = (b: Bill) => {
-          if (gstr2bVerified?.has(String(b.billNumber).trim())) return true;
           if (!b.createdAt) return false;
-          return new Date(b.createdAt) < featureStart;
+          if (new Date(b.createdAt) < featureStart) return true;
+          if (gstr2bRowsLocal.length === 0) return false;
+          const v = vendors.find(x => x.vendorCode === b.vendorCode);
+          const gstin = (v as any)?.gstNo?.trim() || '';
+          if (!gstin) return false;
+          const bAmt = b.billAmount;
+          const bDateMs = new Date(b.billDate).getTime();
+          return gstr2bRowsLocal.some((row: any) =>
+            row.gstin?.trim() === gstin &&
+            Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) < 0.02 &&
+            Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
+          );
         };
         // District Manager-க்கு அவர்கள் district மட்டும் காட்டும்
         const pendingBills = bills
@@ -2717,10 +2772,21 @@ function TransactionsPage({
                 const txnBills = bills.filter(b => b.txnId === t.txnId);
                 const canClose = t.remainingExpected <= 0 && t.status === "Open";
                 const featureStartTP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
-                const isTxnBillVerified = (b: Bill) =>
-                  gstr2bVerified?.has(String(b.billNumber).trim()) ? true
-                  : !b.createdAt ? false
-                  : new Date(b.createdAt) < featureStartTP;
+                const gstr2bRowsTP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
+                const isTxnBillVerified = (b: Bill) => {
+                  if (!b.createdAt) return false;
+                  if (new Date(b.createdAt) < featureStartTP) return true;
+                  if (gstr2bRowsTP.length === 0) return false;
+                  const vTP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
+                  const gstinTP = (vTP as any)?.gstNo?.trim() || '';
+                  if (!gstinTP) return false;
+                  const bDateMs = new Date(b.billDate).getTime();
+                  return gstr2bRowsTP.some((row:any) =>
+                    row.gstin?.trim() === gstinTP &&
+                    Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) < 0.02 &&
+                    Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
+                  );
+                };
                 const pendingGSTR2B = txnBills.filter(b => !isTxnBillVerified(b));
                 const allGSTR2BVerified = txnBills.length > 0 && pendingGSTR2B.length === 0;
                 return (
@@ -3217,10 +3283,21 @@ function BillsPage({
             <tbody className="divide-y divide-gray-100">
               {filtered.map(b => {
                 const featureStartBP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
-                const isVerified = gstr2bVerified?.has(String(b.billNumber).trim())
-                  ? true
-                  : !b.createdAt ? false
-                  : new Date(b.createdAt) < featureStartBP;
+                const gstr2bRowsBP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
+                const isVerified = !b.createdAt ? false
+                  : new Date(b.createdAt) < featureStartBP ? true
+                  : gstr2bRowsBP.length === 0 ? false
+                  : (() => {
+                    const vBP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
+                    const gstinBP = (vBP as any)?.gstNo?.trim() || '';
+                    if (!gstinBP) return false;
+                    const bDateMs = new Date(b.billDate).getTime();
+                    return gstr2bRowsBP.some((row:any) =>
+                      row.gstin?.trim() === gstinBP &&
+                      Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) < 0.02 &&
+                      Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
+                    );
+                  })();
                 const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
                 return (
                 <tr key={b.id} className={`transition-colors ${rowBg}`}>

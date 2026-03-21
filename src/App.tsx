@@ -1247,6 +1247,33 @@ export default function App() {
     } catch { return []; }
   })();
 
+  // Tamil month names → Date parse helper
+  const parseTamilDate = (dateStr: string): Date | null => {
+    if (!dateStr || dateStr === '-') return null;
+    // Already valid ISO/English date?
+    const direct = new Date(dateStr);
+    if (!isNaN(direct.getTime())) return direct;
+    // Tamil format: "09-டிச்.-24" → DD-MON-YY
+    const tamilMonths: Record<string,number> = {
+      'ஜனு':0,'பிப்':1,'மார்':2,'ஏப்':3,'மே':4,'ஜூன்':5,
+      'ஜூலை':6,'ஆக்':7,'செப்':8,'அக்':9,'நவ்':10,'டிச்':11,
+      'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,
+      'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11
+    };
+    // Try DD-MON-YY or DD-MON-YYYY
+    const m = dateStr.match(/(\d{1,2})[\-\/]([^\d\-\/]+)[\-\/](\d{2,4})/);
+    if (m) {
+      const day = parseInt(m[1]);
+      const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
+      const yr = parseInt(m[3]);
+      const year = yr < 100 ? 2000 + yr : yr;
+      // Find matching month
+      const monKey = Object.keys(tamilMonths).find(k => monStr.startsWith(k) || k.startsWith(monStr.substring(0,3)));
+      if (monKey !== undefined) return new Date(year, tamilMonths[monKey], day);
+    }
+    return null;
+  };
+
   // Bill verify helper — GSTIN + Amount match (date flexible ±30 days)
   const isBillVerified = (bill: Bill): boolean => {
     // createdAt இல்லாட்டால் புதிய bill — verify தேவை
@@ -1265,11 +1292,12 @@ export default function App() {
     // GSTR2B row-ல் match செய்: GSTIN match + amount ±1% + date ±45 days
     return gstr2bRows.some(row => {
       if (row.gstin.trim() !== vendorGstin) return false;
-      const amtMatch = Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02; // 2% tolerance
+      const amtMatch = Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02;
       if (!amtMatch) return false;
-      const rowDateMs = new Date(row.date).getTime();
-      const daysDiff = Math.abs(billDateMs - rowDateMs) / (1000 * 60 * 60 * 24);
-      return daysDiff <= 45; // 45 days tolerance
+      const rowDate = parseTamilDate(row.date);
+      if (!rowDate) return true; // date parse ஆகவில்லையெனில் amount match மட்டும் பார்க்கவும்
+      const daysDiff = Math.abs(billDateMs - rowDate.getTime()) / 86400000;
+      return daysDiff <= 45;
     });
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
@@ -1991,11 +2019,13 @@ function DashboardPage({
           if (!gstin) return false;
           const bAmt = b.billAmount;
           const bDateMs = new Date(b.billDate).getTime();
-          return gstr2bRowsLocal.some((row: any) =>
-            row.gstin?.trim() === gstin &&
-            Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) < 0.02 &&
-            Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
-          );
+          return gstr2bRowsLocal.some((row: any) => {
+            if (row.gstin?.trim() !== gstin) return false;
+            if (Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) >= 0.02) return false;
+            const rd = parseTamilDate(row.date);
+            if (!rd) return true;
+            return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
+          });
         };
         // District Manager-க்கு அவர்கள் district மட்டும் காட்டும்
         const pendingBills = bills
@@ -2781,11 +2811,13 @@ function TransactionsPage({
                   const gstinTP = (vTP as any)?.gstNo?.trim() || '';
                   if (!gstinTP) return false;
                   const bDateMs = new Date(b.billDate).getTime();
-                  return gstr2bRowsTP.some((row:any) =>
-                    row.gstin?.trim() === gstinTP &&
-                    Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) < 0.02 &&
-                    Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
-                  );
+                  return gstr2bRowsTP.some((row:any) => {
+                    if (row.gstin?.trim() !== gstinTP) return false;
+                    if (Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) >= 0.02) return false;
+                    const rd = parseTamilDate(row.date);
+                    if (!rd) return true;
+                    return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
+                  });
                 };
                 const pendingGSTR2B = txnBills.filter(b => !isTxnBillVerified(b));
                 const allGSTR2BVerified = txnBills.length > 0 && pendingGSTR2B.length === 0;
@@ -3292,11 +3324,13 @@ function BillsPage({
                     const gstinBP = (vBP as any)?.gstNo?.trim() || '';
                     if (!gstinBP) return false;
                     const bDateMs = new Date(b.billDate).getTime();
-                    return gstr2bRowsBP.some((row:any) =>
-                      row.gstin?.trim() === gstinBP &&
-                      Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) < 0.02 &&
-                      Math.abs(new Date(row.date).getTime() - bDateMs) / 86400000 <= 45
-                    );
+                    return gstr2bRowsBP.some((row:any) => {
+                      if (row.gstin?.trim() !== gstinBP) return false;
+                      if (Math.abs(row.taxableValue - b.billAmount) / Math.max(b.billAmount,1) >= 0.02) return false;
+                      const rd = parseTamilDate(row.date);
+                      if (!rd) return true;
+                      return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
+                    });
                   })();
                 const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
                 return (

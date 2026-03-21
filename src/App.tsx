@@ -1274,30 +1274,34 @@ export default function App() {
     return null;
   };
 
-  // Bill verify helper — GSTIN + Amount match (date flexible ±30 days)
+  // முக்கியமான helper: ஒரு bill verified ஆகியிருக்கிறதா என்று check செய்யும்
   const isBillVerified = (bill: Bill): boolean => {
-    // createdAt இல்லாட்டால் புதிய bill — verify தேவை
+    // createdAt இல்லாட்டால் dummy bill — pending
     if (!bill.createdAt) return false;
-    // Feature start-க்கு முன் createdAt ஆனால் auto-verified
+    // Feature start-க்கு முன் add ஆன bill — auto-verified
     if (new Date(bill.createdAt) < gstr2bFeatureStart) return true;
-    // GSTR2B rows இல்லையா என்றால் pending
+    // Admin/District manually verified ஆகியிருக்கிறதா?
+    if (gstr2bVerified.has(String(bill.billNumber).trim())) return true;
+    // GSTR2B rows இல்லையெனில் pending
     if (gstr2bRows.length === 0) return false;
-    // Vendor GSTIN எடுக்கவும்
+    // Vendor GSTIN
     const vendor = vendors.find(v => v.vendorCode === bill.vendorCode);
     const vendorGstin = (vendor as any)?.gstNo?.trim() || '';
     if (!vendorGstin) return false;
-    // Bill amount (taxable = billAmount without GST)
+    const billNo = String(bill.billNumber).trim();
     const billAmt = bill.billAmount;
     const billDateMs = new Date(bill.billDate).getTime();
-    // GSTR2B row-ல் match செய்: GSTIN match + amount ±1% + date ±45 days
     return gstr2bRows.some(row => {
       if (row.gstin.trim() !== vendorGstin) return false;
+      // 1வது: Invoice number exact match (GSTR2B-ல் இருக்குமானால்)
+      if (row.invoiceNo && String(row.invoiceNo).trim() &&
+          String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
+      // 2வது: Amount match ±2% + date ±45 days
       const amtMatch = Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02;
       if (!amtMatch) return false;
       const rowDate = parseTamilDate(row.date);
-      if (!rowDate) return true; // date parse ஆகவில்லையெனில் amount match மட்டும் பார்க்கவும்
-      const daysDiff = Math.abs(billDateMs - rowDate.getTime()) / 86400000;
-      return daysDiff <= 45;
+      if (!rowDate) return true;
+      return Math.abs(billDateMs - rowDate.getTime()) / 86400000 <= 45;
     });
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
@@ -2013,22 +2017,29 @@ function DashboardPage({
         const isBillVerifiedLocal = (b: Bill) => {
           if (!b.createdAt) return false;
           if (new Date(b.createdAt) < featureStart) return true;
+          if (gstr2bVerified?.has(String(b.billNumber).trim())) return true;
           if (gstr2bRowsLocal.length === 0) return false;
           const v = vendors.find(x => x.vendorCode === b.vendorCode);
           const gstin = (v as any)?.gstNo?.trim() || '';
           if (!gstin) return false;
+          const billNo = String(b.billNumber).trim();
           const bAmt = b.billAmount;
           const bDateMs = new Date(b.billDate).getTime();
           return gstr2bRowsLocal.some((row: any) => {
             if (row.gstin?.trim() !== gstin) return false;
+            if (row.invoiceNo && String(row.invoiceNo).trim() &&
+                String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
             if (Math.abs(row.taxableValue - bAmt) / Math.max(bAmt,1) >= 0.02) return false;
             const rd = parseTamilDate(row.date);
             if (!rd) return true;
             return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
           });
         };
+        // Closed transactions-க்கான bills dashboard-ல் காட்ட வேண்டாம் — history-ல் மட்டும்
+        const closedTxnIds = new Set(transactions.filter(t => t.status === 'Closed').map(t => t.txnId));
         // District Manager-க்கு அவர்கள் district மட்டும் காட்டும்
         const pendingBills = bills
+          .filter(b => !closedTxnIds.has(b.txnId)) // closed txn bills எடுக்காதே
           .filter(b => isAdmin ? true : b.district === district)
           .filter(b => !isBillVerifiedLocal(b));
         const pendingTxns = [...new Set(pendingBills.map(b => b.txnId))];
@@ -3361,7 +3372,25 @@ function BillsPage({
                   <td className="px-3 py-3 font-semibold text-purple-700">{fmt(b.gstAmount)}</td>
                   <td className="px-3 py-3 font-semibold text-green-700">{fmt(b.totalAmount)}</td>
                   <td className="px-3 py-3">
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
+                      {/* Manual Verify button — Admin/District Manager மட்டும் */}
+                      {!isVerified && isAdmin && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Bill ${b.billNumber} மேனுவலாக verify செய்யவுமா?`)) {
+                              setGstr2bVerified((prev: Set<string>) => {
+                                const next = new Set([...prev, String(b.billNumber).trim()]);
+                                localStorage.setItem('AR_GSTR2B_VERIFIED', JSON.stringify([...next]));
+                                return next;
+                              });
+                            }
+                          }}
+                          className="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          title="Manual GSTR2B Verify"
+                        >
+                          ✓ Verify
+                        </button>
+                      )}
                       <button onClick={() => setEditBill({...b})} className="px-2 py-1 rounded text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200">✏️</button>
                       <button onClick={() => onDelete(b.id)} className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200">🗑️</button>
                     </div>

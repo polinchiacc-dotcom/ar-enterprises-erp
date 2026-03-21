@@ -730,14 +730,16 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
   const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
 
   // Sheet-லிருந்து GSTR2B data load செய்யும்
-  // Sri Polinchi GSTR2B - அனைத்து periods
-  const GSTR2B_ALL_GIDS = [
-    { gid: '0',          label: 'GSTR2B (main)' },
-    { gid: '1132151197', label: 'Period 2' },
-    { gid: '1566794920', label: 'Period 3' },
-    { gid: '681701269',  label: 'Period 4' },
-    { gid: '1428826016', label: 'Period 5' },
-    { gid: '56479217',   label: 'Period 6' },
+  // GSTR2B Sources - இரண்டு Google Sheets
+  const GSTR2B_SOURCES = [
+    // 1. Sri Polinchi Sheet — GSTR2B tab (Nov-Dec 2024 data)
+    { sheetId: '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw', gid: '0',          label: 'Sri Polinchi GSTR2B' },
+    // 2. AR ERP Sheet — multiple GSTR2B tabs (FY 2024-25, 2025-26)
+    { sheetId: '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ', gid: '1132151197', label: 'GSTR2B 2025-26 Jan' },
+    { sheetId: '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ', gid: '1566794920', label: 'GSTR2B 2025-26 Apr' },
+    { sheetId: '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ', gid: '681701269',  label: 'GSTR2B 2024-25 Aug' },
+    { sheetId: '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ', gid: '1428826016', label: 'GSTR2B Period 5' },
+    { sheetId: '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ', gid: '56479217',   label: 'GSTR2B Period 6' },
   ];
 
   const loadFromSheet = async () => {
@@ -1291,10 +1293,15 @@ export default function App() {
 
   // முக்கியமான helper: ஒரு bill verified ஆகியிருக்கிறதா என்று check செய்யும்
   const isBillVerified = (bill: Bill): boolean => {
-    // createdAt இல்லாட்டால் billDate பார்க்கவும் — dummy bills-க்கு GSTR2B match தேவை
-    const effectiveDate = bill.createdAt ? new Date(bill.createdAt) : new Date(bill.billDate || '2020-01-01');
-    // Feature start-க்கு முன் add ஆன bill — auto-verified
-    if (effectiveDate < gstr2bFeatureStart) return true;
+    // createdAt இல்லாட்டால் GSTR2B match மட்டும் பார்க்கଵும் — billDate use செய்யே மாட்டாது
+    if (!bill.createdAt) {
+      // createdAt இல்லாத bills: GSTR2B rows இருந்தால் match பார்க்கவும், இல்லையெனில் pending
+      // (dummy bills-க்கு GSTR2B-ல் இல்லாட்டால் பெண்டிங் காட்டும்)
+      if (gstr2bRows.length === 0) return false;
+    } else {
+      // createdAt உள்ள bills: feature start-க்கு முன் ஆனால் auto-verified
+      if (new Date(bill.createdAt) < gstr2bFeatureStart) return true;
+    }
     // Admin/District manually verified ஆகியிருக்கிறதா?
     if (gstr2bVerified.has(String(bill.billNumber).trim())) return true;
     // GSTR2B rows இல்லையெனில் pending
@@ -2035,8 +2042,11 @@ function DashboardPage({
         const featureStart = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
         const gstr2bRowsLocal: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
         const isBillVerifiedLocal = (b: Bill) => {
-          const effDate = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
-          if (effDate < featureStart) return true;
+          if (!b.createdAt) {
+            if (gstr2bRowsLocal.length === 0) return false;
+          } else {
+            if (new Date(b.createdAt) < featureStart) return true;
+          }
           if (gstr2bVerified?.has(String(b.billNumber).trim())) return true;
           if (gstr2bRowsLocal.length === 0) return false;
           const v = vendors.find(x => x.vendorCode === b.vendorCode);
@@ -2839,8 +2849,11 @@ function TransactionsPage({
                 const featureStartTP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
                 const gstr2bRowsTP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
                 const isTxnBillVerified = (b: Bill) => {
-                  const effTP = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
-                  if (effTP < featureStartTP) return true;
+                  if (!b.createdAt) {
+                    if (gstr2bRowsTP.length === 0) return false;
+                  } else {
+                    if (new Date(b.createdAt) < featureStartTP) return true;
+                  }
                   if (gstr2bRowsTP.length === 0) return false;
                   const vTP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
                   const gstinTP = (vTP as any)?.gstNo?.trim() || '';
@@ -3358,29 +3371,37 @@ function BillsPage({
               {filtered.map(b => {
                 const featureStartBP = new Date(localStorage.getItem('AR_GSTR2B_FEATURE_START') || '2099-01-01');
                 const gstr2bRowsBP: any[] = (() => { try { return JSON.parse(localStorage.getItem('AR_GSTR2B_ROWS')||'[]'); } catch { return []; } })();
-                const effDateBP = b.createdAt ? new Date(b.createdAt) : new Date(b.billDate||'2020-01-01');
-                const isVerified = effDateBP < featureStartBP ? true
-                  : gstr2bRowsBP.length === 0 ? false
-                  : (() => {
-                    const vBP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
-                    const gstinBP = (vBP as any)?.gstNo?.trim() || '';
-                    if (!gstinBP) return false;
-                    const bDateMs = new Date(b.billDate).getTime();
-                    return gstr2bRowsBP.some((row:any) => {
-                      if (row.gstin?.trim() !== gstinBP) return false;
-                      if (row.invoiceNo && String(row.invoiceNo).trim() &&
-                          String(row.invoiceNo).trim().toLowerCase() === String(b.billNumber).trim().toLowerCase()) return true;
-                      const a = b.billAmount;
-                      const amtOk = Math.abs(row.taxableValue-a)/Math.max(a,1)<0.02||
-                        Math.abs(row.taxableValue-a*1.18)/Math.max(a*1.18,1)<0.02||
-                        Math.abs(row.taxableValue-a*1.04)/Math.max(a*1.04,1)<0.02||
-                        Math.abs(row.taxableValue-a*1.05)/Math.max(a*1.05,1)<0.02;
-                      if (!amtOk) return false;
-                      const rd = parseTamilDate(row.date);
-                      if (!rd) return true;
-                      return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
-                    });
-                  })();
+                const isVerified: boolean = (() => {
+                  // createdAt இல்லாட்டால் (dummy): GSTR2B match மட்டும்
+                  if (!b.createdAt) {
+                    if (gstr2bRowsBP.length === 0) return false;
+                  } else {
+                    // feature start-க்கு முன்: auto-verified
+                    if (new Date(b.createdAt) < featureStartBP) return true;
+                  }
+                  // Manually verified?
+                  const verifiedSet: Set<string> = (() => { try { return new Set(JSON.parse(localStorage.getItem('AR_GSTR2B_VERIFIED')||'[]')); } catch { return new Set(); } })();
+                  if (verifiedSet.has(String(b.billNumber).trim())) return true;
+                  if (gstr2bRowsBP.length === 0) return false;
+                  const vBP = vendors.find((x:any) => x.vendorCode === b.vendorCode);
+                  const gstinBP = (vBP as any)?.gstNo?.trim() || '';
+                  if (!gstinBP) return false;
+                  const bDateMs = new Date(b.billDate).getTime();
+                  return gstr2bRowsBP.some((row:any) => {
+                    if (row.gstin?.trim() !== gstinBP) return false;
+                    if (row.invoiceNo && String(row.invoiceNo).trim() &&
+                        String(row.invoiceNo).trim().toLowerCase() === String(b.billNumber).trim().toLowerCase()) return true;
+                    const a = b.billAmount;
+                    const amtOk = Math.abs(row.taxableValue-a)/Math.max(a,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.18)/Math.max(a*1.18,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.04)/Math.max(a*1.04,1)<0.02||
+                      Math.abs(row.taxableValue-a*1.05)/Math.max(a*1.05,1)<0.02;
+                    if (!amtOk) return false;
+                    const rd = parseTamilDate(row.date);
+                    if (!rd) return true;
+                    return Math.abs(rd.getTime() - bDateMs) / 86400000 <= 45;
+                  });
+                })();
                 const rowBg = isVerified ? "bg-green-50 hover:bg-green-100" : "bg-red-50/40 hover:bg-red-50";
                 return (
                 <tr key={b.id} className={`transition-colors ${rowBg}`}>

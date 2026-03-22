@@ -747,9 +747,9 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
     try {
       // எல்லா GIDs-ஐயும் load செய்
       let allRows: any[] = [];
-      for (const sheet of GSTR2B_ALL_GIDS) {
+      for (const sheet of GSTR2B_SOURCES) {
         try {
-          const url = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${sheet.gid}`;
+          const url = `https://docs.google.com/spreadsheets/d/${sheet.sheetId}/gviz/tq?tqx=out:csv&gid=${sheet.gid}`;
           const res = await fetch(url);
           if (!res.ok) continue;
           const csv = await res.text();
@@ -778,7 +778,6 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
 
   // CSV parse helper — தனி function-ஆக extract செய்
   const parseGSTR2BCSV = (csv: string): any[] => {
-    const url_dummy = `https://docs.google.com/spreadsheets/d/${POLINCHI_SHEET_ID}/gviz/tq?tqx=out:csv&gid=DUMMY`;
     const lines = csv.trim().split('\n').filter(l => l.trim());
     if (lines.length < 2) return [];
     const parseCSVLine = (line: string) => {
@@ -1293,7 +1292,7 @@ export default function App() {
 
   // முக்கியமான helper: ஒரு bill verified ஆகியிருக்கிறதா என்று check செய்யும்
   const isBillVerified = (bill: Bill): boolean => {
-    // createdAt இல்லாட்டால் GSTR2B match மட்டும் பார்க்கଵும் — billDate use செய்யே மாட்டாது
+    // createdAt இல்லாட்டால் GSTR2B match மட்டும் பார்க்கவும் — billDate use செய்யே மாட்டாது
     if (!bill.createdAt) {
       // createdAt இல்லாத bills: GSTR2B rows இருந்தால் match பார்க்கவும், இல்லையெனில் pending
       // (dummy bills-க்கு GSTR2B-ல் இல்லாட்டால் பெண்டிங் காட்டும்)

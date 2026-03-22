@@ -1583,7 +1583,7 @@ export default function App() {
             <span style={{ fontSize: 11, color: "#8899aa" }}>AR Enterprises</span>
             <span style={{ color: "#c8d0d8", fontSize: 10 }}>›</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: "#1c2b3a", textTransform: "capitalize" }}>
-              {page.replace(/-/g, " ")}
+              {page.split("-").join(" ")}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

@@ -268,7 +268,7 @@ const LS_KEY = "AR_ERP_V3_DATA_ENCRYPTED";
 const SESSION_KEY = "AR_SESSION";
 
 // முக்கியமான helper: Tamil/English date string → Date object
-// App() க்கு வெளியே top-level-ஆக define செய்தால் inline functions-ல் எல்லா இடத்திலும் பயன்படுத்தலாம்
+// v2 — top-level function (cache bust 2026-03-22)
 function parseTamilDate(dateStr: string): Date | null {
   if (!dateStr || dateStr === '-') return null;
   const direct = new Date(dateStr);
@@ -1311,20 +1311,15 @@ export default function App() {
     const billDateMs = new Date(bill.billDate).getTime();
     return gstr2bRows.some(row => {
       if (row.gstin.trim() !== vendorGstin) return false;
-      // 1வது: Invoice number exact match (GSTR2B-ல் இருக்குமானால்)
+      // 1வது: Invoice number exact match
       if (row.invoiceNo && String(row.invoiceNo).trim() &&
           String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
-      // 2வது: Amount match ±2% + date ±45 days
-      // GSTR2B taxableValue = total amount (bill × 1.18) ஆக இருக்கலாம் — இரண்டு வ஻ியிலும் compare செய்
-      const amtMatch =
-        Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02 || // direct taxable match
-        Math.abs(row.taxableValue - billAmt * 1.18) / Math.max(billAmt * 1.18, 1) < 0.02 || // total match
-        Math.abs(row.taxableValue - billAmt * 1.04) / Math.max(billAmt * 1.04, 1) < 0.02 || // 4% GST total
-        Math.abs(row.taxableValue - billAmt * 1.05) / Math.max(billAmt * 1.05, 1) < 0.02;   // 5% GST total
-      if (!amtMatch) return false;
-      const rowDate = parseTamilDate(row.date);
-      if (!rowDate) return true;
-      return Math.abs(billDateMs - rowDate.getTime()) / 86400000 <= 45;
+      // 2வது: Amount match ±2% (date comparison skip — parseTamilDate dependency இல்லை)
+      const a = billAmt;
+      return Math.abs(row.taxableValue - a) / Math.max(a, 1) < 0.02 ||
+        Math.abs(row.taxableValue - a * 1.18) / Math.max(a * 1.18, 1) < 0.02 ||
+        Math.abs(row.taxableValue - a * 1.04) / Math.max(a * 1.04, 1) < 0.02 ||
+        Math.abs(row.taxableValue - a * 1.05) / Math.max(a * 1.05, 1) < 0.02;
     });
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);

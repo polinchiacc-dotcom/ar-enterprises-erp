@@ -1837,8 +1837,8 @@ export default function App() {
             storageUsed={new Blob([JSON.stringify({ vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides })]).size}
           />
         )}
-        </div> {/* inner scrollable content */}
-      </div> {/* main content col */}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4020,8 +4020,8 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
             </div>
           </div>
         )}
-        </div> {/* inner scrollable content */}
-      </div> {/* main content col */}
+        </div>
+      </div>
     </div>
   );
 }

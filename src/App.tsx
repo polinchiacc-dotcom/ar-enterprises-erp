@@ -267,6 +267,30 @@ const BILL_TOTAL_RATE = 1.18;
 const LS_KEY = "AR_ERP_V3_DATA_ENCRYPTED";
 const SESSION_KEY = "AR_SESSION";
 
+// முக்கியமான helper: Tamil/English date string → Date object
+// App() க்கு வெளியே top-level-ஆக define செய்தால் inline functions-ல் எல்லா இடத்திலும் பயன்படுத்தலாம்
+function parseTamilDate(dateStr: string): Date | null {
+  if (!dateStr || dateStr === '-') return null;
+  const direct = new Date(dateStr);
+  if (!isNaN(direct.getTime())) return direct;
+  const tamilMonths: Record<string,number> = {
+    'ஜனு':0,'பிப்':1,'மார்':2,'ஏப்':3,'மே':4,'ஜூன்':5,
+    'ஜூலை':6,'ஆக்':7,'செப்':8,'அக்':9,'நவ்':10,'டிச்':11,
+    'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,
+    'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11
+  };
+  const m = dateStr.match(/(\d{1,2})[\-\/]([^\d\-\/]+)[\-\/](\d{2,4})/);
+  if (m) {
+    const day = parseInt(m[1]);
+    const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
+    const yr = parseInt(m[3]);
+    const year = yr < 100 ? 2000 + yr : yr;
+    const monKey = Object.keys(tamilMonths).find(k => monStr.startsWith(k) || k.startsWith(monStr.substring(0,3)));
+    if (monKey !== undefined) return new Date(year, tamilMonths[monKey], day);
+  }
+  return null;
+}
+
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
@@ -1262,33 +1286,6 @@ export default function App() {
       return s ? JSON.parse(s) : [];
     } catch { return []; }
   })();
-
-  // Tamil month names → Date parse helper
-  const parseTamilDate = (dateStr: string): Date | null => {
-    if (!dateStr || dateStr === '-') return null;
-    // Already valid ISO/English date?
-    const direct = new Date(dateStr);
-    if (!isNaN(direct.getTime())) return direct;
-    // Tamil format: "09-டிச்.-24" → DD-MON-YY
-    const tamilMonths: Record<string,number> = {
-      'ஜனு':0,'பிப்':1,'மார்':2,'ஏப்':3,'மே':4,'ஜூன்':5,
-      'ஜூலை':6,'ஆக்':7,'செப்':8,'அக்':9,'நவ்':10,'டிச்':11,
-      'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,
-      'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11
-    };
-    // Try DD-MON-YY or DD-MON-YYYY
-    const m = dateStr.match(/(\d{1,2})[\-\/]([^\d\-\/]+)[\-\/](\d{2,4})/);
-    if (m) {
-      const day = parseInt(m[1]);
-      const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
-      const yr = parseInt(m[3]);
-      const year = yr < 100 ? 2000 + yr : yr;
-      // Find matching month
-      const monKey = Object.keys(tamilMonths).find(k => monStr.startsWith(k) || k.startsWith(monStr.substring(0,3)));
-      if (monKey !== undefined) return new Date(year, tamilMonths[monKey], day);
-    }
-    return null;
-  };
 
   // முக்கியமான helper: ஒரு bill verified ஆகியிருக்கிறதா என்று check செய்யும்
   const isBillVerified = (bill: Bill): boolean => {

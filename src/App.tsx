@@ -699,7 +699,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       result.push(current.trim());
       return result;
     };
-    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["' ]/g,''));
+const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().split('"').join('').split("'").join('').split(' ').join(''));
     const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
     const iGstin   = ci(['gstin','gst']);
     const iTrade   = ci(['trade','name','supplier']);

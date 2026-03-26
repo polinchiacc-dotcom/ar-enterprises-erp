@@ -279,7 +279,8 @@ function parseTamilDate(dateStr: string): Date | null {
     'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,
     'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11
   };
-  const m = dateStr.match(/(\d{1,2})[\-\/]([^\d\-\/]+)[\-\/](\d{2,4})/);
+  const pattern = new RegExp('(\\d{1,2})[\\-\\/]([^\\d\\-\\/]+)[\\-\\/](\\d{2,4})');
+  const m = dateStr.match(pattern);
   if (m) {
     const day = parseInt(m[1]);
     const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
@@ -699,7 +700,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       result.push(current.trim());
       return result;
     };
-const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().split('"').join('').split("'").join('').split(' ').join(''));
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().split('"').join('').split("'").join('').split(' ').join(''));
     const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
     const iGstin   = ci(['gstin','gst']);
     const iTrade   = ci(['trade','name','supplier']);

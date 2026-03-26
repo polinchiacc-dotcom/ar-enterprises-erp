@@ -714,7 +714,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
       if (cols.length < 4) continue;
-      const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(/"/g,'').trim() : '';
+      const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(new RegExp('"', 'g'),'').trim() : '';
       const toNum = (s: string) => parseFloat(s.replace(/[^0-9.-]/g,''))||0;
       const gstin = get(iGstin);
       if (!gstin || gstin.length < 10) continue; // skip invalid rows

@@ -6114,7 +6114,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     if (m4) return new Date(+m4[1], +m4[2]-1, +m4[3]);
 
     // DD/MM/YY short (Bank Statement — MM/DD/YY handled separately in bank loop)
-    const m5 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    const m5 = s.match(new RegExp('^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2})$'));
     if (m5) {
       // Try DD/MM/YY first (Indian)
       const d = +m5[1], mo = +m5[2], yr = 2000 + +m5[3];

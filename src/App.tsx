@@ -6286,8 +6286,8 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         const dateVal = r[1];
         if (!dateVal || dateVal.length < 5) continue;
         let parsedDate: Date | null = null;
-        const sd = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-        const ld = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+        const sd = dateVal.match(new RegExp('^(\\d{2})\\/(\\d{2})\\/(\\d{2})$'));
+        const ld = dateVal.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
         if (sd) parsedDate = new Date(2000 + +sd[3], +sd[1] - 1, +sd[2]);
         else if (ld) parsedDate = new Date(+ld[3], +ld[2] - 1, +ld[1]);
         if (!parsedDate || isNaN(parsedDate.getTime())) continue;

@@ -6087,7 +6087,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     };
 
     // DD/MM/YYYY or DD-MM-YYYY (Indian format — day first)
-    const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    const m1 = s.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
     if (m1) {
       const day = +m1[1], month = +m1[2], year = +m1[3];
       if (day >= 1 && day <= 31 && month >= 1 && month <= 12)

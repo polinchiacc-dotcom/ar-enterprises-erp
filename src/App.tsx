@@ -268,7 +268,7 @@ const LS_KEY = "AR_ERP_V3_DATA_ENCRYPTED";
 const SESSION_KEY = "AR_SESSION";
 
 // முக்கியமான helper: Tamil/English date string → Date object
-// v2 — top-level function (cache bust 2026-03-22)
+// App() க்கு வெளியே top-level-ஆக define செய்தால் inline functions-ல் எல்லா இடத்திலும் பயன்படுத்தலாம்
 function parseTamilDate(dateStr: string): Date | null {
   if (!dateStr || dateStr === '-') return null;
   const direct = new Date(dateStr);
@@ -279,8 +279,7 @@ function parseTamilDate(dateStr: string): Date | null {
     'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,
     'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11
   };
-  const pattern = new RegExp('(\\d{1,2})[\\-\\/]([^\\d\\-\\/]+)[\\-\\/](\\d{2,4})');
-  const m = dateStr.match(pattern);
+  const m = dateStr.match(/(\d{1,2})[\-\/]([^\d\-\/]+)[\-\/](\d{2,4})/);
   if (m) {
     const day = parseInt(m[1]);
     const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
@@ -429,90 +428,206 @@ const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
 
 // ── 1. Landing Page (முதல் பக்கம்) ──────────────────────────────
 function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "district" | "agent" | "vendor" | "fintrack" | "worktracker" | "reconciliation") => void }) {
-  const roles = [
-    { id: "admin",    icon: "👑", label: "Admin",    sub: "Super Admin access",       color: "#1c3d6e", light: "#eef2f8" },
-    { id: "district", icon: "🏗️", label: "District", sub: "District Manager",          color: "#0e6b4a", light: "#eaf5ee" },
-    { id: "agent",    icon: "🤝", label: "Agent",    sub: "Field Agent",               color: "#5c3d99", light: "#f3eeff" },
-    { id: "vendor",   icon: "🏢", label: "Vendor",   sub: "Self-service portal",       color: "#9a3412", light: "#fff7ed" },
-  ];
-  const tools = [
-    { id: "fintrack",       icon: "💼", label: "FinTrack AI",        sub: "Bank · Projects · GST · Dashboard",  badge: "AI",   color: "#1c3d6e" },
-    { id: "reconciliation", icon: "🔄", label: "Bank Reconciliation", sub: "Contract ↔ Bank · Auto Match",       badge: "AUTO", color: "#0e6b4a" },
-    { id: "worktracker",    icon: "📋", label: "Work Tracker",       sub: "Sri Polinchi & Co · GST · ITC",       badge: "LIVE", color: "#5c3d99" },
-    { id: "auditor",        icon: "🧑‍💼", label: "Auditor",            sub: "GSTR-2B · ITC · GST Dashboard",       badge: "NEW",  color: "#9a3412" },
-  ];
-  const hov = (e: any, on: boolean) => { e.currentTarget.style.boxShadow = on ? "0 4px 18px rgba(0,0,0,0.09)" : "none"; e.currentTarget.style.transform = on ? "translateY(-1px)" : "none"; };
   return (
-    <div style={{ minHeight:"100vh", background:"#f4f6f9", fontFamily:"'Segoe UI',system-ui,sans-serif", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ width:"100%", maxWidth:540 }}>
-        <div style={{ textAlign:"center", marginBottom:32 }}>
-          <div style={{ width:56, height:56, background:"#1c3d6e", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px", boxShadow:"0 4px 14px rgba(28,61,110,0.2)" }}>
-            <span style={{ fontSize:20, fontWeight:800, color:"#fff", letterSpacing:1 }}>AR</span>
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}
+    >
+      <div className="w-full max-w-2xl px-6">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: "linear-gradient(135deg, #c9a227, #f0d060)" }}
+          >
+            <span className="text-3xl font-bold text-gray-900">AR</span>
           </div>
-          <h1 style={{ fontSize:24, fontWeight:700, color:"#1c2b3a", margin:0 }}>AR Enterprises</h1>
-          <p style={{ fontSize:13, color:"#6b7c93", marginTop:4 }}>Multi-District Vendor ERP System V3.0</p>
+          <h1 className="text-3xl font-bold text-white">AR Enterprises</h1>
+          <p className="text-sm mt-2" style={{ color: "#c9a227" }}>Multi-District Vendor ERP System V3.0</p>
+          <p className="text-xs text-gray-400 mt-1">உங்கள் role-ஐ தேர்ந்தெடுக்கவும்</p>
         </div>
-        <p style={{ fontSize:11, fontWeight:600, color:"#a0aab6", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:10 }}>Select Role</p>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
-          {roles.map(r => (
-            <button key={r.id} onClick={() => onSelectRole(r.id as any)}
-              onMouseEnter={e=>hov(e,true)} onMouseLeave={e=>hov(e,false)}
-              style={{ background:"#fff", border:"1px solid #e2e6ea", borderTop:`3px solid ${r.color}`, borderRadius:10, padding:"14px 16px", textAlign:"left", cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:36, height:36, background:r.light, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>{r.icon}</div>
-              <div style={{ flex:1 }}>
-                <p style={{ fontSize:13, fontWeight:600, color:"#1c2b3a", margin:0 }}>{r.label}</p>
-                <p style={{ fontSize:11, color:"#8899aa", margin:0 }}>{r.sub}</p>
+
+        {/* Role Buttons — 4 main + 1 full-width FinTrack */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Admin */}
+          <button
+            onClick={() => onSelectRole("admin")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)", border: "1px solid rgba(201,162,39,0.3)" }}
+          >
+            <div className="text-4xl mb-3">👑</div>
+            <p className="font-bold text-white text-lg">Admin</p>
+            <p className="text-xs text-gray-400 mt-1">Super Admin access</p>
+            <div className="mt-3 text-xs font-semibold" style={{ color: "#c9a227" }}>Login →</div>
+          </button>
+
+          {/* District */}
+          <button
+            onClick={() => onSelectRole("district")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #0c4a6e, #0369a1)", border: "1px solid rgba(56,189,248,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🏗️</div>
+            <p className="font-bold text-white text-lg">District</p>
+            <p className="text-xs text-gray-400 mt-1">District Manager access</p>
+            <div className="mt-3 text-xs font-semibold text-sky-300">Login →</div>
+          </button>
+
+          {/* Agent */}
+          <button
+            onClick={() => onSelectRole("agent")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed)", border: "1px solid rgba(167,139,250,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🤝</div>
+            <p className="font-bold text-white text-lg">Agent</p>
+            <p className="text-xs text-gray-400 mt-1">Field Agent access</p>
+            <div className="mt-3 text-xs font-semibold text-purple-300">Login →</div>
+          </button>
+
+          {/* Vendor */}
+          <button
+            onClick={() => onSelectRole("vendor")}
+            className="group p-6 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #14532d, #15803d)", border: "1px solid rgba(74,222,128,0.3)" }}
+          >
+            <div className="text-4xl mb-3">🏢</div>
+            <p className="font-bold text-white text-lg">Vendor</p>
+            <p className="text-xs text-gray-400 mt-1">Vendor self-service</p>
+            <div className="mt-3 text-xs font-semibold text-green-300">Login →</div>
+          </button>
+
+          {/* FinTrack AI — Full width */}
+          <button
+            onClick={() => onSelectRole("fintrack")}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #7c2d12, #b45309, #92400e)", border: "2px solid rgba(251,191,36,0.5)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">💼</div>
+                <div>
+                  <p className="font-bold text-white text-lg">FinTrack AI</p>
+                  <p className="text-xs text-yellow-200 mt-0.5">Bank Statement • Project Tracking • GST • Financial Dashboard</p>
+                </div>
               </div>
-              <span style={{ color:"#c8d0d8", fontSize:14 }}>›</span>
-            </button>
-          ))}
-        </div>
-        <p style={{ fontSize:11, fontWeight:600, color:"#a0aab6", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:10 }}>Tools & Analytics</p>
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {tools.map(t => (
-            <button key={t.id} onClick={() => onSelectRole(t.id as any)}
-              onMouseEnter={e=>hov(e,true)} onMouseLeave={e=>hov(e,false)}
-              style={{ background:"#fff", border:"1px solid #e2e6ea", borderLeft:`3px solid ${t.color}`, borderRadius:10, padding:"12px 16px", textAlign:"left", cursor:"pointer", display:"flex", alignItems:"center", gap:12, transition:"all 0.15s" }}>
-              <span style={{ fontSize:20, flexShrink:0 }}>{t.icon}</span>
-              <div style={{ flex:1 }}>
-                <p style={{ fontSize:13, fontWeight:600, color:"#1c2b3a", margin:0 }}>{t.label}</p>
-                <p style={{ fontSize:11, color:"#8899aa", margin:0 }}>{t.sub}</p>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>NEW ✨</span>
+                <div className="mt-2 text-xs font-semibold text-yellow-300">Enter →</div>
               </div>
-              <span style={{ fontSize:10, fontWeight:700, color:t.color, background:`${t.color}18`, padding:"2px 8px", borderRadius:4, letterSpacing:"0.04em" }}>{t.badge}</span>
-              <span style={{ color:"#c8d0d8", fontSize:14 }}>›</span>
-            </button>
-          ))}
+            </div>
+          </button>
+
+          {/* Bank Reconciliation — Full width */}
+          <button
+            onClick={() => onSelectRole("reconciliation" as any)}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #134e4a, #0f766e, #0d9488)", border: "2px solid rgba(45,212,191,0.4)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">🔄</div>
+                <div>
+                  <p className="font-bold text-white text-lg">Bank Reconciliation</p>
+                  <p className="text-xs text-teal-200 mt-0.5">Contract Work ↔ Bank Statement • Auto Match • Highlight</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(45,212,191,0.2)", color: "#2dd4bf" }}>AUTO ✓</span>
+                <div className="mt-2 text-xs font-semibold text-teal-300">Match →</div>
+              </div>
+            </div>
+          </button>
+
+          {/* Auditor — Full width */}
+          <button
+            onClick={() => onSelectRole("auditor" as any)}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #2e1065, #4c1d95, #5b21b6)", border: "2px solid rgba(167,139,250,0.4)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">🧑‍💼</div>
+                <div>
+                  <p className="font-bold text-white text-lg">Auditor</p>
+                  <p className="text-xs text-purple-200 mt-0.5">IT & GST Dashboard • GSTR-2B • ITC Register</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>NEW 🆕</span>
+                <div className="mt-2 text-xs font-semibold text-purple-300">Enter →</div>
+              </div>
+            </div>
+          </button>
+
+          {/* Work Tracker — Full width */}
+          <button
+            onClick={() => onSelectRole("worktracker" as any)}
+            className="col-span-2 group p-5 rounded-2xl text-left transition-all hover:scale-105 hover:shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8, #1e40af)", border: "2px solid rgba(99,179,237,0.4)" }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">📋</div>
+                <div>
+                  <p className="font-bold text-white text-lg">Work Tracker</p>
+                  <p className="text-xs text-blue-200 mt-0.5">Sri Polinchi & Co • GST • ITC • Contract Works • Dashboard</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(99,179,237,0.2)", color: "#93c5fd" }}>LIVE 📡</span>
+                <div className="mt-2 text-xs font-semibold text-blue-300">View →</div>
+              </div>
+            </div>
+          </button>
         </div>
-        <p style={{ textAlign:"center", fontSize:11, color:"#c0c8d0", marginTop:24 }}>🔒 AR Enterprises ERP V3.0 — Secured</p>
+
+        <p className="text-center text-xs text-gray-500 mt-8">🔒 AR Enterprises ERP V3.0 — Secured</p>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// AUDITOR PAGE — IT & GST | GSTR-2B | ITC
+// ============================================================
+// Auditor — ERP Apps Script-ஐயே use செய்கிறோம் (same SHEET_URL)
+const AUDITOR_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6a9sjjpl3rF-FdCt969SIAcpEpOZvOigxfVWzHoB9-BZLvgGinsYlYRpgWvkedkys/exec";
+const AUDITOR_API_KEY = "AR_PUDUKKOTTAI_2025_SECRET"; // same as ERP API key
+
+const GST_CLIENTS = [
+  { name: "SRI POLINCHI & CO",   gstin: "33AEQFS3938D1ZU", gst: true },
+  { name: "Raju Malaiyappan",     gstin: "33AXDPM2713N1ZH", gst: true },
+  { name: "Arivoly",              gstin: "33ASRPA6713H1ZU", gst: true },
+  { name: "Vasundra Traders",     gstin: "",                gst: true },
+];
+
+const FY_OPTIONS = ["2025-26","2024-25","2023-24"];
+const MONTHS_GST = ["April","May","June","July","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 
 function AuditorPage({ onBack, onGSTR2BVerified }: { onBack: () => void; onGSTR2BVerified?: (billNos: string[]) => void }) {
   const [tab, setTab] = useState<"gst"|"gstr2b"|"itc">("gst");
   const tabStyle = (id: string, color: string) => ({
     padding: "12px 20px", border: "none", background: "transparent",
-    color: tab === id ? color : "#6b7c93",
+    color: tab === id ? color : "#64748b",
     fontWeight: tab === id ? 700 : 500, fontSize: "13px", cursor: "pointer",
     borderBottom: tab === id ? `2px solid ${color}` : "2px solid transparent",
   });
   return (
-    <div style={{ minHeight:"100vh", background:"#f4f6f9", fontFamily:"'Segoe UI',system-ui,sans-serif", color:"#1c2b3a" }}>
-      <div style={{ background:"#1c3d6e", padding:"12px 24px", display:"flex", alignItems:"center", gap:"12px" }}>
-        <button onClick={onBack} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", padding:"6px 14px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontWeight:600 }}>← Back</button>
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI',sans-serif", color: "#f1f5f9" }}>
+      <div style={{ background: "linear-gradient(135deg,#4c1d95,#6d28d9)", padding: "12px 24px", display: "flex", alignItems: "center", gap: "12px" }}>
+        <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>← Back</button>
         <div>
           <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>🧑‍💼 Auditor Dashboard</div>
           <div style={{ fontSize: "11px", color: "#ddd6fe" }}>IT & GST | GSTR-2B | ITC — Sri Polinchi & Co</div>
         </div>
       </div>
-      <div style={{ background:"#ffffff", borderBottom:"1px solid #e2e6ea", display:"flex", padding:"0 24px" }}>
+      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", display: "flex", padding: "0 24px" }}>
         <button style={tabStyle("gst","#8b5cf6")}    onClick={() => setTab("gst")}>📊 IT & GST Dashboard</button>
         <button style={tabStyle("gstr2b","#06b6d4")} onClick={() => setTab("gstr2b")}>📋 GSTR-2B</button>
         <button style={tabStyle("itc","#10b981")}    onClick={() => setTab("itc")}>💰 ITC Register</button>
       </div>
-      <div style={{ padding:"24px" }}>
+      <div style={{ padding: "24px" }}>
         {tab === "gst"    && <GSTFilingTab />}
         {tab === "gstr2b" && <GSTR2BTab onVerified={onGSTR2BVerified} />}
         {tab === "itc"    && <ITCTab />}
@@ -529,8 +644,8 @@ function GSTFilingTab() {
   const [date, setDate]     = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg]       = useState("");
-  const inp = { width:"100%",padding:"9px 12px",background:"#fff",border:"1px solid #dde2e8",borderRadius:"8px",color:"#1c2b3a",fontSize:"13px",outline:"none",fontFamily:"inherit" };
-  const lbl = { fontSize:"11px",color:"#6b7c93",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
 
   const polinchiData: Record<string,string> = {
     "April_GSTR-1":"17/06/2025",  "April_GSTR-3B":"17/06/2025",
@@ -564,7 +679,7 @@ function GSTFilingTab() {
 
   return (
     <div>
-      <div style={{ background:"#fff",borderRadius:10,padding:"20px",border:"1px solid #e8ecf0",marginBottom:20 }}>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155",marginBottom:"20px" }}>
         <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#a78bfa" }}>➕ New Filing Entry</h2>
         <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px" }}>
           <div><label style={lbl}>Client</label>
@@ -592,22 +707,22 @@ function GSTFilingTab() {
         {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
       </div>
 
-      <div style={{ background:"#fff",borderRadius:10,border:"1px solid #e8ecf0",overflow:"hidden" }}>
+      <div style={{ background:"#1e293b",borderRadius:"12px",border:"1px solid #334155",overflow:"hidden" }}>
         <div style={{ padding:"14px 18px",borderBottom:"1px solid #334155" }}>
           <h2 style={{ fontSize:"14px",fontWeight:700,color:"#a78bfa" }}>📊 SRI POLINCHI & CO — FY 2025-26</h2>
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"12px" }}>
-            <thead><tr style={{ background:"#f8f9fb" }}>
+            <thead><tr style={{ background:"#0f172a" }}>
               {["Month","GSTR-1","GSTR-3B","Status"].map(h=>
-                <th key={h} style={{ padding:"10px 12px",textAlign:"left" as const,color:"#6b7c93",fontWeight:700 }}>{h}</th>)}
+                <th key={h} style={{ padding:"10px 12px",textAlign:"left" as const,color:"#64748b",fontWeight:700 }}>{h}</th>)}
             </tr></thead>
             <tbody>
               {MONTHS_GST.map(m => {
                 const g1=polinchiData[m+"_GSTR-1"]||"", g3=polinchiData[m+"_GSTR-3B"]||"";
                 const both=g1&&g3, none=!g1&&!g3;
                 return (<tr key={m} style={{ borderBottom:"1px solid #1a2942" }}>
-                  <td style={{ padding:"8px 12px",fontWeight:600,color:"#1c2b3a" }}>{m} {m==="Jan"||m==="Feb"||m==="Mar"?"2026":"2025"}</td>
+                  <td style={{ padding:"8px 12px",fontWeight:600,color:"#f1f5f9" }}>{m} {m==="Jan"||m==="Feb"||m==="Mar"?"2026":"2025"}</td>
                   <td style={{ padding:"8px 12px" }}>{g1?<span style={{ color:"#10b981",fontWeight:600 }}>✅ {g1}</span>:<span style={{ color:"#ef4444" }}>❌ Pending</span>}</td>
                   <td style={{ padding:"8px 12px" }}>{g3?<span style={{ color:"#10b981",fontWeight:600 }}>✅ {g3}</span>:<span style={{ color:"#ef4444" }}>❌ Pending</span>}</td>
                   <td style={{ padding:"8px 12px" }}><span style={{ padding:"2px 10px",borderRadius:"10px",fontSize:"11px",fontWeight:700,background:both?"rgba(16,185,129,0.15)":none?"rgba(239,68,68,0.15)":"rgba(245,158,11,0.15)",color:both?"#10b981":none?"#ef4444":"#f59e0b" }}>{both?"✅ Filed":none?"❌ Pending":"⚠️ Partial"}</span></td>
@@ -635,8 +750,8 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
   const [loading, setLoading]     = useState(false);
   const [saving, setSaving]   = useState(false);
   const [msg, setMsg]         = useState("");
-  const inp = { width:"100%",padding:"9px 12px",background:"#fff",border:"1px solid #dde2e8",borderRadius:"8px",color:"#1c2b3a",fontSize:"13px",outline:"none",fontFamily:"inherit" };
-  const lbl = { fontSize:"11px",color:"#6b7c93",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
 
   // Sheet-லிருந்து GSTR2B data load செய்யும்
   // GSTR2B Sources - இரண்டு Google Sheets
@@ -700,7 +815,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       result.push(current.trim());
       return result;
     };
-    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().split('"').join('').split("'").join('').split(' ').join(''));
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["' ]/g,''));
     const ci = (names: string[]) => headers.findIndex(h => names.some(n => h.includes(n)));
     const iGstin   = ci(['gstin','gst']);
     const iTrade   = ci(['trade','name','supplier']);
@@ -714,8 +829,8 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
       if (cols.length < 4) continue;
-      const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(new RegExp('"', 'g'),'').trim() : '';
-      const toNum = (s: string) => parseFloat(s.replace(new RegExp('[^0-9.-]', 'g'),''))||0;
+      const get = (idx: number) => idx >= 0 ? (cols[idx]||"").replace(/"/g,'').trim() : '';
+      const toNum = (s: string) => parseFloat(s.replace(/[^0-9.-]/g,''))||0;
       const gstin = get(iGstin);
       if (!gstin || gstin.length < 10) continue; // skip invalid rows
       rows.push({
@@ -784,15 +899,15 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
 
   return (
     <div>
-      <div style={{ background:"#fff",borderRadius:10,padding:"20px",border:"1px solid #e8ecf0",marginBottom:20 }}>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155",marginBottom:"20px" }}>
         <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#06b6d4" }}>📋 GSTR-2B</h2>
 
         {/* Mode Toggle */}
         <div style={{ display:"flex",gap:"8px",marginBottom:"16px" }}>
-          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8" as any }}>
+          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#0e7490":"#1e293b",color:loadMode==="sheet"?"#fff":"#64748b",border:loadMode==="sheet"?"none":"1px solid #334155" as any }}>
             📊 Load from Sheet
           </button>
-          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8" as any }}>
+          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#0e7490":"#1e293b",color:loadMode==="paste"?"#fff":"#64748b",border:loadMode==="paste"?"none":"1px solid #334155" as any }}>
             ➕ Paste New Data
           </button>
         </div>
@@ -805,7 +920,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
         {/* Mode: Load from Sheet */}
         {loadMode === "sheet" && (
           <div>
-            <div style={{ fontSize:"12px",color:"#6b7c93",marginBottom:"10px" }}>
+            <div style={{ fontSize:"12px",color:"#64748b",marginBottom:"10px" }}>
               📄 Sri Polinchi Google Sheet → <strong style={{ color:"#06b6d4" }}>GSTR2B</strong> tab-லிருந்து நேரடியாக load ஆகும்
             </div>
             <button onClick={loadFromSheet} disabled={loading} style={{ padding:"9px 24px",background:"linear-gradient(135deg,#0e7490,#0891b2)",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>
@@ -826,7 +941,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
             </div>
             <div style={{ display:"flex",gap:"10px" }}>
               <button onClick={handleParse} style={{ padding:"8px 20px",background:"#0e7490",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:"13px" }}>🔍 Parse</button>
-              <button onClick={handleSave} disabled={saving||!parsed.length} style={{ padding:"8px 20px",background:parsed.length?"#0891b2":"#e2e6ea",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:parsed.length?"pointer":"not-allowed",fontSize:"13px" }}>
+              <button onClick={handleSave} disabled={saving||!parsed.length} style={{ padding:"8px 20px",background:parsed.length?"#0891b2":"#334155",border:"none",borderRadius:"8px",color:"#fff",fontWeight:700,cursor:parsed.length?"pointer":"not-allowed",fontSize:"13px" }}>
                 {saving?"⏳...":`💾 Save ${parsed.length} Rows`}</button>
             </div>
           </div>
@@ -834,7 +949,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
         {msg && <div style={{ marginTop:"10px",padding:"8px 12px",borderRadius:"8px",background:msg.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",fontSize:"12px",color:msg.startsWith("✅")?"#10b981":"#ef4444" }}>{msg}</div>}
       </div>
       {displayData.length>0 && (
-        <div style={{ background:"#fff",borderRadius:10,border:"1px solid #e8ecf0",overflow:"hidden" }}>
+        <div style={{ background:"#1e293b",borderRadius:"12px",border:"1px solid #334155",overflow:"hidden" }}>
           <div style={{ padding:"12px 18px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
             <h3 style={{ fontSize:"13px",fontWeight:700,color:"#06b6d4" }}>Preview — {displayData.length} rows</h3>
             <div style={{ display:"flex",gap:"16px",fontSize:"12px" }}>
@@ -846,18 +961,18 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
           </div>
           <div style={{ overflowX:"auto",maxHeight:"280px",overflowY:"auto" }}>
             <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"11px" }}>
-              <thead style={{ position:"sticky" as const,top:0,background:"#f8f9fb" }}>
+              <thead style={{ position:"sticky" as const,top:0,background:"#0f172a" }}>
                 <tr>{["GSTIN","Trade Name","Invoice No","Date","Taxable","IGST","CGST","SGST","Total"].map(h=>
-                  <th key={h} style={{ padding:"8px 10px",textAlign:"left" as const,color:"#6b7c93",fontWeight:700,whiteSpace:"nowrap" as const }}>{h}</th>)}
+                  <th key={h} style={{ padding:"8px 10px",textAlign:"left" as const,color:"#64748b",fontWeight:700,whiteSpace:"nowrap" as const }}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {displayData.slice(0,100).map((r,i)=>(
                   <tr key={i} style={{ borderBottom:"1px solid #1a2942" }}>
-                    <td style={{ padding:"6px 10px",color:"#6b7c93",fontFamily:"monospace",fontSize:11 }}>{r.gstin}</td>
-                    <td style={{ padding:"6px 10px",color:"#1c2b3a",fontWeight:600,maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const }}>{r.tradeName}</td>
-                    <td style={{ padding:"6px 10px",color:"#6b7c93" }}>{r.invoiceNo}</td>
-                    <td style={{ padding:"6px 10px",color:"#6b7c93" }}>{r.invoiceDate}</td>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8",fontFamily:"monospace" }}>{r.gstin}</td>
+                    <td style={{ padding:"6px 10px",color:"#f1f5f9",fontWeight:600,maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const }}>{r.tradeName}</td>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8" }}>{r.invoiceNo}</td>
+                    <td style={{ padding:"6px 10px",color:"#94a3b8" }}>{r.invoiceDate}</td>
                     <td style={{ padding:"6px 10px" }}>{f2(r.taxableValue)}</td>
                     <td style={{ padding:"6px 10px",color:"#06b6d4" }}>{f2(r.igst)}</td>
                     <td style={{ padding:"6px 10px",color:"#06b6d4" }}>{f2(r.cgst)}</td>
@@ -885,8 +1000,8 @@ function ITCTab() {
   const [notes, setNotes]   = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg]       = useState("");
-  const inp = { width:"100%",padding:"9px 12px",background:"#fff",border:"1px solid #dde2e8",borderRadius:"8px",color:"#1c2b3a",fontSize:"13px",outline:"none",fontFamily:"inherit" };
-  const lbl = { fontSize:"11px",color:"#6b7c93",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
+  const inp = { width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"8px",color:"#f1f5f9",fontSize:"13px",outline:"none" };
+  const lbl = { fontSize:"11px",color:"#64748b",marginBottom:"4px",display:"block" as const,fontWeight:600,textTransform:"uppercase" as const };
   const total=(parseFloat(igst)||0)+(parseFloat(cgst)||0)+(parseFloat(sgst)||0);
   const net=total-(parseFloat(rev)||0);
 
@@ -910,7 +1025,7 @@ function ITCTab() {
 
   return (
     <div>
-      <div style={{ background:"#ffffff",borderRadius:"12px",padding:"20px",border:"1px solid #334155" }}>
+      <div style={{ background:"#1e293b",borderRadius:"12px",padding:"20px",border:"1px solid #334155" }}>
         <h2 style={{ fontSize:"14px",fontWeight:700,marginBottom:"16px",color:"#10b981" }}>💰 ITC Register Entry</h2>
         <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px" }}>
           <div><label style={lbl}>Client</label><select value={client} onChange={e=>setClient(e.target.value)} style={inp as any}>{GST_CLIENTS.filter(c=>c.gst).map(c=><option key={c.gstin} value={c.gstin}>{c.name}</option>)}</select></div>
@@ -1024,69 +1139,78 @@ const handleLogin = async () => {
   }
 };
 
-  const roleColors2: Record<string,string> = { admin:"#1c3d6e", district:"#0e6b4a", agent:"#5c3d99", vendor:"#9a3412" };
-  const roleLight2: Record<string,string>  = { admin:"#eef2f8", district:"#eaf5ee", agent:"#f3eeff", vendor:"#fff7ed" };
-  const accent = roleColors2[role] || "#1c3d6e";
-  const accentBg = roleLight2[role] || "#eef2f8";
-  const inpStyle: any = { width:"100%", padding:"10px 14px", borderRadius:8, border:"1px solid #dde2e8", fontSize:13, color:"#1c2b3a", background:"#fff", outline:"none", boxSizing:"border-box", fontFamily:"inherit" };
-
   return (
-    <div style={{ minHeight:"100vh", background:"#f4f6f9", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
-      <div style={{ width:"100%", maxWidth:420, padding:"0 20px" }}>
-        <div style={{ background:"#fff", borderRadius:14, border:"1px solid #e2e6ea", overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.07)" }}>
-          <div style={{ height:4, background:accent }} />
-          <div style={{ padding:"28px 32px 32px" }}>
-            <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", fontSize:12, color:"#6b7c93", display:"flex", alignItems:"center", gap:6, marginBottom:24, padding:0 }}>
-              ← Back to Home
-            </button>
-            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
-              <div style={{ width:44, height:44, background:accentBg, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>{cfg.icon}</div>
-              <div>
-                <h1 style={{ fontSize:18, fontWeight:700, color:"#1c2b3a", margin:0 }}>{cfg.label}</h1>
-                <p style={{ fontSize:12, color:"#8899aa", margin:0 }}>{cfg.hint}</p>
-              </div>
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-              <div>
-                <label style={{ display:"block", fontSize:11, fontWeight:600, color:"#6b7c93", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  {role === "vendor" ? "GST Number / Vendor Code" : "Username"}
-                </label>
-                <input type="text" value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleLogin()}
-                  placeholder={role === "vendor" ? "33AAAAA0000A1Z5 or PDK25HW001" : "Enter username"}
-                  autoComplete="off" disabled={loading} style={inpStyle}
-                />
-              </div>
-              <div>
-                <label style={{ display:"block", fontSize:11, fontWeight:600, color:"#6b7c93", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  {role === "vendor" ? "Mobile Number" : "Password"}
-                </label>
-                <input type={role === "vendor" ? "text" : "password"} value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleLogin()}
-                  placeholder={role === "vendor" ? "9876543210" : "Enter password"}
-                  autoComplete="new-password" disabled={loading} style={inpStyle}
-                />
-              </div>
-              {error && (
-                <div style={{ padding:"10px 14px", borderRadius:8, background:"#fef2f2", border:"1px solid #fecaca", borderLeft:"3px solid #ef4444" }}>
-                  <p style={{ fontSize:12, color:"#b91c1c", margin:0 }}>{error}</p>
-                </div>
-              )}
-              <button onClick={handleLogin} disabled={loading}
-                style={{ width:"100%", padding:"11px", borderRadius:8, border:"none", fontSize:13, fontWeight:700, color:"#fff", background:accent, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
-                {loading ? "Logging in..." : "Login →"}
-              </button>
-            </div>
-            <div style={{ marginTop:24, paddingTop:16, borderTop:"1px solid #f0f3f6", textAlign:"center" }}>
-              <p style={{ fontSize:11, color:"#a0aab6", margin:0 }}>🔒 AR Enterprises ERP V3.0 — Secured</p>
-            </div>
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}
+    >
+      <div
+        className="w-full max-w-md p-8 rounded-2xl shadow-2xl"
+        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(20px)" }}
+      >
+        {/* Back */}
+        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
+          ← Back to Home
+        </button>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-3">{cfg.icon}</div>
+          <h1 className="text-2xl font-bold text-white">{cfg.label}</h1>
+          <p className="text-xs mt-2 text-gray-400">{cfg.hint}</p>
+        </div>
+
+        {/* Form */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {role === "vendor" ? "GST Number / Vendor Code" : "Username"}
+            </label>
+            <input
+              type="text" value={username}
+              onChange={e => setUsername(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              placeholder={role === "vendor" ? "33AAAAA0000A1Z5 or PDK25HW001" : "Enter username"}
+              autoComplete="off" disabled={loading}
+              className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+            />
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {role === "vendor" ? "Mobile Number" : "Password"}
+            </label>
+            <input
+              type={role === "vendor" ? "text" : "password"} value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              placeholder={role === "vendor" ? "9876543210" : "Enter password"}
+              autoComplete="new-password" disabled={loading}
+              className="w-full px-4 py-2.5 rounded-lg text-white text-sm outline-none placeholder-gray-500 disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/50">
+              <p className="text-red-300 text-xs text-center">{error}</p>
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin} disabled={loading}
+            className="w-full py-2.5 rounded-lg font-semibold text-gray-900 text-sm transition-all disabled:opacity-50 hover:scale-105"
+            style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
+          >
+            {loading ? "🔄 Logging in..." : `${cfg.icon} Login →`}
+          </button>
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <p className="text-xs text-gray-400 text-center">🔒 AR Enterprises ERP V3.0</p>
         </div>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -1187,15 +1311,20 @@ export default function App() {
     const billDateMs = new Date(bill.billDate).getTime();
     return gstr2bRows.some(row => {
       if (row.gstin.trim() !== vendorGstin) return false;
-      // 1வது: Invoice number exact match
+      // 1வது: Invoice number exact match (GSTR2B-ல் இருக்குமானால்)
       if (row.invoiceNo && String(row.invoiceNo).trim() &&
           String(row.invoiceNo).trim().toLowerCase() === billNo.toLowerCase()) return true;
-      // 2வது: Amount match ±2% (date comparison skip — parseTamilDate dependency இல்லை)
-      const a = billAmt;
-      return Math.abs(row.taxableValue - a) / Math.max(a, 1) < 0.02 ||
-        Math.abs(row.taxableValue - a * 1.18) / Math.max(a * 1.18, 1) < 0.02 ||
-        Math.abs(row.taxableValue - a * 1.04) / Math.max(a * 1.04, 1) < 0.02 ||
-        Math.abs(row.taxableValue - a * 1.05) / Math.max(a * 1.05, 1) < 0.02;
+      // 2வது: Amount match ±2% + date ±45 days
+      // GSTR2B taxableValue = total amount (bill × 1.18) ஆக இருக்கலாம் — இரண்டு வ஻ியிலும் compare செய்
+      const amtMatch =
+        Math.abs(row.taxableValue - billAmt) / Math.max(billAmt, 1) < 0.02 || // direct taxable match
+        Math.abs(row.taxableValue - billAmt * 1.18) / Math.max(billAmt * 1.18, 1) < 0.02 || // total match
+        Math.abs(row.taxableValue - billAmt * 1.04) / Math.max(billAmt * 1.04, 1) < 0.02 || // 4% GST total
+        Math.abs(row.taxableValue - billAmt * 1.05) / Math.max(billAmt * 1.05, 1) < 0.02;   // 5% GST total
+      if (!amtMatch) return false;
+      const rowDate = parseTamilDate(row.date);
+      if (!rowDate) return true;
+      return Math.abs(billDateMs - rowDate.getTime()) / 86400000 <= 45;
     });
   };
   const [sidebarOpen, setSidebarOpen]     = useState(true);
@@ -1368,7 +1497,7 @@ export default function App() {
   // ── Loading ────────────────────────────────────────────────
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f4f6f9" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #0d2144 100%)" }}>
         <div className="text-center">
           <div className="w-16 h-16 rounded-full border-4 animate-spin mx-auto mb-4" style={{ borderColor: '#c9a227', borderTopColor: 'transparent' }}></div>
           <p className="text-white font-semibold text-lg">📊 Loading AR ERP...</p>
@@ -1502,101 +1631,55 @@ export default function App() {
       ];
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#f4f6f9", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5", fontFamily: "'Segoe UI', sans-serif" }}>
 
-      {/* Sidebar — Arctic White style */}
+      {/* Sidebar */}
       <div
-        className={`flex-shrink-0 transition-all duration-300 relative ${sidebarOpen ? "w-60" : "w-14"}`}
-        style={{ background: "#ffffff", borderRight: "1px solid #e2e6ea", boxShadow: "2px 0 8px rgba(0,0,0,0.04)" }}
+        className={`flex-shrink-0 transition-all duration-300 ${sidebarOpen ? "w-64" : "w-16"}`}
+        style={{ background: "linear-gradient(180deg, #0a1628 0%, #1a2f5e 100%)", borderRight: "1px solid rgba(255,255,255,0.08)" }}
       >
-        {/* Logo area */}
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #e8ecf0", minHeight: 52 }}>
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <div style={{ width: 28, height: 28, background: "#1c3d6e", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>AR</div>
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "#1c2b3a", lineHeight: 1.2 }}>AR Enterprises</p>
-                <p style={{ fontSize: 10, color: "#8899aa" }}>ERP V3.0</p>
-              </div>
+            <div>
+              <p className="font-bold text-sm" style={{ color: "#c9a227" }}>AR Enterprises</p>
+              <p className="text-xs text-gray-400">ERP V3.0</p>
             </div>
           )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ color: "#8899aa", fontSize: 14, background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 4 }}
-            className="hover:bg-gray-100 transition-colors">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-400 hover:text-white text-lg transition-colors">
             {sidebarOpen ? "◀" : "▶"}
           </button>
         </div>
-
-        {/* User badge */}
         {sidebarOpen && (
-          <div style={{ margin: "10px 10px 6px", padding: "8px 10px", background: "#f2f5f8", borderRadius: 8, borderLeft: "3px solid #1c3d6e" }}>
-            <p style={{ fontSize: 10, color: "#6b7c93", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>{isAdmin ? "Super Admin" : "District Manager"}</p>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#1c2b3a", marginTop: 1 }}>{user.username}</p>
-            {!isAdmin && <p style={{ fontSize: 10, color: "#8899aa" }}>{district}</p>}
+          <div className="p-3 m-3 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+            <p className="text-xs text-gray-400">{isAdmin ? "👑 Super Admin" : `🏛️ ${district}`}</p>
+            <p className="text-xs font-medium text-white truncate">{user.username}</p>
           </div>
         )}
-
-        {/* Nav items */}
-        <nav style={{ padding: "6px 8px", overflowY: "auto", maxHeight: "calc(100vh - 200px)" }}>
+        <nav className="p-2 space-y-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
           {navItems.map(n => (
             <button key={n.id} onClick={() => setPage(n.id)}
-              className="w-full flex items-center transition-all"
-              style={{
-                gap: sidebarOpen ? 10 : 0,
-                padding: sidebarOpen ? "8px 10px" : "9px 0",
-                justifyContent: sidebarOpen ? "flex-start" : "center",
-                borderRadius: 8,
-                marginBottom: 2,
-                fontSize: 13,
-                fontWeight: page === n.id ? 600 : 400,
-                color: page === n.id ? "#1c3d6e" : "#6b7c93",
-                background: page === n.id ? "#eef2f8" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderLeft: page === n.id ? "3px solid #1c3d6e" : "3px solid transparent",
-              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${page === n.id ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+              style={page === n.id ? { background: "linear-gradient(135deg, #c9a227, #f0d060)" } : {}}
             >
-              <span style={{ fontSize: 15, flexShrink: 0 }}>{n.icon}</span>
-              {sidebarOpen && <span style={{ flex: 1, textAlign: "left" }}>{n.label}</span>}
+              <span className="text-lg">{n.icon}</span>
+              {sidebarOpen && <span className="flex-1 text-left">{n.label}</span>}
               {sidebarOpen && (n as any).badge > 0 && (
-                <span style={{ background: "#e53e3e", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{(n as any).badge}</span>
+                <span className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">{(n as any).badge}</span>
               )}
             </button>
           ))}
         </nav>
-
-        {/* Logout */}
-        <div style={{ position: "absolute", bottom: 12, left: 0, right: 0, padding: "0 8px" }}>
-          <button onClick={handleLogout}
-            className="w-full flex items-center justify-center transition-all"
-            style={{ gap: 6, padding: "7px 10px", borderRadius: 8, fontSize: 12, color: "#6b7c93", background: "none", border: "1px solid #e2e6ea", cursor: "pointer" }}
-          >
-            <span>🚪</span>
-            {sidebarOpen && <span>Logout</span>}
-          </button>
-        </div>
+        {sidebarOpen && (
+          <div className="absolute bottom-4 left-0 w-64 px-3">
+            <button onClick={handleLogout} className="w-full py-2 rounded-lg text-xs text-gray-400 hover:text-white transition-all" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+              🚪 Logout
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto" style={{ display: "flex", flexDirection: "column" }}>
-
-        {/* Top Bar */}
-        <div style={{ background: "#ffffff", borderBottom: "1px solid #e2e6ea", padding: "0 24px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, color: "#8899aa" }}>AR Enterprises</span>
-            <span style={{ color: "#c8d0d8", fontSize: 10 }}>›</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#1c2b3a", textTransform: "capitalize" }}>
-              {page.split("-").join(" ")}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 11, color: "#8899aa" }}>{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
-            <div style={{ width: 30, height: 30, background: "#1c3d6e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>
-              {user.username.slice(0,2).toUpperCase()}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto" }}>
+      <div className="flex-1 overflow-y-auto">
 
         {page === "dashboard" && (
           <DashboardPage
@@ -1839,7 +1922,7 @@ export default function App() {
             storageUsed={new Blob([JSON.stringify({ vendors, transactions, bills, wallet, managedUsers, auditLogs, agents, agentWallet, agentOverrides })]).size}
           />
         )}
-        </div>
+
       </div>
     </div>
   );
@@ -1941,12 +2024,12 @@ function DashboardPage({
   };
 
   return (
-    <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:20 }}>
-      <div style={{ paddingBottom:16, borderBottom:"1px solid #e8ecf0" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">
           {isAdmin ? "📊 Master Dashboard — AR Enterprises" : `📊 ${district} Dashboard`}
         </h1>
-        <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Multi-District ERP V3.0 — Real-time Analytics</p>
+        <p className="text-sm text-gray-500">Multi-District ERP V3.0 — Real-time Analytics</p>
       </div>
 
       {/* GSTR2B Pending Bills Alert — Admin + District Manager */}
@@ -2077,26 +2160,26 @@ function DashboardPage({
 
       {/* Stats Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Total Vendors</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p>
+          <p className="text-3xl font-bold mt-2" style={{ color: "#1a2f5e" }}>{vendors.length}</p>
           <p className="text-xs text-gray-400 mt-1">Active accounts</p>
         </div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Transactions</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p>
+          <p className="text-3xl font-bold mt-2" style={{ color: "#0369a1" }}>{transactions.length}</p>
           <p className="text-xs text-gray-400 mt-1">
             <span className="text-green-600">Open: {openTxns}</span> |{" "}
             <span className="text-blue-600">Closed: {closedTxns}</span>
           </p>
         </div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Total Expected</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p>
+          <p className="text-3xl font-bold mt-2" style={{ color: "#b45309" }}>{fmt(totalExpected)}</p>
         </div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 font-medium uppercase">Bills Received</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsReceived)}</p>
+          <p className="text-3xl font-bold mt-2" style={{ color: "#15803d" }}>{fmt(totalBillsReceived)}</p>
           <p className="text-xs text-gray-400 mt-1">{bills.length} total bills</p>
         </div>
       </div>
@@ -2104,21 +2187,21 @@ function DashboardPage({
       {/* Admin Stats Row 2 */}
       {isAdmin && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div style={{ background:"#fff", borderRadius:10, padding:"16px 18px", border:"1px solid #e8ecf0", borderTop:`3px solid #7c3aed` }}>
-            <p style={{ fontSize:10, fontWeight:700, color:"#8899aa", textTransform:"uppercase", letterSpacing:"0.07em", margin:0 }}>Total GST Amount</p>
-            <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }}>{fmt(totalGST)}</p>
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 shadow-lg text-white">
+            <p className="text-xs font-medium uppercase opacity-90">Total GST Amount</p>
+            <p className="text-3xl font-bold mt-2">{fmt(totalGST)}</p>
           </div>
-          <div style={{ background:"#fff", borderRadius:10, padding:"16px 18px", border:"1px solid #e8ecf0", borderTop:`3px solid #b06010` }}>
-            <p style={{ fontSize:10, fontWeight:700, color:"#8899aa", textTransform:"uppercase", letterSpacing:"0.07em", margin:0 }}>💰 Wallet Balance</p>
-            <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }}>{fmt(walletBalance)}</p>
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 shadow-lg text-white">
+            <p className="text-xs font-medium uppercase opacity-90">💰 Wallet Balance</p>
+            <p className="text-3xl font-bold mt-2">{fmt(walletBalance)}</p>
           </div>
-          <div style={{ background:"#fff", borderRadius:10, padding:"16px 18px", border:"1px solid #e8ecf0", borderTop:`3px solid #0e6b4a` }}>
-            <p style={{ fontSize:10, fontWeight:700, color:"#8899aa", textTransform:"uppercase", letterSpacing:"0.07em", margin:0 }}>Total Profit</p>
-            <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }}>{fmt(totalProfit)}</p>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 shadow-lg text-white">
+            <p className="text-xs font-medium uppercase opacity-90">Total Profit</p>
+            <p className="text-3xl font-bold mt-2">{fmt(totalProfit)}</p>
           </div>
-          <div style={{ background:"#fff", borderRadius:10, padding:"16px 18px", border:"1px solid #e8ecf0", borderTop:`3px solid #1c3d6e` }}>
-            <p style={{ fontSize:10, fontWeight:700, color:"#8899aa", textTransform:"uppercase", letterSpacing:"0.07em", margin:0 }}>Active Districts</p>
-            <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }}>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 shadow-lg text-white">
+            <p className="text-xs font-medium uppercase opacity-90">Active Districts</p>
+            <p className="text-3xl font-bold mt-2">
               {new Set(transactions.map(t => t.district)).size}
             </p>
           </div>
@@ -2397,13 +2480,13 @@ function VendorsPage({
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>🏢 Vendor Management</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{filtered.length} vendors found</p>
+          <h1 className="text-2xl font-bold text-gray-800">🏢 Vendor Management</h1>
+          <p className="text-sm text-gray-500">{filtered.length} vendors found</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105"
-          style={{ background: "#1c3d6e", borderRadius:8, border:"none", cursor:"pointer" }}
+          style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}
         >
           + New Vendor
         </button>
@@ -2498,7 +2581,7 @@ function VendorsPage({
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>
                 {["Code","Vendor Name","Mobile","Business","District","GST No","Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
@@ -2652,11 +2735,11 @@ function TransactionsPage({
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📋 Monthly Transactions</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{filtered.length} transactions</p>
+          <h1 className="text-2xl font-bold text-gray-800">📋 Monthly Transactions</h1>
+          <p className="text-sm text-gray-500">{filtered.length} transactions</p>
         </div>
         {!isAdmin && (
-          <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white hover:scale-105 transition-all" style={{ background: "#1c3d6e", borderRadius:8, border:"none", cursor:"pointer" }}>
+          <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white hover:scale-105 transition-all" style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>
             + New Transaction
           </button>
         )}
@@ -2730,15 +2813,15 @@ function TransactionsPage({
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 uppercase font-medium">Total Expected</p>
           <p className="text-2xl font-bold text-gray-800 mt-1">{fmt(totalExpected)}</p>
         </div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 uppercase font-medium">Total GST</p>
           <p className="text-2xl font-bold text-purple-700 mt-1">{fmt(totalGST)}</p>
         </div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 uppercase font-medium">Bills Received</p>
           <p className="text-2xl font-bold text-green-700 mt-1">{fmt(totalBillsReceived)}</p>
         </div>
@@ -2748,7 +2831,7 @@ function TransactionsPage({
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>
                 {["TXN ID","Vendor","Month/FY","Expected","GST","Advance","Bills","Remaining","Status","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
@@ -2850,7 +2933,7 @@ function TransactionsPage({
               })}
             </tbody>
             {filtered.length > 0 && (
-              <tfoot style={{ background: "#eef2f8" }}>
+              <tfoot style={{ background: "#1a2f5e" }}>
                 <tr>
                   <td colSpan={3} className="px-3 py-3 font-bold text-yellow-300 text-xs">மொத்தம் ({filtered.length} transactions)</td>
                   <td className="px-3 py-3 font-bold text-yellow-300">{fmt(totalExpected)}</td>
@@ -3067,8 +3150,8 @@ function BillsPage({
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>🧾 Bill Management</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>GST = Bill×GST% | Total = Bill×1.18</p>
+          <h1 className="text-2xl font-bold text-gray-800">🧾 Bill Management</h1>
+          <p className="text-sm text-gray-500">GST = Bill×GST% | Total = Bill×1.18</p>
         </div>
         {!isAdmin && (
           <div className="flex gap-2">
@@ -3082,7 +3165,7 @@ function BillsPage({
             <button
               onClick={() => { setShowForm(!showForm); setShowBulkForm(false); }}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white hover:scale-105 transition-all"
-              style={{ background: "#1c3d6e", borderRadius:8, border:"none", cursor:"pointer" }}
+              style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}
             >
               + New Bill
             </button>
@@ -3264,16 +3347,16 @@ function BillsPage({
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}><p className="text-xs text-gray-500 uppercase font-medium">Total Bill Amount</p><p className="text-2xl font-bold text-gray-800 mt-1">{fmt(totalBillAmt)}</p></div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}><p className="text-xs text-gray-500 uppercase font-medium">Total GST</p><p className="text-2xl font-bold text-purple-700 mt-1">{fmt(totalGST)}</p></div>
-        <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}><p className="text-xs text-gray-500 uppercase font-medium">Total Amount</p><p className="text-2xl font-bold text-green-700 mt-1">{fmt(totalAmt)}</p></div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><p className="text-xs text-gray-500 uppercase font-medium">Total Bill Amount</p><p className="text-2xl font-bold text-gray-800 mt-1">{fmt(totalBillAmt)}</p></div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><p className="text-xs text-gray-500 uppercase font-medium">Total GST</p><p className="text-2xl font-bold text-purple-700 mt-1">{fmt(totalGST)}</p></div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><p className="text-xs text-gray-500 uppercase font-medium">Total Amount</p><p className="text-2xl font-bold text-green-700 mt-1">{fmt(totalAmt)}</p></div>
       </div>
 
       {/* Bills Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>
                 {["Bill ID","TXN ID","Vendor","Bill Number","Date","Bill Amt","GST%","GST தொகை","Total","Actions"].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>
@@ -3372,7 +3455,7 @@ function BillsPage({
               })}
             </tbody>
             {filtered.length > 0 && (
-              <tfoot style={{ background: "#eef2f8" }}>
+              <tfoot style={{ background: "#1a2f5e" }}>
                 <tr>
                   <td colSpan={5} className="px-3 py-3 font-bold text-yellow-300 text-xs">மொத்தம் ({filtered.length} bills)</td>
                   <td className="px-3 py-3 font-bold text-yellow-300">{fmt(totalBillAmt)}</td>
@@ -3495,8 +3578,8 @@ function WalletPage({
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>💰 Admin Main Wallet</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Central finance management</p>
+          <h1 className="text-2xl font-bold text-gray-800">💰 Admin Main Wallet</h1>
+          <p className="text-sm text-gray-500">Central finance management</p>
         </div>
         <div className="flex gap-2">
           <button onClick={exportCSV} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50">📥 Export CSV</button>
@@ -3505,7 +3588,7 @@ function WalletPage({
       </div>
 
       {/* Balance Card */}
-      <div className="rounded-xl p-6 text-white" style={{ background: "#1c3d6e" }}>
+      <div className="rounded-xl p-6 text-white" style={{ background: "linear-gradient(135deg, #0a1628, #1a2f5e)" }}>
         <p className="text-sm text-gray-300">Current Wallet Balance</p>
         <p className="text-5xl font-bold mt-2" style={{ color: "#f0d060" }}>{fmt(balance)}</p>
         <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-white/10">
@@ -3528,8 +3611,8 @@ function WalletPage({
         <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-amber-200 space-y-4">
           <h2 className="font-bold text-gray-800 text-lg">✏️ Wallet Edit / Manual Entry</h2>
           <div className="flex gap-2">
-            <button onClick={() => setEditMode("set")} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${editMode === "set" ? "text-white" : "text-gray-600 border-2 border-gray-300"}`} style={editMode === "set" ? { background: "#1c3d6e", color: "#fff" } : {}}>🏦 Balance மாற்று</button>
-            <button onClick={() => setEditMode("manual")} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${editMode === "manual" ? "text-white" : "text-gray-600 border-2 border-gray-300"}`} style={editMode === "manual" ? { background: "#1c3d6e", color: "#fff" } : {}}>➕ Manual Entry</button>
+            <button onClick={() => setEditMode("set")} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${editMode === "set" ? "text-white" : "text-gray-600 border-2 border-gray-300"}`} style={editMode === "set" ? { background: "#1a2f5e" } : {}}>🏦 Balance மாற்று</button>
+            <button onClick={() => setEditMode("manual")} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${editMode === "manual" ? "text-white" : "text-gray-600 border-2 border-gray-300"}`} style={editMode === "manual" ? { background: "#1a2f5e" } : {}}>➕ Manual Entry</button>
           </div>
           {editMode === "set" ? (
             <div className="space-y-3">
@@ -3569,7 +3652,7 @@ function WalletPage({
         <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">📒 Wallet Ledger</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>
                 {["Date","Description","Type","Debit (−)","Credit (+)","Balance"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
@@ -3652,18 +3735,18 @@ function AnalyticsPage({
   };
 
   return (
-    <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", gap:20 }}>
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📈 Reports & Analytics</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Master financial overview — All districts</p>
+          <h1 className="text-2xl font-bold text-gray-800">📈 Reports & Analytics</h1>
+          <p className="text-sm text-gray-500">Master financial overview — All districts</p>
         </div>
         <button onClick={exportCSV} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50">📥 Export District Report</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Expected",    value: fmt(totalExpected),  color: "#1c3d6e" },
+          { label: "Total Expected",    value: fmt(totalExpected),  color: "#1a2f5e" },
           { label: "Bills Received",    value: fmt(totalBillsAmt),  color: "#15803d" },
           { label: "Total GST",         value: fmt(totalGST),       color: "#7c3aed" },
           { label: "8% Profit Earned",  value: fmt(totalProfit),    color: "#b45309" },
@@ -3690,7 +3773,7 @@ function AnalyticsPage({
                 return (
                   <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full rounded-t-lg transition-all hover:opacity-80"
-                      style={{ height: `${h}%`, background: "#1c3d6e", minHeight: "10px" }}
+                      style={{ height: `${h}%`, background: "linear-gradient(180deg, #1a2f5e, #2a4f9e)", minHeight: "10px" }}
                       title={`${m.month}: ${fmt(m.expected)}`}
                     />
                     <p className="text-xs text-gray-500 truncate w-full text-center">{m.month.slice(0,3)}</p>
@@ -3706,7 +3789,7 @@ function AnalyticsPage({
         <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">🏛️ District-wise Summary</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>{["#","District","Txns","Expected ₹","GST Amt","Bills ₹","Profit","Closed"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -3728,7 +3811,6 @@ function AnalyticsPage({
         </div>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -3747,16 +3829,16 @@ function ReportsPage({
   const pendingTxns    = transactions.filter(t => t.status === "PendingClose").length;
 
   return (
-    <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:20 }}>
-      <div style={{ paddingBottom:16, borderBottom:"1px solid #e8ecf0" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📄 {district} — Reports</h1>
-        <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>District performance overview</p>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">📄 {district} — Reports</h1>
+        <p className="text-sm text-gray-500">District performance overview</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsAmt)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p className="text-3xl font-bold mt-2" style={{ color: "#1a2f5e" }}>{vendors.length}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p className="text-3xl font-bold mt-2" style={{ color: "#0369a1" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p className="text-3xl font-bold mt-2" style={{ color: "#b45309" }}>{fmt(totalExpected)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p className="text-3xl font-bold mt-2" style={{ color: "#15803d" }}>{fmt(totalBillsAmt)}</p></div>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">📆 Monthly Summary</h2></div>
@@ -3829,8 +3911,8 @@ function UserManagementPage({
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div><h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>👥 User Management</h1><p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>District user accounts</p></div>
-        <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white hover:scale-105 transition-all" style={{ background: "#1c3d6e", borderRadius:8, border:"none", cursor:"pointer" }}>+ New User</button>
+        <div><h1 className="text-2xl font-bold text-gray-800">👥 User Management</h1><p className="text-sm text-gray-500">District user accounts</p></div>
+        <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white hover:scale-105 transition-all" style={{ background: "linear-gradient(135deg, #1a2f5e, #2a4f9e)" }}>+ New User</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -3872,7 +3954,7 @@ function UserManagementPage({
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>{["#","Username","District","Password","Status","Created","Actions"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -3967,10 +4049,10 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
 
   return (
     <div className="p-6 space-y-4">
-      <div><h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📜 Audit Logs</h1><p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Complete activity trail — {filtered.length} entries</p></div>
+      <div><h1 className="text-2xl font-bold text-gray-800">📜 Audit Logs</h1><p className="text-sm text-gray-500">Complete activity trail — {filtered.length} entries</p></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Actions", value: logs.length, color: "#1c3d6e" },
+          { label: "Total Actions", value: logs.length, color: "#1a2f5e" },
           { label: "Creates",       value: logs.filter(l => l.action === "CREATE").length, color: "#16a34a" },
           { label: "Updates",       value: logs.filter(l => l.action === "UPDATE").length, color: "#0369a1" },
           { label: "Deletes",       value: logs.filter(l => l.action === "DELETE").length, color: "#dc2626" },
@@ -3997,7 +4079,7 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f2f5f8" }}>
+            <thead style={{ background: "#0a1628" }}>
               <tr>{["Timestamp","User","Action","Entity","Entity ID"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -4016,15 +4098,15 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
         </div>
         {totalPages > 1 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between">
-            <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Page {currentPage} of {totalPages}</p>
+            <p className="text-sm text-gray-500">Page {currentPage} of {totalPages}</p>
             <div className="flex gap-2">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 rounded text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50">← Prev</button>
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 rounded text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50">Next →</button>
             </div>
           </div>
         )}
-        </div>
       </div>
+    </div>
   );
 }
 
@@ -4117,7 +4199,7 @@ function AdminAgentsPage({
           <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50">← Back</button>
           <div>
             <h1 className="text-xl font-bold text-gray-800">🤝 {selectedAgent.fullName}</h1>
-            <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{selectedAgent.agentId} | {selectedAgent.managerDistrict} | {selectedAgent.mobile}</p>
+            <p className="text-sm text-gray-500">{selectedAgent.agentId} | {selectedAgent.managerDistrict} | {selectedAgent.mobile}</p>
           </div>
           <span className={`ml-auto px-3 py-1 rounded-full text-xs font-bold ${selectedAgent.status === "approved" ? "bg-green-100 text-green-700" : selectedAgent.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
             {selectedAgent.status.toUpperCase()}
@@ -4148,7 +4230,7 @@ function AdminAgentsPage({
                 Type: <strong>{selectedAgent.commissionType === "custom" ? `Custom — ${selectedAgent.customCommissionPercent}%` : "Auto (Slab)"}</strong>
               </p>
             </div>
-            <button onClick={() => { setEditCommAgent(selectedAgent); setEditCommType(selectedAgent.commissionType); setEditCommPct(String(selectedAgent.customCommissionPercent)); }} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#eef2f8" }}>✏️ மாற்று</button>
+            <button onClick={() => { setEditCommAgent(selectedAgent); setEditCommType(selectedAgent.commissionType); setEditCommPct(String(selectedAgent.customCommissionPercent)); }} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#1a2f5e" }}>✏️ மாற்று</button>
           </div>
         </div>
 
@@ -4162,10 +4244,10 @@ function AdminAgentsPage({
         </div>
 
         {detailTab === "txns" && (
-          <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead style={{ background: "#f2f5f8" }}>
+                <thead style={{ background: "#0a1628" }}>
                   <tr>{["TXN ID","Vendor","District","Amount","GST%","Commission","Status"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -4191,10 +4273,10 @@ function AdminAgentsPage({
         )}
 
         {detailTab === "wallet" && (
-          <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead style={{ background: "#f2f5f8" }}>
+                <thead style={{ background: "#0a1628" }}>
                   <tr>{["Date","Vendor","TXN","Txn Amt","GST%","Commission%","Commission","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -4222,10 +4304,10 @@ function AdminAgentsPage({
             <div className="flex justify-end">
               <button onClick={() => setShowOverrideModal(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#7c3aed" }}>+ Custom Override சேர்</button>
             </div>
-            <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead style={{ background: "#f2f5f8" }}>
+                  <thead style={{ background: "#0a1628" }}>
                     <tr>{["Vendor Code","Vendor Name","Commission%","Set By","Set At","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -4341,8 +4423,8 @@ function AdminAgentsPage({
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>🤝 Agent Management</h1>
-          <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{approved.length} active agents | {pending.length} pending approval</p>
+          <h1 className="text-2xl font-bold text-gray-800">🤝 Agent Management</h1>
+          <p className="text-sm text-gray-500">{approved.length} active agents | {pending.length} pending approval</p>
         </div>
         {pending.length > 0 && (
           <span className="px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-bold animate-pulse">
@@ -4369,7 +4451,7 @@ function AdminAgentsPage({
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
                   <p className="font-bold text-gray-800 text-lg">{agent.fullName}</p>
-                  <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{agent.agentId} | {agent.mobile}</p>
+                  <p className="text-sm text-gray-500">{agent.agentId} | {agent.mobile}</p>
                   <p className="text-sm text-gray-500 mt-1">
                     Manager: <strong>{agent.managerName}</strong> ({agent.managerDistrict})
                   </p>
@@ -4413,10 +4495,10 @@ function AdminAgentsPage({
 
       {/* Agents List */}
       {tab === "list" && (
-        <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead style={{ background: "#f2f5f8" }}>
+              <thead style={{ background: "#0a1628" }}>
                 <tr>{["Agent","Manager","District","Commission","Wallet","Transactions","Status","Actions"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -4472,7 +4554,7 @@ function AdminAgentsPage({
             <button
               onClick={() => setEditSlabs(prev => [...prev, { gstPercent: 0, agentCommission: 0 }])}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "#1c3d6e", color:"#fff", borderRadius:8, border:"none", cursor:"pointer" }}
+              style={{ background: "#1a2f5e" }}
             >
               + Row சேர்
             </button>
@@ -4480,7 +4562,7 @@ function AdminAgentsPage({
 
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-sm">
-              <thead style={{ background: "#eef2f8" }}>
+              <thead style={{ background: "#1a2f5e" }}>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">GST %</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">Agent Commission %</th>
@@ -4597,11 +4679,11 @@ function AgentDashboardPage({
     <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5" }}>
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0" style={{ background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)" }}>
-        <div className="p-4 border-b" style={{ borderColor: "#e2e6ea" }}>
+        <div className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <p className="font-bold text-sm" style={{ color: "#f0d060" }}>AR Enterprises</p>
           <p className="text-xs text-gray-400">Agent Portal</p>
         </div>
-        <div style={{ margin:"10px 10px 6px", padding:"8px 10px", background:"#f2f5f8", borderRadius:8, borderLeft:"3px solid #1c3d6e" }}>
+        <div className="p-3 m-3 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
           <p className="text-xs text-gray-400">🤝 Agent</p>
           <p className="text-xs font-bold text-white truncate">{agent.fullName}</p>
           <p className="text-xs text-green-400 mt-1">💰 {fmt(agent.commissionBalance)}</p>
@@ -4609,7 +4691,7 @@ function AgentDashboardPage({
         <nav className="p-2 space-y-1">
           {navItems.map(n => (
             <button key={n.id} onClick={() => setPage(n.id)}
-              style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:8, marginBottom:2, fontSize:13, fontWeight:page===n.id?600:400, color:page===n.id?"#1c3d6e":"#6b7c93", background:page===n.id?"#eef2f8":"transparent", border:"none", cursor:"pointer", borderLeft:page===n.id?"3px solid #1c3d6e":"3px solid transparent", width:"100%" }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${page === n.id ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
               style={page === n.id ? { background: "linear-gradient(135deg, #f0d060, #c9a227)" } : {}}
             >
               <span>{n.icon}</span><span>{n.label}</span>
@@ -4617,7 +4699,7 @@ function AgentDashboardPage({
           ))}
         </nav>
         <div className="absolute bottom-4 left-0 w-56 px-3">
-          <button onClick={onLogout} style={{ width:"100%", padding:"7px 10px", borderRadius:8, fontSize:12, color:"#6b7c93", background:"none", border:"1px solid #e2e6ea", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🚪 Logout</button>
+          <button onClick={onLogout} className="w-full py-2 rounded-lg text-xs text-gray-400 hover:text-white transition-all" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>🚪 Logout</button>
         </div>
       </div>
 
@@ -4635,10 +4717,10 @@ function AgentDashboardPage({
 
         {/* Dashboard */}
         {page === "dashboard" && (
-          <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", gap:20 }}>
+          <div className="p-6 space-y-6">
             <div>
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>👋 வணக்கம், {agent.fullName}!</h1>
-              <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{agent.agentId} | Manager: {agent.managerName} ({agent.managerDistrict})</p>
+              <h1 className="text-2xl font-bold text-gray-800">👋 வணக்கம், {agent.fullName}!</h1>
+              <p className="text-sm text-gray-500">{agent.agentId} | Manager: {agent.managerName} ({agent.managerDistrict})</p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -4648,7 +4730,7 @@ function AgentDashboardPage({
                 { label: "Commission Earned",value: fmt(round2(totalCommission)), color: "#15803d" },
                 { label: "Wallet Balance",   value: fmt(agent.commissionBalance), color: "#7c3aed" },
               ].map(s => (
-                <div key={s.label} style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
+                <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
                   <p className="text-xs text-gray-500 uppercase font-medium">{s.label}</p>
                   <p className="text-2xl font-bold mt-2" style={{ color: s.color }}>{s.value}</p>
                 </div>
@@ -4681,7 +4763,7 @@ function AgentDashboardPage({
             </div>
 
             {/* Recent transactions */}
-            <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">Recent Transactions</h2></div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -4718,7 +4800,7 @@ function AgentDashboardPage({
         {/* Wallet Page */}
         {page === "wallet" && (
           <div className="p-6 space-y-4">
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>💰 My Commission Wallet</h1>
+            <h1 className="text-2xl font-bold text-gray-800">💰 My Commission Wallet</h1>
 
             <div className="rounded-xl p-6 text-white" style={{ background: "linear-gradient(135deg, #1a1a2e, #16213e)" }}>
               <p className="text-sm text-gray-300">Current Balance</p>
@@ -4737,7 +4819,7 @@ function AgentDashboardPage({
               {walletMonth && <button onClick={() => setWalletMonth("")} className="text-xs text-gray-400 hover:text-gray-600">Clear ✕</button>}
             </div>
 
-            <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead style={{ background: "#1a1a2e" }}>
@@ -4962,7 +5044,7 @@ function VendorDashboardPage({
   return (
     <div
       className="min-h-screen"
-      style={{ background: "#f4f6f9", fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+      style={{ background: "#f0f2f5", fontFamily: "'Segoe UI', sans-serif" }}
     >
       {/* Header */}
       <div
@@ -4983,7 +5065,7 @@ function VendorDashboardPage({
         </button>
       </div>
 
-      <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", gap:20 }}>
+      <div className="p-6 space-y-6">
 
         {/* Welcome */}
         <div>
@@ -5057,19 +5139,19 @@ function VendorDashboardPage({
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 uppercase font-medium">Total Transactions</p>
             <p className="text-3xl font-bold mt-2 text-blue-700">{filtered.length}</p>
             <p className="text-xs text-gray-400 mt-1">
               Open: {openCount} | Pending: {pendingCount} | Closed: {closedCount}
             </p>
           </div>
-          <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 uppercase font-medium">Expected Amount</p>
             <p className="text-2xl font-bold mt-2 text-gray-800">{fmt(totalExpected)}</p>
             <p className="text-xs text-gray-400 mt-1">Advance: {fmt(totalAdvance)}</p>
           </div>
-          <div style={{ background:"#fff", borderRadius:10, padding:"14px 16px", border:"1px solid #e8ecf0" }}>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 uppercase font-medium">Bills Submitted</p>
             <p className="text-2xl font-bold mt-2 text-green-700">{fmt(totalBillsAmt)}</p>
             <p className="text-xs text-gray-400 mt-1">{filteredBills.length} bills total</p>
@@ -5213,8 +5295,8 @@ function SettingsPage({
   };
 
   return (
-    <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", gap:20 }}>
-      <div><h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>⚙️ Settings</h1><p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>App configuration & data management</p></div>
+    <div className="p-6 space-y-6">
+      <div><h1 className="text-2xl font-bold text-gray-800">⚙️ Settings</h1><p className="text-sm text-gray-500">App configuration & data management</p></div>
 
       {/* Backup & Restore */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 space-y-4">
@@ -5281,7 +5363,6 @@ function SettingsPage({
         <button onClick={() => { onUpdateSettings(localSettings); alert("✅ Settings saved!"); }} className="px-8 py-3 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all" style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}>💾 Save Settings</button>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -5337,13 +5418,13 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
   const notSetup = WORK_TRACKER_SHEET_URL === "PASTE_IFRAME_URL_HERE";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f4f6f9", fontFamily: "'Segoe UI', sans-serif", display: "flex", flexDirection: "column" as const }}>
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI', sans-serif", display: "flex", flexDirection: "column" as const }}>
 
       {/* Header */}
       <div style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <button onClick={onBack}
-            style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", padding:"6px 14px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontWeight:600 }}>
+            style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>
             ← Back to ERP
           </button>
           <div>
@@ -5357,7 +5438,7 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
             href={`https://docs.google.com/spreadsheets/d/${SHEET_BASE_ID}/edit`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ background: "#e8ecf0", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}
+            style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}
           >
             ↗️ Open in Sheets
           </a>
@@ -5365,7 +5446,7 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ background: "#ffffff", borderBottom: "1px solid #334155", padding: "0 20px", display: "flex", gap: "2px", overflowX: "auto" as const, flexShrink: 0 }}>
+      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: "0 20px", display: "flex", gap: "2px", overflowX: "auto" as const, flexShrink: 0 }}>
         {SHEET_TABS.map(tab => (
           <button
             key={tab.id}
@@ -5374,7 +5455,7 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
               padding: "10px 14px",
               border: "none",
               background: "transparent",
-              color: activeTab === tab.id ? "#93c5fd" : "#6b7c93",
+              color: activeTab === tab.id ? "#93c5fd" : "#64748b",
               fontWeight: activeTab === tab.id ? 700 : 500,
               fontSize: "12px",
               cursor: "pointer",
@@ -5406,7 +5487,7 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
         {isLoading && (
           <div style={{
             position: "absolute" as const, inset: 0,
-            background: "#f4f6f9",
+            background: "#0f172a",
             display: "flex", flexDirection: "column" as const,
             alignItems: "center", justifyContent: "center",
             zIndex: 10
@@ -6087,7 +6168,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     };
 
     // DD/MM/YYYY or DD-MM-YYYY (Indian format — day first)
-    const m1 = s.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
+    const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
     if (m1) {
       const day = +m1[1], month = +m1[2], year = +m1[3];
       if (day >= 1 && day <= 31 && month >= 1 && month <= 12)
@@ -6114,7 +6195,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     if (m4) return new Date(+m4[1], +m4[2]-1, +m4[3]);
 
     // DD/MM/YY short (Bank Statement — MM/DD/YY handled separately in bank loop)
-    const m5 = s.match(new RegExp('^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2})$'));
+    const m5 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
     if (m5) {
       // Try DD/MM/YY first (Indian)
       const d = +m5[1], mo = +m5[2], yr = 2000 + +m5[3];
@@ -6286,8 +6367,8 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         const dateVal = r[1];
         if (!dateVal || dateVal.length < 5) continue;
         let parsedDate: Date | null = null;
-        const sd = dateVal.match(new RegExp('^(\\d{2})\\/(\\d{2})\\/(\\d{2})$'));
-        const ld = dateVal.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
+        const sd = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+        const ld = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
         if (sd) parsedDate = new Date(2000 + +sd[3], +sd[1] - 1, +sd[2]);
         else if (ld) parsedDate = new Date(+ld[3], +ld[2] - 1, +ld[1]);
         if (!parsedDate || isNaN(parsedDate.getTime())) continue;
@@ -6418,28 +6499,28 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
   const matchedAmt = matched.reduce((s, r) => s + (r.contractAmt||0), 0);
 
   const cardStyle = (color: string) => ({
-    background: "#ffffff", borderRadius: "12px", padding: "18px",
+    background: "#1e293b", borderRadius: "12px", padding: "18px",
     border: `1px solid #334155`, position: "relative" as const, overflow: "hidden" as const
   });
 
   const tabBtn = (id: typeof activeTab, label: string, count: number, color: string) => (
     <button key={id} onClick={() => setActiveTab(id)} style={{
       padding: "8px 16px", border: "none", background: "transparent",
-      color: activeTab === id ? color : "#6b7c93",
+      color: activeTab === id ? color : "#64748b",
       fontWeight: activeTab === id ? 700 : 500, fontSize: "13px",
       cursor: "pointer", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent",
       whiteSpace: "nowrap" as const, transition: "all 0.2s"
     }}>
-      {label} <span style={{ background: activeTab===id?color:"#e2e6ea", color: activeTab===id?"#fff":"#6b7c93", padding: "1px 6px", borderRadius: "10px", fontSize: "11px", marginLeft: "4px" }}>{count}</span>
+      {label} <span style={{ background: activeTab===id?color:"#334155", color: activeTab===id?"#fff":"#94a3b8", padding: "1px 6px", borderRadius: "10px", fontSize: "11px", marginLeft: "4px" }}>{count}</span>
     </button>
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f4f6f9", fontFamily: "'Segoe UI', sans-serif", color: "#1c2b3a" }}>
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Segoe UI', sans-serif", color: "#f1f5f9" }}>
       {/* Header */}
       <div style={{ background: "linear-gradient(135deg, #1e3a5f, #1d4ed8)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <button onClick={onBack} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", padding:"6px 14px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontWeight:600 }}>
+          <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>
             ← Back
           </button>
           <div>
@@ -6448,7 +6529,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
           </div>
         </div>
         <button onClick={runReconciliation} disabled={loading} style={{
-          background: loading ? "#e2e6ea" : "linear-gradient(135deg, #10b981, #059669)",
+          background: loading ? "#334155" : "linear-gradient(135deg, #10b981, #059669)",
           border: "none", color: "#fff", padding: "8px 20px", borderRadius: "8px",
           cursor: loading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 700
         }}>
@@ -6460,8 +6541,8 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         {!loaded && !loading && (
           <div style={{ textAlign: "center" as const, padding: "60px 20px" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔄</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1c2b3a", marginBottom: "8px" }}>Bank Reconciliation Tool</div>
-            <div style={{ fontSize: "13px", color: "#6b7c93", marginBottom: "24px", maxWidth: "500px", margin: "0 auto 24px", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#f1f5f9", marginBottom: "8px" }}>Bank Reconciliation Tool</div>
+            <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "24px", maxWidth: "500px", margin: "0 auto 24px", lineHeight: 1.6 }}>
               Contract Work sheets-ல் உள்ள Receipt Amount-ஐ Bank Statement Credits-உடன் தானாகவே match செய்யும்.
               ✅ Exact match (Date + Amount) &nbsp; ⚠️ Partial (Amount only) &nbsp; ❌ Unmatched
             </div>
@@ -6493,7 +6574,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
               ].map(s => (
                 <div key={s.label} style={cardStyle(s.color)}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: s.color }}></div>
-                  <div style={{ fontSize: "11px", color: "#6b7c93", fontWeight: 600, textTransform: "uppercase" as const }}>{s.label}</div>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, textTransform: "uppercase" as const }}>{s.label}</div>
                   <div style={{ fontSize: "28px", fontWeight: 800, color: s.color, marginTop: "4px" }}>{s.value}</div>
                   <div style={{ fontSize: "11px", color: "#475569", marginTop: "2px" }}>{s.sub}</div>
                 </div>
@@ -6501,12 +6582,12 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Match % bar */}
-            <div style={{ background: "#ffffff", borderRadius: "10px", padding: "14px 18px", marginBottom: "20px", border: "1px solid #334155" }}>
+            <div style={{ background: "#1e293b", borderRadius: "10px", padding: "14px 18px", marginBottom: "20px", border: "1px solid #334155" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600 }}>Overall Match Rate</span>
                 <span style={{ fontWeight: 800, color: matchPct > 80 ? "#10b981" : matchPct > 50 ? "#f59e0b" : "#ef4444" }}>{matchPct}%</span>
               </div>
-              <div style={{ background: "#f4f6f9", borderRadius: "4px", height: "12px" }}>
+              <div style={{ background: "#0f172a", borderRadius: "4px", height: "12px" }}>
                 <div style={{ height: "100%", borderRadius: "4px", width: matchPct + "%", background: matchPct > 80 ? "#10b981" : matchPct > 50 ? "#f59e0b" : "#ef4444", transition: "width 1s" }}></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "11px", color: "#475569" }}>
@@ -6517,7 +6598,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Tabs */}
-            <div style={{ background: "#ffffff", borderBottom: "1px solid #334155", display: "flex", gap: "2px", overflowX: "auto" as const, marginBottom: "16px", borderRadius: "10px 10px 0 0" }}>
+            <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", display: "flex", gap: "2px", overflowX: "auto" as const, marginBottom: "16px", borderRadius: "10px 10px 0 0" }}>
               {tabBtn("summary",   "📊 Summary",   results.length, "#3b82f6")}
               {tabBtn("matched",   "✅ Matched",   matched.length, "#10b981")}
               {tabBtn("unmatched", "❌ Unmatched", unmatched.length, "#ef4444")}
@@ -6525,16 +6606,16 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Table */}
-            <div style={{ background: "#ffffff", borderRadius: "0 0 12px 12px", border: "1px solid #334155", overflow: "hidden" }}>
+            <div style={{ background: "#1e293b", borderRadius: "0 0 12px 12px", border: "1px solid #334155", overflow: "hidden" }}>
               <div style={{ overflowX: "auto" as const }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "12px" }}>
                   <thead>
-                    <tr style={{ background: "#f4f6f9" }}>
+                    <tr style={{ background: "#0f172a" }}>
                       {(activeTab !== "bank" ? [
                         "Status", "Work Name", "Sheet", "Contract Date", "Bank Date",
                         "Contract Amt", "Bank Credit", "Diff", "Bank Description"
                       ] : ["Date", "Description", "Credit Amount"]).map((h: string) => (
-                        <th key={h} style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "11px", color: "#6b7c93", fontWeight: 700, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -6553,21 +6634,21 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
                               {r.status==="MATCHED"?"✅":r.status==="PARTIAL"?"⚠️":"❌"} {r.status}
                             </span>
                           </td>
-                          <td style={{ padding: "8px 12px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, fontWeight: 600, color: "#1c2b3a" }}>{r.workName || "—"}</td>
-                          <td style={{ padding: "8px 12px", color: "#6b7c93", fontSize: "11px", whiteSpace: "nowrap" as const }}>{r.sheet?.replace("Contract work ","")?.replace("Contract Work ","")}</td>
-                          <td style={{ padding: "8px 12px", color: "#6b7c93", whiteSpace: "nowrap" as const }}>{r.contractDate || "—"}</td>
+                          <td style={{ padding: "8px 12px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, fontWeight: 600, color: "#f1f5f9" }}>{r.workName || "—"}</td>
+                          <td style={{ padding: "8px 12px", color: "#64748b", fontSize: "11px", whiteSpace: "nowrap" as const }}>{r.sheet?.replace("Contract work ","")?.replace("Contract Work ","")}</td>
+                          <td style={{ padding: "8px 12px", color: "#94a3b8", whiteSpace: "nowrap" as const }}>{r.contractDate || "—"}</td>
                           <td style={{ padding: "8px 12px", color: r.bankDate ? "#93c5fd" : "#ef4444", whiteSpace: "nowrap" as const }}>{r.bankDate || "❌ None"}</td>
-                          <td style={{ padding: "8px 12px", fontWeight: 700, color: "#1c2b3a", whiteSpace: "nowrap" as const }}>{fmtR(r.contractAmt)}</td>
+                          <td style={{ padding: "8px 12px", fontWeight: 700, color: "#f1f5f9", whiteSpace: "nowrap" as const }}>{fmtR(r.contractAmt)}</td>
                           <td style={{ padding: "8px 12px", fontWeight: 700, color: r.bankAmt ? "#10b981" : "#475569", whiteSpace: "nowrap" as const }}>{r.bankAmt ? fmtR(r.bankAmt) : "—"}</td>
                           <td style={{ padding: "8px 12px", color: r.diff < 2 ? "#10b981" : "#f59e0b", whiteSpace: "nowrap" as const }}>{r.diff < 2 ? "✓" : fmtR(r.diff)}</td>
-                          <td style={{ padding: "8px 12px", color: "#6b7c93", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{r.bankDesc || "—"}</td>
+                          <td style={{ padding: "8px 12px", color: "#64748b", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{r.bankDesc || "—"}</td>
                         </tr>
                       ))
                     ) : (
                       unmatchedBank.map((b: any, i: number) => (
                         <tr key={i} style={{ borderBottom: "1px solid #1a2942" }}>
                           <td style={{ padding: "8px 12px", color: "#f59e0b", whiteSpace: "nowrap" as const }}>{b.dateStr}</td>
-                          <td style={{ padding: "8px 12px", color: "#1c2b3a", fontWeight: 600 }}>{b.description}</td>
+                          <td style={{ padding: "8px 12px", color: "#f1f5f9", fontWeight: 600 }}>{b.description}</td>
                           <td style={{ padding: "8px 12px", fontWeight: 700, color: "#10b981", whiteSpace: "nowrap" as const }}>{fmtR(b.credit)}</td>
                         </tr>
                       ))

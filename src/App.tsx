@@ -283,7 +283,7 @@ function parseTamilDate(dateStr: string): Date | null {
   const m = dateStr.match(pattern);
   if (m) {
     const day = parseInt(m[1]);
-    const monStr = m[2].replace(/\./g,'').toLowerCase().trim();
+    const monStr = m[2].replace(new RegExp('\\.','g'),'').toLowerCase().trim();
     const yr = parseInt(m[3]);
     const year = yr < 100 ? 2000 + yr : yr;
     const monKey = Object.keys(tamilMonths).find(k => monStr.startsWith(k) || k.startsWith(monStr.substring(0,3)));
@@ -740,10 +740,10 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
       const c = lines[i].split("\t").map(x=>x.trim());
       if (c.length < 4) continue;
       rows.push({ gstin:c[0]||"", tradeName:c[1]||"", invoiceNo:c[2]||"", invoiceDate:c[3]||"",
-        taxableValue:parseFloat((c[4]||"").replace(/[^0-9.]/g,""))||0,
-        igst:parseFloat((c[5]||"").replace(/[^0-9.]/g,""))||0,
-        cgst:parseFloat((c[6]||"").replace(/[^0-9.]/g,""))||0,
-        sgst:parseFloat((c[7]||"").replace(/[^0-9.]/g,""))||0 });
+        taxableValue:parseFloat((c[4]||"").replace(new RegExp("[^0-9.]","g"),""))||0,
+        igst:parseFloat((c[5]||"").replace(new RegExp("[^0-9.]","g"),""))||0,
+        cgst:parseFloat((c[6]||"").replace(new RegExp("[^0-9.]","g"),""))||0,
+        sgst:parseFloat((c[7]||"").replace(new RegExp("[^0-9.]","g"),""))||0 });
     }
     setParsed(rows); setMsg(`✅ ${rows.length} rows parsed`);
   };
@@ -6067,8 +6067,8 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     if (!val && val !== 0) return 0;
     if (typeof val === "number") return Math.abs(val);
     const s = String(val)
-      .replace(/[$₹₹,\s#\x00-\x1f\x7f]/g, "") // remove $, ₹, commas, spaces, control chars
-      .replace(/[^0-9.-]/g, "")                        // keep only digits, dot, minus
+      .replace(new RegExp("[$₹,\\s#]","g"), "") // remove $, ₹, commas, spaces, control chars
+      .replace(new RegExp("[^0-9.-]","g"), "")          // keep only digits, dot, minus
       .trim();
     if (!s) return 0;
     const n = parseFloat(s);
@@ -6078,7 +6078,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
   // Parse date string — handles multiple formats
   const parseDate = (val: any): Date | null => {
     if (!val) return null;
-    const s = String(val).trim().replace(/"/g, "");
+    const s = String(val).trim().replace(new RegExp('"', "g"), "");
     if (!s || s === "-" || s === "" || s === "null") return null;
 
     const MONTHS: Record<string,number> = {
@@ -6087,7 +6087,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     };
 
     // DD/MM/YYYY or DD-MM-YYYY (Indian format — day first)
-    const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    const m1 = s.match(new RegExp("^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$"));
     if (m1) {
       const day = +m1[1], month = +m1[2], year = +m1[3];
       if (day >= 1 && day <= 31 && month >= 1 && month <= 12)
@@ -6095,7 +6095,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     }
 
     // DD-Mon-YYYY or DD-Mon-YY (e.g. 08-Apr-2025 or 08-Apr-25)
-    const m2 = s.match(/^(\d{1,2})[- ]([A-Za-z]{3})[- ]?(\d{2,4})$/);
+    const m2 = s.match(new RegExp("^(\\d{1,2})[- ]([A-Za-z]{3})[- ]?(\\d{2,4})$"));
     if (m2) {
       const mon = MONTHS[m2[2].toLowerCase()];
       const year = +m2[3] < 100 ? 2000 + +m2[3] : +m2[3];
@@ -6103,18 +6103,18 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
     }
 
     // Mon-DD-YYYY or Mon DD, YYYY (e.g. Apr-08-2025)
-    const m3 = s.match(/^([A-Za-z]{3})[- ](\d{1,2})[ ,]*(\d{4})$/);
+    const m3 = s.match(new RegExp("^([A-Za-z]{3})[- ](\\d{1,2})[ ,]*(\\d{4})$"));
     if (m3) {
       const mon = MONTHS[m3[1].toLowerCase()];
       if (mon !== undefined) return new Date(+m3[3], mon, +m3[2]);
     }
 
     // YYYY-MM-DD (ISO format)
-    const m4 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const m4 = s.match(new RegExp("^(\\d{4})-(\\d{2})-(\\d{2})$"));
     if (m4) return new Date(+m4[1], +m4[2]-1, +m4[3]);
 
     // DD/MM/YY short (Bank Statement — MM/DD/YY handled separately in bank loop)
-    const m5 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    const m5 = s.match(new RegExp("^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2})$"));
     if (m5) {
       // Try DD/MM/YY first (Indian)
       const d = +m5[1], mo = +m5[2], yr = 2000 + +m5[3];
@@ -6164,7 +6164,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
         for (let i = 0; i < Math.min(5, rows.length); i++) {
           if (rows[i].some(c => c.toLowerCase().includes("receipt"))) { hRow = i; break; }
         }
-        const headers = rows[hRow].map(h => h.toLowerCase().replace(/["\s]/g, ""));
+        const headers = rows[hRow].map(h => h.toLowerCase().replace(new RegExp('["\\s]', "g"), ""));
         const col = (k: string) => headers.findIndex(h => h.includes(k));
         const workCol    = col("workname") !== -1 ? col("workname") : col("works") !== -1 ? col("works") : 1;
         const amtCol     = col("receiptamount") !== -1 ? col("receiptamount") : col("receiveblea") !== -1 ? col("receiveblea") : col("receivable") !== -1 ? col("receivable") : -1;
@@ -6176,7 +6176,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
 
         for (let i = hRow + 1; i < rows.length; i++) {
           const r = rows[i];
-          const workName = r[workCol]?.replace(/"/g, "").trim();
+          const workName = r[workCol]?.replace(new RegExp('"', "g"), "").trim();
           const receiptAmt = amtCol >= 0 ? parseAmt(r[amtCol]) : 0;
           if (!receiptAmt || receiptAmt === 0) continue;
 
@@ -6187,7 +6187,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
 
           // First try the dedicated receipt date column
           if (receiptDateCol >= 0 && r[receiptDateCol]) {
-            const raw = r[receiptDateCol].replace(/"/g, "").trim();
+            const raw = r[receiptDateCol].replace(new RegExp('"', "g"), "").trim();
             receiptDate = parseDate(raw);
             receiptDateStr = fmtDate(receiptDate);
           }
@@ -6195,7 +6195,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
           // If no date found, scan ALL columns for any parseable date
           if (!receiptDate) {
             for (let ci = 0; ci < r.length; ci++) {
-              const cell = (r[ci] || "").replace(/"/g, "").trim();
+              const cell = (r[ci] || "").replace(new RegExp('"', "g"), "").trim();
               // Must look like a date: DD/MM/YYYY or DD-MM-YYYY
               if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(cell)) {
                 const parsed = parseDate(cell);
@@ -6210,7 +6210,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
 
           allContracts.push({
             rowIndex: i, sheetName: name, workName: workName || "",
-            party: partyCol >= 0 ? r[partyCol]?.replace(/"/g, "") : "",
+            party: partyCol >= 0 ? r[partyCol]?.replace(new RegExp('"', "g"), "") : "",
             receiptAmount: receiptAmt, receiptDate, receiptDateStr,
             taxableValue: taxCol >= 0 ? parseAmt(r[taxCol]) : 0,
             gstAmount: gstCol >= 0 ? parseAmt(r[gstCol]) : 0,
@@ -6281,17 +6281,17 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
       // CREDIT: col1=date col2=desc col5='' col6='$ amount' col7='$ balance'
       // DEBIT:  col1=date col2=desc col5='#amount' col6='$ balance' col7=''
       for (let i = 5; i < bankRows.length; i++) {
-        const r = bankRows[i].map((c: string) => String(c || "").replace(/"/g, "").trim());
+        const r = bankRows[i].map((c: string) => String(c || "").replace(new RegExp('"', "g"), "").trim());
         if (!r || r.length < 6) continue;
         const dateVal = r[1];
         if (!dateVal || dateVal.length < 5) continue;
         let parsedDate: Date | null = null;
-        const sd = dateVal.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-        const ld = dateVal.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+        const sd = dateVal.match(new RegExp("^(\\d{2})\\/(\\d{2})\\/(\\d{2})$"));
+        const ld = dateVal.match(new RegExp("^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$"));
         if (sd) parsedDate = new Date(2000 + +sd[3], +sd[1] - 1, +sd[2]);
         else if (ld) parsedDate = new Date(+ld[3], +ld[2] - 1, +ld[1]);
         if (!parsedDate || isNaN(parsedDate.getTime())) continue;
-        const desc = (r[2] || "").replace(/\s+/g, " ").trim();
+        const desc = (r[2] || "").replace(new RegExp("\\s+","g"), " ").trim();
         const c5 = (r[5] || "").trim();
         const c6 = (r[6] || "").trim();
         const c7 = (r[7] || "").trim();

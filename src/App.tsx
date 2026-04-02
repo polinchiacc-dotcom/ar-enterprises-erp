@@ -6197,7 +6197,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             for (let ci = 0; ci < r.length; ci++) {
               const cell = (r[ci] || "").replace(new RegExp('"', "g"), "").trim();
               // Must look like a date: DD/MM/YYYY or DD-MM-YYYY
-              if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(cell)) {
+              if (new RegExp("^\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{4}$").test(cell)) {
                 const parsed = parseDate(cell);
                 if (parsed) {
                   receiptDate = parsed;
@@ -6263,7 +6263,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             }
             const rows = parseCSV(text);
             // Validate: check if it looks like bank data (has date-like content)
-            const hasData = rows.some(r => r.some(c => /\d{2}[\/-]\d{2}[\/-]\d{4}|\d{4}/.test(c)));
+            const hasData = rows.some(r => r.some(c => new RegExp("\\d{2}[\\/\\-]\\d{2}[\\/\\-]\\d{4}|\\d{4}").test(c)));
             if (rows.length > 5 && hasData) {
               console.log(`✅ Bank CSV loaded: ${rows.length} rows from ${url}`);
               return rows;

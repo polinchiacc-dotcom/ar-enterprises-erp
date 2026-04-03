@@ -1696,6 +1696,9 @@ export default function App() {
             isAdmin={isAdmin} district={district}
             bills={myBills} transactions={myTxns} vendors={myVendors}
             gstr2bVerified={gstr2bVerified}
+            setGstr2bVerified={(fn) => {
+              setGstr2bVerified(fn);
+            }}
             onAdd={async (bill) => {
               const val = await validateData(billSchema, { billNumber: bill.billNumber, billAmount: bill.billAmount, billDate: bill.billDate });
               if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
@@ -2079,12 +2082,12 @@ function DashboardPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Total Vendors</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#1c3d6e", margin:"6px 0 0" }}>{vendors.length}</p>
           <p className="text-xs text-gray-400 mt-1">Active accounts</p>
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Transactions</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#0369a1", margin:"6px 0 0" }}>{transactions.length}</p>
           <p className="text-xs text-gray-400 mt-1">
             <span className="text-green-600">Open: {openTxns}</span> |{" "}
             <span className="text-blue-600">Closed: {closedTxns}</span>
@@ -2092,11 +2095,11 @@ function DashboardPage({
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Total Expected</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#b45309", margin:"6px 0 0" }}>{fmt(totalExpected)}</p>
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Bills Received</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsReceived)}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#15803d", margin:"6px 0 0" }}>{fmt(totalBillsReceived)}</p>
           <p className="text-xs text-gray-400 mt-1">{bills.length} total bills</p>
         </div>
       </div>
@@ -2967,7 +2970,7 @@ function TransactionsPage({
 // ============================================================
 function BillsPage({
   isAdmin, district, bills, transactions, vendors,
-  onAdd, onBulkAdd, onUpdate, onDelete, gstr2bVerified
+  onAdd, onBulkAdd, onUpdate, onDelete, gstr2bVerified, setGstr2bVerified
 }: {
   isAdmin: boolean; district: string;
   bills: Bill[]; transactions: Transaction[]; vendors: Vendor[];
@@ -2976,6 +2979,7 @@ function BillsPage({
   onUpdate: (b: Bill) => void;
   onDelete: (id: string) => void;
   gstr2bVerified?: Set<string>;
+  setGstr2bVerified?: (fn: (prev: Set<string>) => Set<string>) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
@@ -3753,10 +3757,10 @@ function ReportsPage({
         <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>District performance overview</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsAmt)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p style={{ fontSize:22, fontWeight:700, color:"#1c3d6e", margin:"6px 0 0" }}>{vendors.length}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p style={{ fontSize:22, fontWeight:700, color:"#0369a1", margin:"6px 0 0" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p style={{ fontSize:22, fontWeight:700, color:"#b45309", margin:"6px 0 0" }}>{fmt(totalExpected)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p style={{ fontSize:22, fontWeight:700, color:"#15803d", margin:"6px 0 0" }}>{fmt(totalBillsAmt)}</p></div>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">📆 Monthly Summary</h2></div>

@@ -789,10 +789,10 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
 
         {/* Mode Toggle */}
         <div style={{ display:"flex",gap:"8px",marginBottom:"16px" }}>
-          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8" as any }}>
+          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8" } as any}>
             📊 Load from Sheet
           </button>
-          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8" as any }}>
+          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8" } as any}>
             ➕ Paste New Data
           </button>
         </div>
@@ -6197,7 +6197,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             for (let ci = 0; ci < r.length; ci++) {
               const cell = (r[ci] || "").replace(new RegExp('"', "g"), "").trim();
               // Must look like a date: DD/MM/YYYY or DD-MM-YYYY
-              if (new RegExp("^\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{4}$").test(cell)) {
+              if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(cell)) {
                 const parsed = parseDate(cell);
                 if (parsed) {
                   receiptDate = parsed;
@@ -6263,7 +6263,7 @@ function ReconciliationPage({ onBack }: { onBack: () => void }) {
             }
             const rows = parseCSV(text);
             // Validate: check if it looks like bank data (has date-like content)
-            const hasData = rows.some(r => r.some(c => new RegExp("\\d{2}[\\/\\-]\\d{2}[\\/\\-]\\d{4}|\\d{4}").test(c)));
+            const hasData = rows.some(r => r.some(c => /\d{2}[\/-]\d{2}[\/-]\d{4}|\d{4}/.test(c)));
             if (rows.length > 5 && hasData) {
               console.log(`✅ Bank CSV loaded: ${rows.length} rows from ${url}`);
               return rows;

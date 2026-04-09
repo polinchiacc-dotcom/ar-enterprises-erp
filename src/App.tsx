@@ -1104,7 +1104,6 @@ const handleLogin = async () => {
         </div>
       </div>
     </div>
-  </div>
   );
 }
 

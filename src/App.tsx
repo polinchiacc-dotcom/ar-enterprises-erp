@@ -836,7 +836,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
         {loadMode === "paste" && (
           <div>
             <div style={{ marginBottom:"12px" }}>
-              <label style={lbl}>📋 Data Paste (எக்ஸல்/Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
+              <label style={lbl}>📋 Data Paste (எக்ஸல் அல்லது Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
               <div style={{ fontSize:"11px",color:"#475569",marginBottom:"6px" }}>Format: Period | GSTIN | Trade Name | Invoice No | Date | Taxable | IGST | CGST | SGST</div>
               <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={7}
                 placeholder="Sheet-லிருந்து copy செய்து இங்கே paste செய்யவும்..."

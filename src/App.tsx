@@ -1104,6 +1104,7 @@ const handleLogin = async () => {
         </div>
       </div>
     </div>
+  </div>
   );
 }
 
@@ -3707,7 +3708,8 @@ function AnalyticsPage({
             <div className="flex items-end gap-2 h-40">
               {monthSummary.map(m => {
                 const maxE = Math.max(...monthSummary.map(x => x.expected));
-                const h = maxE > 0 ? (m.expected / maxE * 100) : 0;
+                const ratio = maxE > 0 ? m.expected / maxE : 0;
+                const h = ratio * 100;
                 return (
                   <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full rounded-t-lg transition-all hover:opacity-80"

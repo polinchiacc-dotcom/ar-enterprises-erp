@@ -1067,7 +1067,7 @@ const handleLogin = async () => {
             <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
               <div>
                 <label style={{ display:"block", fontSize:11, fontWeight:600, color:"#6b7c93", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  {role === "vendor" ? "GST Number / Vendor Code" : "Username"}
+                  {role === "vendor" ? "GST Number or Vendor Code" : "Username"}
                 </label>
                 <input type="text" value={username}
                   onChange={e => setUsername(e.target.value)}

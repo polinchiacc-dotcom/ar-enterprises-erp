@@ -807,10 +807,10 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
 
         {/* Mode Toggle */}
         <div style={{ display:"flex",gap:"8px",marginBottom:"16px" }}>
-          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8" } as any}>
+          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer" as const,background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8"}}>
             📊 Load from Sheet
           </button>
-          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8" } as any}>
+          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer" as const,background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8"}}>
             ➕ Paste New Data
           </button>
         </div>

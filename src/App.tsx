@@ -263,7 +263,7 @@ const BIZ_SHORT: Record<string,string> = {
 };
 
 const PROFIT_RATE = 0.08;
-const BILL_TOTAL_RATE = 1.18;
+// BUG #11: Removed hardcoded 18% - use per-bill gstPercent;
 const LS_KEY = "AR_ERP_V3_DATA_ENCRYPTED";
 const SESSION_KEY = "AR_SESSION";
 
@@ -303,7 +303,7 @@ const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const genId = (prefix: string) =>
-  prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5).toUpperCase();
+  prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7).toUpperCase();
 
 const genVendorCode = (district: string, bizType: string, year: string, existing: Vendor[]) => {
   const d = DIST_SHORT[district] || district.slice(0, 3).toUpperCase();
@@ -324,7 +324,7 @@ function recalcTransactions(transactions: Transaction[], bills: Bill[]): Transac
     if (txnBills.length === 0) {
       return { ...t, billsReceived: 0, remainingExpected: t.expectedAmount };
     }
-    const sumTotal = txnBills.reduce((s, b) => s + round2(b.billAmount * BILL_TOTAL_RATE), 0);
+    const sumTotal = txnBills.reduce((s, b) => s + round2(b.billAmount * (1 + (Number(b.gstPercent) || 0) / 100)), 0);
     const remaining = round2(Math.max(0, t.expectedAmount - sumTotal));
     const billsReceived = txnBills.reduce((s, b) => s + b.billAmount, 0);
     return { ...t, billsReceived: round2(billsReceived), remainingExpected: remaining };
@@ -412,7 +412,7 @@ const clearSession = () => {
 };
 
 const DEFAULT_ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'admin';
-const DEFAULT_ADMIN_PASSWORD = 'Admin@123';
+const BOOTSTRAP_PASSWORD: string | undefined = import.meta.env.VITE_ADMIN_BOOTSTRAP_PASSWORD;
 
 // ============================================================
 // LOGIN PAGE COMPONENT
@@ -489,24 +489,6 @@ function LandingPage({ onSelectRole }: { onSelectRole: (role: "admin" | "distric
   );
 }
 
-
-// ============================================================
-// AUDITOR CONSTANTS
-// ============================================================
-const AUDITOR_SCRIPT_URL = import.meta.env.VITE_AUDITOR_SCRIPT_URL || "";
-const AUDITOR_API_KEY = import.meta.env.VITE_AUDITOR_API_KEY || "AR_AUDITOR_2025";
-
-const GST_CLIENTS = [
-  { name: "Sri Polinchi & Co", gstin: "33AAGFS1234A1Z5", gst: true },
-  { name: "AR Enterprises",    gstin: "33AABCA1234B1Z5", gst: true },
-];
-
-const FY_OPTIONS = ["2023-24", "2024-25", "2025-26", "2026-27"];
-
-const MONTHS_GST = [
-  "April","May","June","July","Aug","Sep",
-  "Oct","Nov","Dec","Jan","Feb","Mar"
-];
 
 function AuditorPage({ onBack, onGSTR2BVerified }: { onBack: () => void; onGSTR2BVerified?: (billNos: string[]) => void }) {
   const [tab, setTab] = useState<"gst"|"gstr2b"|"itc">("gst");
@@ -807,10 +789,10 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
 
         {/* Mode Toggle */}
         <div style={{ display:"flex",gap:"8px",marginBottom:"16px" }}>
-          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer" as const,background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8"}}>
+          <button onClick={()=>setLoadMode("sheet")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="sheet"?"#1c3d6e":"#fff",color:loadMode==="sheet"?"#fff":"#6b7c93",border:loadMode==="sheet"?"none":"1px solid #dde2e8" as any }}>
             📊 Load from Sheet
           </button>
-          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer" as const,background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8"}}>
+          <button onClick={()=>setLoadMode("paste")} style={{ padding:"7px 18px",border:"none",borderRadius:"8px",fontWeight:700,fontSize:"12px",cursor:"pointer",background:loadMode==="paste"?"#1c3d6e":"#fff",color:loadMode==="paste"?"#fff":"#6b7c93",border:loadMode==="paste"?"none":"1px solid #dde2e8" as any }}>
             ➕ Paste New Data
           </button>
         </div>
@@ -836,7 +818,7 @@ function GSTR2BTab({ onVerified }: { onVerified?: (billNos: string[]) => void })
         {loadMode === "paste" && (
           <div>
             <div style={{ marginBottom:"12px" }}>
-              <label style={lbl}>📋 Data Paste (எக்ஸல் அல்லது Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
+              <label style={lbl}>📋 Data Paste (எக்ஸல்/Sheets-லிருந்து Ctrl+C செய்து இங்கே paste)</label>
               <div style={{ fontSize:"11px",color:"#475569",marginBottom:"6px" }}>Format: Period | GSTIN | Trade Name | Invoice No | Date | Taxable | IGST | CGST | SGST</div>
               <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={7}
                 placeholder="Sheet-லிருந்து copy செய்து இங்கே paste செய்யவும்..."
@@ -1067,7 +1049,7 @@ const handleLogin = async () => {
             <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
               <div>
                 <label style={{ display:"block", fontSize:11, fontWeight:600, color:"#6b7c93", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  {role === "vendor" ? "GST Number or Vendor Code" : "Username"}
+                  {role === "vendor" ? "GST Number / Vendor Code" : "Username"}
                 </label>
                 <input type="text" value={username}
                   onChange={e => setUsername(e.target.value)}
@@ -1104,7 +1086,6 @@ const handleLogin = async () => {
         </div>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -1714,9 +1695,6 @@ export default function App() {
             isAdmin={isAdmin} district={district}
             bills={myBills} transactions={myTxns} vendors={myVendors}
             gstr2bVerified={gstr2bVerified}
-            setGstr2bVerified={(fn) => {
-              setGstr2bVerified(fn);
-            }}
             onAdd={async (bill) => {
               const val = await validateData(billSchema, { billNumber: bill.billNumber, billAmount: bill.billAmount, billDate: bill.billDate });
               if (!val.valid) { alert("❌ " + val.errors.join("\n")); return; }
@@ -2100,12 +2078,12 @@ function DashboardPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Total Vendors</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#1c3d6e", margin:"6px 0 0" }}>{vendors.length}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p>
           <p className="text-xs text-gray-400 mt-1">Active accounts</p>
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Transactions</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#0369a1", margin:"6px 0 0" }}>{transactions.length}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p>
           <p className="text-xs text-gray-400 mt-1">
             <span className="text-green-600">Open: {openTxns}</span> |{" "}
             <span className="text-blue-600">Closed: {closedTxns}</span>
@@ -2113,11 +2091,11 @@ function DashboardPage({
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Total Expected</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#b45309", margin:"6px 0 0" }}>{fmt(totalExpected)}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p>
         </div>
         <div style={{ background:"#fff", borderRadius:10, padding:"16px 20px", border:"1px solid #e8ecf0" }}>
           <p className="text-xs text-gray-500 font-medium uppercase">Bills Received</p>
-          <p style={{ fontSize:22, fontWeight:700, color:"#15803d", margin:"6px 0 0" }}>{fmt(totalBillsReceived)}</p>
+          <p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsReceived)}</p>
           <p className="text-xs text-gray-400 mt-1">{bills.length} total bills</p>
         </div>
       </div>
@@ -2988,7 +2966,7 @@ function TransactionsPage({
 // ============================================================
 function BillsPage({
   isAdmin, district, bills, transactions, vendors,
-  onAdd, onBulkAdd, onUpdate, onDelete, gstr2bVerified, setGstr2bVerified
+  onAdd, onBulkAdd, onUpdate, onDelete, gstr2bVerified
 }: {
   isAdmin: boolean; district: string;
   bills: Bill[]; transactions: Transaction[]; vendors: Vendor[];
@@ -2997,7 +2975,6 @@ function BillsPage({
   onUpdate: (b: Bill) => void;
   onDelete: (id: string) => void;
   gstr2bVerified?: Set<string>;
-  setGstr2bVerified?: (fn: (prev: Set<string>) => Set<string>) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
@@ -3708,8 +3685,7 @@ function AnalyticsPage({
             <div className="flex items-end gap-2 h-40">
               {monthSummary.map(m => {
                 const maxE = Math.max(...monthSummary.map(x => x.expected));
-                const ratio = maxE > 0 ? m.expected / maxE : 0;
-                const h = ratio * 100;
+                const h = maxE > 0 ? (m.expected / maxE * 100) : 0;
                 return (
                   <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full rounded-t-lg transition-all hover:opacity-80"
@@ -3776,10 +3752,10 @@ function ReportsPage({
         <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>District performance overview</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p style={{ fontSize:22, fontWeight:700, color:"#1c3d6e", margin:"6px 0 0" }}>{vendors.length}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p style={{ fontSize:22, fontWeight:700, color:"#0369a1", margin:"6px 0 0" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p style={{ fontSize:22, fontWeight:700, color:"#b45309", margin:"6px 0 0" }}>{fmt(totalExpected)}</p></div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p style={{ fontSize:22, fontWeight:700, color:"#15803d", margin:"6px 0 0" }}>{fmt(totalBillsAmt)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Vendors</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#1c3d6e" }}>{vendors.length}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Transactions</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#0369a1" }}>{transactions.length}</p><p className="text-xs text-gray-400 mt-1">Open: {openTxns} | Pending: {pendingTxns} | Closed: {closedTxns}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Total Expected</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#b45309" }}>{fmt(totalExpected)}</p></div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"><p className="text-xs text-gray-500 uppercase">Bills Received</p><p style={{ fontSize:22, fontWeight:700, color:"#1c2b3a", margin:"6px 0 0" }} style={{ color: "#15803d" }}>{fmt(totalBillsAmt)}</p></div>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">📆 Monthly Summary</h2></div>
@@ -5460,256 +5436,6 @@ function WorkTrackerPage({ onBack }: { onBack: () => void }) {
 // ============================================================
 // FINTRACK AI DASHBOARD — Integrated with ERP Data
 // ============================================================
-// ============================================================
-// AI FEATURES — Anthropic Claude Integration
-// ============================================================
-
-// ── AI Chat Component (Tamil + English) ──
-function AIChat({ vendors, transactions, bills, wallet }: {
-  vendors: any[]; transactions: any[]; bills: any[]; wallet: any[];
-}) {
-  const [msgs, setMsgs] = React.useState<{role:"user"|"ai", text:string}[]>([
-    { role:"ai", text:"வணக்கம்! நான் AR Enterprises AI Assistant. உங்கள் ERP data பற்றி Tamil அல்லது English-ல் கேளுங்கள்! 🙏" }
-  ]);
-  const [input, setInput] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const chatRef = React.useRef<HTMLDivElement>(null);
-
-  const fmt = (n:number) => "₹" + n.toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2});
-
-  const getContext = () => {
-    const totalExp = transactions.reduce((s,t)=>s+t.expectedAmount,0);
-    const totalBills = bills.reduce((s,b)=>s+b.billAmount,0);
-    const walletBal = wallet.length > 0 ? wallet[wallet.length-1].balance : 0;
-    const openTxns = transactions.filter(t=>t.status==="Open");
-    const pendingTxns = transactions.filter(t=>t.status==="Pending");
-    const districtSummary = transactions.reduce((acc:any,t)=>{
-      acc[t.district] = (acc[t.district]||0) + t.expectedAmount;
-      return acc;
-    }, {});
-    const topDistricts = Object.entries(districtSummary)
-      .sort((a:any,b:any)=>b[1]-a[1]).slice(0,5)
-      .map(([d,a]:any)=>`${d}: ${fmt(a)}`).join(", ");
-    const overdueVendors = vendors.filter(v => {
-      const vTxns = transactions.filter(t=>t.vendorCode===v.vendorCode && t.status==="Open");
-      return vTxns.length > 0;
-    });
-    return `You are AR Enterprises ERP AI Assistant. Answer in the same language the user asks (Tamil or English). Be concise and helpful.
-
-LIVE ERP DATA:
-- Total Vendors: ${vendors.length} (${overdueVendors.length} with open transactions)
-- Transactions: ${transactions.length} total | Open: ${openTxns.length} | Pending: ${pendingTxns.length} | Closed: ${transactions.filter(t=>t.status==="Closed").length}
-- Total Expected Amount: ${fmt(totalExp)}
-- Total Bills Received: ${fmt(totalBills)}
-- Collection Rate: ${totalExp > 0 ? ((totalBills/totalExp)*100).toFixed(1) : 0}%
-- Wallet Balance: ${fmt(walletBal)}
-- Top 5 Districts by Revenue: ${topDistricts}
-- Districts Count: ${[...new Set(transactions.map(t=>t.district))].length}
-
-Answer questions about vendors, transactions, bills, collections, GST, and financial analysis based on this data.`;
-  };
-
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg = input.trim();
-    setInput("");
-    setMsgs(prev => [...prev, {role:"user", text:userMsg}]);
-    setLoading(true);
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:1000,
-          system: getContext(),
-          messages:[{role:"user", content:userMsg}]
-        })
-      });
-      const data = await res.json();
-      const aiText = data.content?.[0]?.text || "மன்னிக்கவும், பதில் கிடைக்கவில்லை.";
-      setMsgs(prev => [...prev, {role:"ai", text:aiText}]);
-    } catch {
-      setMsgs(prev => [...prev, {role:"ai", text:"Connection error. Please try again."}]);
-    }
-    setLoading(false);
-    setTimeout(()=>{ if(chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; },100);
-  };
-
-  return (
-    <div style={{ background:"#fff", borderRadius:16, border:"1px solid #e2e6ea", overflow:"hidden", height:"100%" }}>
-      <div style={{ background:"#1c3d6e", padding:"14px 18px", display:"flex", alignItems:"center", gap:10 }}>
-        <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🤖</div>
-        <div>
-          <div style={{ fontWeight:700, color:"#fff", fontSize:14 }}>AR Enterprises AI Assistant</div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.7)" }}>Tamil & English — Live ERP Data Connected</div>
-        </div>
-        <div style={{ marginLeft:"auto", width:8, height:8, borderRadius:"50%", background:"#10b981" }}></div>
-      </div>
-      <div ref={chatRef} style={{ height:340, overflowY:"auto", padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-        {msgs.map((m,i) => (
-          <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start" }}>
-            <div style={{
-              maxWidth:"80%", padding:"10px 14px", borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",
-              background:m.role==="user"?"#1c3d6e":"#f4f6f9",
-              color:m.role==="user"?"#fff":"#1c2b3a",
-              fontSize:13, lineHeight:1.5, whiteSpace:"pre-wrap"
-            }}>
-              {m.text}
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display:"flex", gap:4, padding:"10px 14px", background:"#f4f6f9", borderRadius:"16px 16px 16px 4px", width:"fit-content" }}>
-            {[0,1,2].map(i=>(
-              <div key={i} style={{ width:7, height:7, borderRadius:"50%", background:"#1c3d6e", animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite` }}></div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div style={{ padding:"12px 16px", borderTop:"1px solid #e2e6ea", display:"flex", gap:8 }}>
-        <input
-          value={input}
-          onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>e.key==="Enter" && send()}
-          placeholder="Tamil அல்லது English-ல் கேளுங்கள்..."
-          style={{ flex:1, padding:"10px 14px", borderRadius:10, border:"1px solid #e2e6ea", fontSize:13, outline:"none", background:"#f8f9fb", color:"#1c2b3a" }}
-        />
-        <button onClick={send} disabled={loading} style={{ padding:"10px 18px", background:"#1c3d6e", color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer" }}>
-          அனுப்பு
-        </button>
-      </div>
-      <div style={{ padding:"8px 16px 12px", display:"flex", gap:6, flexWrap:"wrap" }}>
-        {["Pending vendors யார்?","Top district எது?","இந்த மாதம் collection எவ்வளவு?","Open transactions எத்தனை?"].map(q=>(
-          <button key={q} onClick={()=>{setInput(q);}} style={{ fontSize:11, padding:"4px 10px", border:"1px solid #e2e6ea", borderRadius:20, background:"#fff", color:"#1c3d6e", cursor:"pointer" }}>{q}</button>
-        ))}
-      </div>
-      <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
-    </div>
-  );
-}
-
-// ── AI Smart Alerts Component ──
-function AISmartAlerts({ vendors, transactions, bills, wallet }: {
-  vendors:any[]; transactions:any[]; bills:any[]; wallet:any[];
-}) {
-  const fmt = (n:number) => "₹" + n.toLocaleString("en-IN", {minimumFractionDigits:0, maximumFractionDigits:0});
-  const alerts: {type:"danger"|"warning"|"info"|"success", icon:string, title:string, desc:string}[] = [];
-
-  const openTxns = transactions.filter(t=>t.status==="Open");
-  const pendingTxns = transactions.filter(t=>t.status==="Pending");
-  const totalPending = openTxns.reduce((s,t)=>s+t.remainingExpected,0);
-  const walletBal = wallet.length > 0 ? wallet[wallet.length-1].balance : 0;
-  const totalExp = transactions.reduce((s,t)=>s+t.expectedAmount,0);
-  const totalBills = bills.reduce((s,b)=>s+b.billAmount,0);
-  const collRate = totalExp > 0 ? (totalBills/totalExp)*100 : 0;
-
-  if (openTxns.length > 5) alerts.push({type:"danger", icon:"🔴", title:`${openTxns.length} Open Transactions Pending`, desc:`${fmt(totalPending)} இன்னும் collect ஆகவில்லை — உடனே follow-up தேவை`});
-  if (walletBal < 50000) alerts.push({type:"danger", icon:"⚠️", title:"Wallet Balance குறைவாக உள்ளது", desc:`Current balance: ${fmt(walletBal)} — Top-up தேவை`});
-  if (collRate < 60) alerts.push({type:"warning", icon:"📉", title:`Collection Rate குறைவு — ${collRate.toFixed(1)}%`, desc:`Target 80% — ${fmt(totalExp - totalBills)} இன்னும் pending`});
-  if (pendingTxns.length > 0) alerts.push({type:"warning", icon:"⏳", title:`${pendingTxns.length} Transactions Pending Approval`, desc:`District managers-ஐ contact பண்ணி approve செய்யுங்கள்`});
-  if (collRate >= 80) alerts.push({type:"success", icon:"✅", title:`Collection Rate நன்றாக உள்ளது — ${collRate.toFixed(1)}%`, desc:`Target 80% achieved! Keep maintaining this pace.`});
-  if (vendors.length > 0) alerts.push({type:"info", icon:"👥", title:`${vendors.length} Active Vendors — ${[...new Set(transactions.map(t=>t.district))].length} Districts`, desc:`Largest vendor group: ${Object.entries(vendors.reduce((a:any,v)=>{a[v.district]=(a[v.district]||0)+1;return a},{})).sort((a:any,b:any)=>b[1]-a[1])[0]?.[0] || "—"}`});
-
-  const colors: Record<string,{bg:string,border:string,text:string}> = {
-    danger: {bg:"#fff5f5", border:"#fca5a5", text:"#dc2626"},
-    warning: {bg:"#fffbeb", border:"#fcd34d", text:"#b45309"},
-    info: {bg:"#eff6ff", border:"#93c5fd", text:"#1d4ed8"},
-    success: {bg:"#f0fdf4", border:"#86efac", text:"#15803d"},
-  };
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-      {alerts.map((a,i) => (
-        <div key={i} style={{ background:colors[a.type].bg, border:`1px solid ${colors[a.type].border}`, borderRadius:12, padding:"12px 16px", display:"flex", gap:12, alignItems:"flex-start" }}>
-          <span style={{ fontSize:20, lineHeight:1 }}>{a.icon}</span>
-          <div>
-            <div style={{ fontWeight:700, fontSize:13, color:colors[a.type].text, marginBottom:2 }}>{a.title}</div>
-            <div style={{ fontSize:12, color:"#6b7c93" }}>{a.desc}</div>
-          </div>
-        </div>
-      ))}
-      {alerts.length === 0 && (
-        <div style={{ textAlign:"center", color:"#8899aa", fontSize:13, padding:"20px" }}>✅ எல்லாம் சரியாக உள்ளது!</div>
-      )}
-    </div>
-  );
-}
-
-// ── AI Vendor Insights ──
-function AIVendorInsights({ vendors, transactions, bills }: { vendors:any[]; transactions:any[]; bills:any[]; }) {
-  const [loading, setLoading] = React.useState(false);
-  const [insight, setInsight] = React.useState("");
-  const fmt = (n:number) => "₹" + n.toLocaleString("en-IN", {minimumFractionDigits:0});
-
-  const getInsights = async () => {
-    setLoading(true);
-    setInsight("");
-    const distData = transactions.reduce((acc:any,t)=>{
-      if(!acc[t.district]) acc[t.district]={exp:0,bills:0,count:0,open:0};
-      acc[t.district].exp += t.expectedAmount;
-      acc[t.district].count += 1;
-      if(t.status==="Open") acc[t.district].open += 1;
-      return acc;
-    },{});
-    bills.forEach(b=>{
-      const txn = transactions.find(t=>t.txnId===b.txnId);
-      if(txn && distData[txn.district]) distData[txn.district].bills += b.billAmount;
-    });
-    const summary = Object.entries(distData).map(([d,v]:any)=>
-      `${d}: Expected ${fmt(v.exp)}, Collected ${fmt(v.bills)}, ${v.count} txns, ${v.open} open`
-    ).join("
-");
-
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:600,
-          messages:[{role:"user", content:`Analyze this Tamil Nadu district-wise vendor performance data and provide 4-5 key insights in Tamil. Be specific with numbers. Format as bullet points.
-
-Data:
-${summary}
-
-Total vendors: ${vendors.length}`}]
-        })
-      });
-      const data = await res.json();
-      setInsight(data.content?.[0]?.text || "Analysis கிடைக்கவில்லை.");
-    } catch { setInsight("Connection error. Try again."); }
-    setLoading(false);
-  };
-
-  return (
-    <div style={{ background:"#fff", borderRadius:16, border:"1px solid #e2e6ea", overflow:"hidden" }}>
-      <div style={{ padding:"14px 18px", borderBottom:"1px solid #e2e6ea", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div style={{ fontWeight:700, fontSize:14, color:"#1c2b3a" }}>🧠 AI District Analysis</div>
-        <button onClick={getInsights} disabled={loading} style={{ padding:"7px 16px", background:"#1c3d6e", color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer" }}>
-          {loading ? "Analyzing..." : "AI Analysis பெறு"}
-        </button>
-      </div>
-      <div style={{ padding:"16px 18px", minHeight:120 }}>
-        {!insight && !loading && (
-          <div style={{ textAlign:"center", color:"#8899aa", fontSize:13, paddingTop:20 }}>
-            "AI Analysis பெறு" button click செய்யுங்கள் — District-wise insights கிடைக்கும்
-          </div>
-        )}
-        {loading && (
-          <div style={{ textAlign:"center", color:"#1c3d6e", fontSize:13, paddingTop:20 }}>
-            🤖 AI analyzing your data...
-          </div>
-        )}
-        {insight && (
-          <div style={{ fontSize:13, color:"#1c2b3a", lineHeight:1.7, whiteSpace:"pre-wrap" }}>{insight}</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
 function FinTrackDashboard({
   vendors, transactions, bills, wallet, onBack
 }: {
@@ -5910,56 +5636,6 @@ function FinTrackDashboard({
               {statCard("ERP Wallet Debit", fmtFT(erpWalletDebit), "Total expense (ERP)", "#ef4444", "📤")}
               {statCard("FinTrack Income", fmtFT(ftTotalCredit), ftBankTxns.filter((t:any)=>t.credit).length + " credits", "#3b82f6", "🏦")}
               {statCard("Pending Amount", fmtFT(ftTotalPending + (transactions.filter(t=>t.status==="Open").reduce((s,t)=>s+t.remainingExpected,0))), "All projects", "#f59e0b", "⏳")}
-            </div>
-
-            {/* ── AI FEATURES SECTION ── */}
-            <div style={{ marginBottom:"24px" }}>
-              <div style={{ fontWeight:700, fontSize:15, color:"#1c2b3a", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
-                🤖 <span>AI Assistant & Smart Insights</span>
-                <span style={{ fontSize:11, background:"#eef2f8", color:"#1c3d6e", padding:"2px 8px", borderRadius:20, fontWeight:600 }}>Powered by Claude AI</span>
-              </div>
-
-              {/* AI Smart Alerts */}
-              <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:"#6b7c93", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8 }}>Smart Alerts</div>
-                <AISmartAlerts vendors={vendors} transactions={transactions} bills={bills} wallet={wallet} />
-              </div>
-
-              {/* AI Chat + District Analysis - 2 column */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-                <AIChat vendors={vendors} transactions={transactions} bills={bills} wallet={wallet} />
-                <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-                  <AIVendorInsights vendors={vendors} transactions={transactions} bills={bills} />
-                  {/* Quick Stats AI */}
-                  <div style={{ background:"#f4f6f9", borderRadius:16, border:"1px solid #e2e6ea", padding:"16px 18px" }}>
-                    <div style={{ fontWeight:700, fontSize:13, color:"#1c2b3a", marginBottom:12 }}>📊 Quick AI Insights</div>
-                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
-                        <span style={{ color:"#6b7c93" }}>Best performing district</span>
-                        <span style={{ fontWeight:700, color:"#1c3d6e" }}>
-                          {(() => { const d = transactions.reduce((a:any,t)=>{a[t.district]=(a[t.district]||0)+t.expectedAmount;return a},{}); const top = Object.entries(d).sort((a:any,b:any)=>b[1]-a[1])[0]; return top ? top[0] : "—"; })()}
-                        </span>
-                      </div>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
-                        <span style={{ color:"#6b7c93" }}>Collection efficiency</span>
-                        <span style={{ fontWeight:700, color: transactions.reduce((s,t)=>s+t.expectedAmount,0) > 0 && (bills.reduce((s,b)=>s+b.billAmount,0)/transactions.reduce((s,t)=>s+t.expectedAmount,0))*100 >= 80 ? "#16a34a" : "#dc2626" }}>
-                          {transactions.reduce((s,t)=>s+t.expectedAmount,0) > 0 ? ((bills.reduce((s,b)=>s+b.billAmount,0)/transactions.reduce((s,t)=>s+t.expectedAmount,0))*100).toFixed(1) : "0"}%
-                        </span>
-                      </div>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
-                        <span style={{ color:"#6b7c93" }}>Active districts</span>
-                        <span style={{ fontWeight:700, color:"#1c3d6e" }}>{[...new Set(transactions.map(t=>t.district))].length}</span>
-                      </div>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
-                        <span style={{ color:"#6b7c93" }}>Avg transaction value</span>
-                        <span style={{ fontWeight:700, color:"#1c3d6e" }}>
-                          {transactions.length > 0 ? "₹" + Math.round(transactions.reduce((s,t)=>s+t.expectedAmount,0)/transactions.length).toLocaleString("en-IN") : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* ERP + FinTrack Combined */}

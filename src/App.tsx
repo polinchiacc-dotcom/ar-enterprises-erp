@@ -5308,7 +5308,6 @@ function SettingsPage({
         <button onClick={() => { onUpdateSettings(localSettings); alert("✅ Settings saved!"); }} className="px-8 py-3 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all" style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}>💾 Save Settings</button>
       </div>
     </div>
-  </div>
   );
 }
 

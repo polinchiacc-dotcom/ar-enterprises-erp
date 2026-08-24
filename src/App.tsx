@@ -4052,7 +4052,6 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
           </div>
         )}
         </div>
-      </div>
   );
 }
 

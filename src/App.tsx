@@ -5659,10 +5659,9 @@ function AIVendorInsights({ vendors, transactions, bills }: { vendors:any[]; tra
       const txn = transactions.find(t=>t.txnId===b.txnId);
       if(txn && distData[txn.district]) distData[txn.district].bills += b.billAmount;
     });
-    const summary = Object.entries(distData).map(([d,v]:any)=>
+        const summary = Object.entries(distData).map(([d,v]:any)=>
       `${d}: Expected ${fmt(v.exp)}, Collected ${fmt(v.bills)}, ${v.count} txns, ${v.open} open`
-    ).join("
-");
+    ).join("\n");
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {

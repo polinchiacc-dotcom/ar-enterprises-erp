@@ -1,89 +1,108 @@
-import bcrypt from 'bcryptjs';
-import CryptoJS from 'crypto-js';
-import DOMPurify from 'dompurify';
-
-const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'AR_ENTERPRISES_2025_SECURE_KEY_32CH';
-
 // ============================================================
-// PASSWORD HASHING
+// src/utils/security.ts (CRASH-FREE SHA-256 IMPLEMENTATION)
 // ============================================================
+
+export interface Session {
+  user: any;
+  expiry: number;
+}
+
+// 1. Pure JavaScript SHA-256 Fallback (பிரவுசர் தடை செய்தாலும் இயங்கும்)
+function sha256Fallback(ascii: string): string {
+  function rightRotate(value: number, amount: number) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  
+  const words = [];
+  const asciiLength = ascii.length;
+  let str = ascii + "\x80";
+  while ((str.length % 64) - 56) str += "\x00";
+  for (let i = 0; i < str.length; i++) {
+    words[i >>> 2] |= str.charCodeAt(i) << (24 - 8 * (i % 4));
+  }
+  words[words.length] = 0;
+  words[words.length] = asciiLength * 8;
+  
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a,
+      h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+      
+  const k = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+  
+  for (let i = 0; i < words.length; i += 16) {
+    const w = words.slice(i, i + 16);
+    for (let j = 16; j < 64; j++) {
+      const s0 = rightRotate(w[j-15], 7) ^ rightRotate(w[j-15], 18) ^ (w[j-15] >>> 3);
+      const s1 = rightRotate(w[j-2], 17) ^ rightRotate(w[j-2], 19) ^ (w[j-2] >>> 10);
+      w[j] = (w[j-16] + s0 + w[j-7] + s1) | 0;
+    }
+    
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+    for (let j = 0; j < 64; j++) {
+      const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + k[j] + w[j]) | 0;
+      const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) | 0;
+      
+      h = g; g = f; f = e;
+      e = (d + temp1) | 0;
+      d = c; c = b; b = a;
+      a = (temp1 + temp2) | 0;
+    }
+    h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + h) | 0;
+  }
+  
+  const hex = [h0, h1, h2, h3, h4, h5, h6, h7].map(v => {
+    const unsigned = v < 0 ? v + 0x100000000 : v;
+    return unsigned.toString(16).padStart(8, "0");
+  }).join("");
+  
+  return hex;
+}
+
+// 2. Safe Hashing Entry
 export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
+  try {
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch (e) {
+    console.warn("⚠️ System Crypto blocked, using pure JS fallback.");
+  }
+  return sha256Fallback(password);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  const hashedInput = await hashPassword(password);
+  return hashedInput === hash;
 }
 
-// ============================================================
-// DATA ENCRYPTION
-// ============================================================
-export function encryptData(data: any): string {
-  try {
-    const jsonString = JSON.stringify(data);
-    return CryptoJS.AES.encrypt(jsonString, ENCRYPTION_KEY).toString();
-  } catch (err) {
-    console.error('Encryption error:', err);
-    return '';
-  }
-}
-
-export function decryptData(encryptedData: string): any {
-  try {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
-    const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
-    return JSON.parse(decryptedString);
-  } catch (err) {
-    console.error('Decryption error:', err);
-    return null;
-  }
-}
-
-// ============================================================
-// INPUT SANITIZATION
-// ============================================================
 export function sanitizeInput(input: string): string {
-  return DOMPurify.sanitize(input.trim(), { ALLOWED_TAGS: [] });
+  if (!input) return "";
+  return input.trim().replace(/[<>'"&]/g, "");
 }
 
-export function sanitizeHTML(html: string): string {
-  return DOMPurify.sanitize(html);
+export function createSession(user: any, durationHours: number = 8): Session {
+  const expiry = Date.now() + durationHours * 60 * 60 * 1000;
+  return { user, expiry };
 }
 
-// ============================================================
-// SESSION MANAGEMENT
-// ============================================================
-export interface Session {
-  user: any;
-  loginTime: string;
-  expiresAt: string;
-  deviceId: string;
-}
-
-export function createSession(user: any, hoursValid: number = 8): Session {
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + hoursValid * 60 * 60 * 1000);
-  
-  return {
-    user,
-    loginTime: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-    deviceId: getDeviceId()
-  };
-}
-
-export function isSessionValid(session: Session): boolean {
-  const now = new Date();
-  const expires = new Date(session.expiresAt);
-  return now < expires;
-}
-
-function getDeviceId(): string {
-  let deviceId = localStorage.getItem('AR_DEVICE_ID');
-  if (!deviceId) {
-    deviceId = 'DEV_' + Math.random().toString(36).substr(2, 9).toUpperCase();
-    localStorage.setItem('AR_DEVICE_ID', deviceId);
-  }
-  return deviceId;
+export function isSessionValid(session: Session | null): boolean {
+  if (!session) return false;
+  return Date.now() < session.expiry;
 }

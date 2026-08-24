@@ -1223,12 +1223,27 @@ export default function App() {
   });
 
   // ── Initialize ─────────────────────────────────────────────
+    // ── Safe App Initialization ────────────────────────────────
   useEffect(() => {
     async function initialize() {
+      // Step 1: Session லோடு செய்தல்
       try {
         const session = loadSession();
         if (session) { setUser(session.user); }
+      } catch (err) {
+        console.error('Session load failed:', err);
+      }
+
+      // Step 2: Google Sheets லோடு செய்தல் (Isolated Catch block!)
+      try {
+        console.log("📥 Attempting to load from Google Sheets...");
         await loadFromSheets();
+      } catch (err) {
+        console.warn('⚠️ Google Sheets Sync delay. Local cache will be used:', err);
+      }
+
+      // Step 3: Local Storage-லிருந்து நிலவரங்களை வாசித்தல்
+      try {
         const reloaded = loadFromStorage() as any;
         if (reloaded) {
           setVendors(reloaded.vendors || []);
@@ -1241,23 +1256,15 @@ export default function App() {
           setAgentWallet(reloaded.agentWallet || []);
           setAgentOverrides(reloaded.agentOverrides || []);
         }
-      } catch (err) { console.log('Initial load failed:', err); }
+      } catch (err) {
+        console.error('Local Storage read error:', err);
+      }
+
       setIsInitializing(false);
-      startAutoSync(5);
+      startAutoSync(5); // 5 நிமிட ஆட்டோ சிங்க் தொடக்கம்
     }
     initialize();
   }, []);
-
-  useEffect(() => {
-    const handleResize = () => { if (window.innerWidth < 768) setSidebarOpen(false); };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (settings.browserNotifications && 'Notification' in window) Notification.requestPermission();
-  }, [settings.browserNotifications]);
 
   // ── Save ───────────────────────────────────────────────────
   const saveData = useCallback((

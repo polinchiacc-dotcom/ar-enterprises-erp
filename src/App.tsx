@@ -3958,10 +3958,12 @@ function UserManagementPage({
 }
 
 // ============================================================
-// AUDIT LOGS PAGE
+// AUDIT LOGS PAGE (FIXED JSX TAGS)
 // ============================================================
 function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
-  const [search, setSearch] = useState(""); const [actionFilter, setActionFilter] = useState(""); const [entityFilter, setEntityFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [entityFilter, setEntityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
@@ -3971,7 +3973,7 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
   });
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated  = [...filtered].reverse().slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginated = [...filtered].reverse().slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const actionBadge = (action: AuditLog['action']) => {
     switch(action) {
@@ -3987,15 +3989,22 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
 
   const entityIcon = (entity: AuditLog['entity']) => {
     switch(entity) {
-      case "Transaction": return "📋"; case "Vendor": return "🏢";
-      case "Bill": return "🧾"; case "Wallet": return "💰";
-      case "User": return "👤"; default: return "📄";
+      case "Transaction": return "📋";
+      case "Vendor": return "🏢";
+      case "Bill": return "🧾";
+      case "Wallet": return "💰";
+      case "User": return "👤";
+      default: return "📄";
     }
   };
 
   return (
     <div className="p-6 space-y-4">
-      <div><h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📜 Audit Logs</h1><p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Complete activity trail — {filtered.length} entries</p></div>
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>📜 Audit Logs</h1>
+        <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Complete activity trail — {filtered.length} entries</p>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Actions", value: logs.length, color: "#1c3d6e" },
@@ -4009,6 +4018,7 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
           </div>
         ))}
       </div>
+
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search by user or entity ID..." className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-sm outline-none focus:border-blue-500" />
@@ -4022,11 +4032,16 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
           </select>
         </div>
       </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead style={{ background: "#f2f5f8" }}>
-              <tr>{["Timestamp","User","Action","Entity","Entity ID"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+              <tr>
+                {["Timestamp","User","Action","Entity","Entity ID"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>
+                ))}
+              </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginated.map(log => (
@@ -4042,6 +4057,7 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
           </table>
           {paginated.length === 0 && <p className="text-center py-12 text-gray-400">No audit logs found</p>}
         </div>
+
         {totalPages > 1 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between">
             <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>Page {currentPage} of {totalPages}</p>
@@ -4051,7 +4067,8 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
             </div>
           </div>
         )}
-        </div>
+      </div>
+    </div>
   );
 }
 

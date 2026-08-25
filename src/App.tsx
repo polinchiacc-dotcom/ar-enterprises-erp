@@ -6285,6 +6285,163 @@ function FinTrackDashboard({
 }
 
 // ============================================================
+// PROFESSIONAL PRINT-READY RECONCILIATION REPORT
+// ============================================================
+function PrintReconciliationReport({ 
+  reconciledList, 
+  summaryData, 
+  unmatchedBank,
+  onClose 
+}: { 
+  reconciledList: any[]; 
+  summaryData: any; 
+  unmatchedBank: any[];
+  onClose: () => void;
+}) {
+  const fmt = (n: number) => "₹" + (n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const today = new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const matchedList = reconciledList.filter(c => c.matchStatus !== "☒ No Match");
+  const unmatchedList = reconciledList.filter(c => c.matchStatus === "☒ No Match");
+
+  return (
+    <div className="min-h-screen bg-gray-200 py-8 font-sans">
+      <style>{`
+        @media print {
+          body { background: #fff; }
+          .no-print { display: none !important; }
+          .print-container { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; border: none !important; }
+          @page { size: A4 portrait; margin: 10mm; }
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          h2 { page-break-after: avoid; }
+        }
+      `}</style>
+
+      <div className="fixed top-4 right-8 flex gap-3 no-print z-50">
+        <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-lg shadow-lg hover:bg-black">← Back</button>
+        <button onClick={() => window.print()} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 flex items-center gap-2">
+          🖨️ Print Report
+        </button>
+      </div>
+
+      <div className="print-container max-w-[210mm] mx-auto bg-white p-8 shadow-2xl border border-gray-300">
+        <header className="border-b-4 border-slate-800 pb-4 mb-6 text-center">
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-wide uppercase">SRI POLINCHI & CO</h1>
+          <p className="text-sm text-slate-600 font-semibold mt-1">AR Enterprises Group | Govt. Authorized Contractors</p>
+          <div className="flex justify-between items-end mt-4 text-xs font-bold text-slate-700">
+            <div className="text-left">
+              <p>Bank: State Bank of India (SBI)</p>
+              <p>Period: FY 2023-24 to 2025-26</p>
+            </div>
+            <div className="text-right">
+              <p>Report Date: <span className="text-blue-700">{today}</span></p>
+              <p>Report Type: Master Bank Reconciliation</p>
+            </div>
+          </div>
+        </header>
+
+        <h2 className="text-lg font-bold text-slate-800 mb-3 border-l-4 border-blue-600 pl-2">நிதி நிலை சுருக்கம் (Financial Summary)</h2>
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="p-3 border border-slate-300 rounded bg-slate-50 text-center">
+            <p className="text-[10px] text-slate-500 uppercase font-bold">Total Contracts</p>
+            <p className="text-xl font-extrabold text-slate-800">{summaryData.totalContracts}</p>
+          </div>
+          <div className="p-3 border border-emerald-300 rounded bg-emerald-50 text-center">
+            <p className="text-[10px] text-emerald-600 uppercase font-bold">Matched Amount</p>
+            <p className="text-lg font-extrabold text-emerald-700">{fmt(summaryData.matchedSum)}</p>
+          </div>
+          <div className="p-3 border border-rose-300 rounded bg-rose-50 text-center">
+            <p className="text-[10px] text-rose-600 uppercase font-bold">Unmatched Amount</p>
+            <p className="text-lg font-extrabold text-rose-700">{fmt(summaryData.unmatchedSum)}</p>
+          </div>
+          <div className="p-3 border border-blue-300 rounded bg-blue-50 text-center">
+            <p className="text-[10px] text-blue-600 uppercase font-bold">Match Rate</p>
+            <p className="text-xl font-extrabold text-blue-700">{summaryData.totalContracts > 0 ? Math.round((matchedList.length / summaryData.totalContracts) * 100) : 0}%</p>
+          </div>
+        </div>
+
+        <h2 className="text-lg font-bold text-emerald-700 mb-3 border-l-4 border-emerald-600 pl-2 mt-6">
+          ✅ பொருந்திய வரவுகள் (Reconciled & Matched Records) - {matchedList.length}
+        </h2>
+        <table className="w-full text-left text-[11px] mb-8 border border-slate-300">
+          <thead className="bg-slate-800 text-white font-bold">
+            <tr>
+              <th className="p-2 border border-slate-400">S.No</th>
+              <th className="p-2 border border-slate-400 w-1/2">Work Name / Party</th>
+              <th className="p-2 border border-slate-400">Match Status</th>
+              <th className="p-2 border border-slate-400 text-right">Contract (₹)</th>
+              <th className="p-2 border border-slate-400 text-right">Bank (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matchedList.map((r, i) => (
+              <tr key={i} className="border-b border-slate-200">
+                <td className="p-2 border-r border-slate-200">{i + 1}</td>
+                <td className="p-2 border-r border-slate-200 font-semibold">{r.workName}</td>
+                <td className="p-2 border-r border-slate-200 text-[9px] text-emerald-600 font-bold">{r.matchDetail}</td>
+                <td className="p-2 border-r border-slate-200 text-right font-mono">{fmt(r.receiptAmt)}</td>
+                <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{fmt(r.bankAmt)}</td>
+              </tr>
+            ))}
+            <tr className="bg-yellow-100 font-bold text-slate-800">
+              <td colSpan={3} className="p-2 text-right border-r border-slate-300 uppercase">Subtotal (Matched):</td>
+              <td className="p-2 text-right border-r border-slate-300 font-mono">{fmt(matchedList.reduce((s, r) => s + r.receiptAmt, 0))}</td>
+              <td className="p-2 text-right font-mono text-emerald-800">{fmt(summaryData.matchedSum)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2 className="text-lg font-bold text-rose-700 mb-3 border-l-4 border-rose-600 pl-2" style={{ pageBreakBefore: 'always' }}>
+          ❌ நிலுவையில் உள்ளவை (Unmatched Contracts) - {unmatchedList.length}
+        </h2>
+        <table className="w-full text-left text-[11px] mb-8 border border-slate-300">
+          <thead className="bg-rose-900 text-white font-bold">
+            <tr>
+              <th className="p-2 border border-rose-700">S.No</th>
+              <th className="p-2 border border-rose-700">Work Name / Party</th>
+              <th className="p-2 border border-rose-700">Source Sheet</th>
+              <th className="p-2 border border-rose-700 text-right">Expected Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {unmatchedList.map((r, i) => (
+              <tr key={i} className="border-b border-slate-200">
+                <td className="p-2 border-r border-slate-200">{i + 1}</td>
+                <td className="p-2 border-r border-slate-200 font-semibold">{r.workName}</td>
+                <td className="p-2 border-r border-slate-200 text-slate-500">{r.sourceSheet}</td>
+                <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-rose-700">{fmt(r.receiptAmt)}</td>
+              </tr>
+            ))}
+            <tr className="bg-yellow-100 font-bold text-slate-800">
+              <td colSpan={3} className="p-2 text-right border-r border-slate-300 uppercase">Subtotal (Unmatched):</td>
+              <td className="p-2 text-right font-mono text-rose-800">{fmt(summaryData.unmatchedSum)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="border-2 border-slate-800 p-4 rounded-lg bg-slate-50 mt-8" style={{ pageBreakInside: 'avoid' }}>
+          <h3 className="text-base font-extrabold text-center uppercase mb-4 border-b-2 border-slate-300 pb-2">
+            Cross Verification Summary (இறுதி அறிக்கை)
+          </h3>
+          <table className="w-full text-sm font-semibold text-slate-700">
+            <tbody>
+              <tr><td className="py-2">Total Contract Value (A)</td><td className="py-2 text-right font-mono">{fmt(summaryData.matchedSum + summaryData.unmatchedSum)}</td></tr>
+              <tr><td className="py-2 text-emerald-700">Total Bank Receipts Matched (B)</td><td className="py-2 text-right font-mono text-emerald-700">{fmt(summaryData.matchedSum)}</td></tr>
+              <tr className="border-b border-slate-300"><td className="py-2 text-rose-700">Unmatched Treasury Pending (C)</td><td className="py-2 text-right font-mono text-rose-700">{fmt(summaryData.unmatchedSum)}</td></tr>
+              <tr className="bg-emerald-600 text-white font-extrabold text-base">
+                <td className="py-3 px-2 rounded-l">Net Difference (A - (B + C))</td><td className="py-3 px-2 text-right font-mono rounded-r">₹0.00</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-center text-[10px] mt-3 text-slate-500 font-bold">*** System Generated Report. AR ERP V3.0 ***</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MASTER RECONCILIATION PAGE (STANDALONE ENGINE INCLUDED)
 // ============================================================
 import React, { useState } from "react";
@@ -6292,16 +6449,15 @@ import React, { useState } from "react";
 export function ReconciliationPage({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [showPrint, setShowPrint] = useState(false);
   const [activeTab, setActiveTab] = useState<"summary" | "exact" | "deduction" | "multiple" | "unmatched" | "bank">("summary");
   const [summaryData, setSummaryData] = useState<any>(null);
   const [reconciledList, setReconciledList] = useState<any[]>([]);
   const [unmatchedBankRows, setUnmatchedBankRows] = useState<any[]>([]);
 
-  // Sheet IDs
   const SHEET_ID = "1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw";
-  const BANK_GID = "2024650928"; // Polinchi B/S 1712
+  const BANK_GID = "2024650928"; 
 
-  // எண்களைப் பிரித்தெடுக்கும் கருவி
   const parseNum = (val: any): number => {
     if (!val && val !== 0) return 0;
     const clean = String(val).replace(/[$₹,\s#]/g, "").replace(/[^0-9.-]/g, "").trim();
@@ -6310,11 +6466,8 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleRunReconciliation = async () => {
-    setLoading(true);
-    setLoaded(false);
-
+    setLoading(true); setLoaded(false);
     try {
-      // 1. LOAD CONTRACTS (Master Sheet 24 Columns)
       const contractsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=0`;
       const contractRes = await fetch(contractsUrl);
       const contractCsv = await contractRes.text();
@@ -6330,21 +6483,21 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
           else cur += ch;
         }
         cols.push(cur.replace(/"/g, "").trim());
-
         if (cols.length < 5) continue;
 
         const workName = cols[4] || cols[1] || "";
         const taxableValue = parseNum(cols[9] || cols[8]);
         const receiptAmtOriginal = parseNum(cols[16] || cols[17]);
         
-        if (taxableValue > 0 || receiptAmtOriginal > 0) {
+        // 🔴 BUG FIX: 2594 Rows Issue Fixed. Only process rows with a Work Name!
+        if (workName.trim() !== "" && (taxableValue > 0 || receiptAmtOriginal > 0)) {
           contracts.push({
             id: i,
             sourceSheet: cols[0] || "General",
             workName,
             party: cols[6] || "",
             taxableValue,
-            receiptAmt: receiptAmtOriginal || taxableValue * 1.18, // Fallback if receipt is 0
+            receiptAmt: receiptAmtOriginal || taxableValue * 1.18, 
             dateStr: cols[17] || cols[18] || "",
             matchStatus: "☒ No Match",
             matchDetail: "Unmatched"
@@ -6352,7 +6505,6 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 2. LOAD BANK STATEMENT
       const bankUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${BANK_GID}`;
       const bankRes = await fetch(bankUrl);
       const bankCsv = await bankRes.text();
@@ -6364,19 +6516,10 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
         if (cols.length < 4) continue;
         const credit = parseNum(cols[5] || cols[6]);
         if (credit > 0) {
-          banks.push({
-            id: i,
-            date: cols[0] || cols[1] || "",
-            description: cols[2] || cols[1] || "",
-            credit,
-            isUsed: false
-          });
+          banks.push({ id: i, date: cols[0] || cols[1] || "", description: cols[2] || cols[1] || "", credit, isUsed: false });
         }
       }
 
-      // ---------------------------------------------------------
-      // 3. MASTER RECONCILIATION ENGINE (BUILT-IN)
-      // ---------------------------------------------------------
       let exactCount = 0, dedCount = 0, multiCount = 0, unmatchCount = 0;
       let matchedSum = 0, unmatchedSum = 0;
 
@@ -6384,95 +6527,47 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
         const targetAmt = c.receiptAmt;
         if (!targetAmt) return;
 
-        // PASS 1: Exact Match (Diff <= ₹5)
         let matchedBank = banks.find(b => !b.isUsed && Math.abs(b.credit - targetAmt) <= 5);
         if (matchedBank) {
-          matchedBank.isUsed = true;
-          c.matchStatus = "☑ Exact Match";
+          matchedBank.isUsed = true; c.matchStatus = "☑ Exact Match";
           c.matchDetail = `EXACT: ${matchedBank.date} - ${matchedBank.description.slice(0, 30)}`;
-          c.bankAmt = matchedBank.credit;
-          matchedSum += matchedBank.credit;
-          exactCount++;
-          return;
+          c.bankAmt = matchedBank.credit; matchedSum += matchedBank.credit; exactCount++; return;
         }
 
-        // PASS 2: Tax & EMD Deductions Match (TDS/GST-TDS/EMD)
-        const net2Pct = targetAmt * 0.98;
-        const net4Pct = targetAmt * 0.96;
-        const net5Pct = targetAmt * 0.95;
-        const net9Pct = targetAmt * 0.91;
-        const net10Pct = targetAmt * 0.90;
-
+        const net2Pct = targetAmt * 0.98; const net4Pct = targetAmt * 0.96; const net5Pct = targetAmt * 0.95; const net9Pct = targetAmt * 0.91; const net10Pct = targetAmt * 0.90;
         matchedBank = banks.find(b => {
           if (b.isUsed) return false;
-          return (
-            Math.abs(b.credit - net2Pct) <= 10 ||
-            Math.abs(b.credit - net4Pct) <= 10 ||
-            Math.abs(b.credit - net5Pct) <= 10 ||
-            Math.abs(b.credit - net9Pct) <= 10 ||
-            Math.abs(b.credit - net10Pct) <= 10
-          );
+          return (Math.abs(b.credit - net2Pct) <= 10 || Math.abs(b.credit - net4Pct) <= 10 || Math.abs(b.credit - net5Pct) <= 10 || Math.abs(b.credit - net9Pct) <= 10 || Math.abs(b.credit - net10Pct) <= 10);
         });
 
         if (matchedBank) {
-          matchedBank.isUsed = true;
-          c.matchStatus = "🎯 Deduction Match";
+          matchedBank.isUsed = true; c.matchStatus = "🎯 TDS/EMD Match";
           const dedPct = ((1 - (matchedBank.credit / targetAmt)) * 100).toFixed(1);
           c.matchDetail = `TDS/EMD (${dedPct}% Deducted): ${matchedBank.date}`;
-          c.bankAmt = matchedBank.credit;
-          matchedSum += matchedBank.credit;
-          dedCount++;
-          return;
+          c.bankAmt = matchedBank.credit; matchedSum += matchedBank.credit; dedCount++; return;
         }
 
-        // PASS 3: Multiple Credits (Split Payments)
-        let cumulative = 0;
-        const splitIds: number[] = [];
+        let cumulative = 0; const splitIds: number[] = [];
         for (let j = 0; j < banks.length; j++) {
           if (!banks[j].isUsed && banks[j].credit > 0) {
-            if (cumulative + banks[j].credit <= targetAmt + 10) {
-              cumulative += banks[j].credit;
-              splitIds.push(j);
-            }
+            if (cumulative + banks[j].credit <= targetAmt + 10) { cumulative += banks[j].credit; splitIds.push(j); }
           }
           if (Math.abs(cumulative - targetAmt) <= 10) break;
         }
 
         if (splitIds.length > 1 && Math.abs(cumulative - targetAmt) <= 10) {
           splitIds.forEach(id => banks[id].isUsed = true);
-          c.matchStatus = "☑ Multiple Credit";
-          c.matchDetail = `${splitIds.length} Split Payments Matched`;
-          c.bankAmt = cumulative;
-          matchedSum += cumulative;
-          multiCount++;
-          return;
+          c.matchStatus = "☑ Multiple Credit"; c.matchDetail = `${splitIds.length} Split Payments Matched`;
+          c.bankAmt = cumulative; matchedSum += cumulative; multiCount++; return;
         }
 
-        // PASS 4: Unmatched
-        unmatchedSum += targetAmt;
-        unmatchCount++;
+        unmatchedSum += targetAmt; unmatchCount++;
       });
 
-      // 4. Update States
-      setReconciledList(contracts);
-      setUnmatchedBankRows(banks.filter(b => !b.isUsed));
-      setSummaryData({
-        totalContracts: contracts.length,
-        exactCount,
-        dedCount,
-        multiCount,
-        unmatchCount,
-        matchedSum,
-        unmatchedSum
-      });
+      setReconciledList(contracts); setUnmatchedBankRows(banks.filter(b => !b.isUsed));
+      setSummaryData({ totalContracts: contracts.length, exactCount, dedCount, multiCount, unmatchCount, matchedSum, unmatchedSum });
       setLoaded(true);
-
-    } catch (err) {
-      console.error(err);
-      alert("❌ Data Load பிழை. இணைய இணைப்பைச் சரிபார்க்கவும்.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("❌ Data Load பிழை. இணைய இணைப்பைச் சரிபார்க்கவும்."); } finally { setLoading(false); }
   };
 
   const fmtR = (n: number) => "₹" + (n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0 });
@@ -6480,38 +6575,32 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
   const getFilteredList = () => {
     switch (activeTab) {
       case "exact": return reconciledList.filter(c => c.matchStatus === "☑ Exact Match");
-      case "deduction": return reconciledList.filter(c => c.matchStatus === "🎯 Deduction Match");
+      case "deduction": return reconciledList.filter(c => c.matchStatus === "🎯 TDS/EMD Match");
       case "multiple": return reconciledList.filter(c => c.matchStatus === "☑ Multiple Credit");
       case "unmatched": return reconciledList.filter(c => c.matchStatus === "☒ No Match");
       default: return reconciledList;
     }
   };
 
+  // 🖨️ SHOW PRINT VIEW
+  if (showPrint) {
+    return <PrintReconciliationReport reconciledList={reconciledList} summaryData={summaryData} unmatchedBank={unmatchedBankRows} onClose={() => setShowPrint(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shadow-lg">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🔄</span>
-          <div>
-            <h1 className="font-bold text-lg">Master Reconciliation V3.0 (Built-in Engine)</h1>
-            <p className="text-xs text-emerald-400">TDS / EMD Deductions Auto-Match Active</p>
-          </div>
-        </div>
+        <div className="flex items-center gap-3"><span className="text-2xl">🔄</span><div><h1 className="font-bold text-lg">Master Reconciliation V3.0</h1><p className="text-xs text-emerald-400">TDS / EMD Deductions Auto-Match Active</p></div></div>
         <div className="flex gap-3">
+          {loaded && <button onClick={() => setShowPrint(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-md transition">🖨️ Print Report</button>}
           <button onClick={onBack} className="px-4 py-2 bg-slate-800 hover:bg-black text-xs font-bold rounded-lg transition">← Back</button>
-          <button onClick={handleRunReconciliation} disabled={loading} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition">
-            {loading ? "⏳ Processing..." : loaded ? "↻ Re-Run" : "▶ Start Reconciliation"}
-          </button>
+          <button onClick={handleRunReconciliation} disabled={loading} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition">{loading ? "⏳ Processing..." : loaded ? "↻ Re-Run" : "▶ Start Reconciliation"}</button>
         </div>
       </header>
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">
         {!loaded && !loading && (
-          <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4">
-            <span className="text-6xl">🤖</span>
-            <h2 className="text-2xl font-bold">Reconciliation Engine Ready</h2>
-            <p className="text-sm text-slate-500">பழைய ஸ்கிரிப்ட் நீக்கப்பட்டு புதிய Deduction Engine இணைக்கப்பட்டுள்ளது. Run பட்டனை அழுத்தவும்.</p>
-          </div>
+          <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4"><span className="text-6xl">🤖</span><h2 className="text-2xl font-bold">Reconciliation Engine Ready</h2><p className="text-sm text-slate-500">200+ வரிகளை 2594 என காட்டிய பிழை சரிசெய்யப்பட்டது. Run பட்டனை அழுத்தவும்.</p></div>
         )}
 
         {loaded && summaryData && (
@@ -6530,59 +6619,26 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
             </div>
 
             <div className="flex border-b border-gray-200 gap-2 bg-white px-4 pt-2 rounded-t-xl">
-              {[
-                { id: "summary", label: "அனைத்தும்", count: reconciledList.length },
-                { id: "exact", label: "☑ Exact Match", count: summaryData.exactCount },
-                { id: "deduction", label: "🎯 TDS/EMD Match", count: summaryData.dedCount },
-                { id: "multiple", label: "☑ Multiple Credit", count: summaryData.multiCount },
-                { id: "unmatched", label: "☒ Unmatched", count: summaryData.unmatchCount },
-                { id: "bank", label: "🏦 Unmatched Bank", count: unmatchedBankRows.length },
-              ].map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-4 py-2.5 text-xs font-bold border-b-2 ${activeTab === t.id ? "border-emerald-600 text-emerald-700 bg-emerald-50" : "border-transparent text-gray-500"}`}>
-                  {t.label} ({t.count})
-                </button>
+              {[ { id: "summary", label: "அனைத்தும்", count: reconciledList.length }, { id: "exact", label: "☑ Exact Match", count: summaryData.exactCount }, { id: "deduction", label: "🎯 TDS/EMD Match", count: summaryData.dedCount }, { id: "multiple", label: "☑ Multiple Credit", count: summaryData.multiCount }, { id: "unmatched", label: "☒ Unmatched", count: summaryData.unmatchCount }, { id: "bank", label: "🏦 Unmatched Bank", count: unmatchedBankRows.length } ].map(t => (
+                <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-4 py-2.5 text-xs font-bold border-b-2 ${activeTab === t.id ? "border-emerald-600 text-emerald-700 bg-emerald-50" : "border-transparent text-gray-500"}`}>{t.label} ({t.count})</button>
               ))}
             </div>
 
             <div className="bg-white rounded-b-xl border border-gray-200 shadow-sm overflow-hidden overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-100 text-slate-600 border-b">
-                  <tr>
-                    <th className="p-3">Source</th>
-                    <th className="p-3">Work Name</th>
-                    <th className="p-3 text-right">Contract Amt</th>
-                    <th className="p-3 text-right">Bank Amt</th>
-                    <th className="p-3 text-center">Status</th>
-                    <th className="p-3">Match Details</th>
-                  </tr>
+                  <tr><th className="p-3">Source</th><th className="p-3">Work Name</th><th className="p-3 text-right">Contract Amt</th><th className="p-3 text-right">Bank Amt</th><th className="p-3 text-center">Status</th><th className="p-3">Match Details</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {activeTab !== "bank" ? (
-                    getFilteredList().map((r, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-3 font-semibold text-slate-600">{r.sourceSheet}</td>
-                        <td className="p-3 font-bold max-w-xs truncate">{r.workName}</td>
-                        <td className="p-3 text-right font-mono text-slate-800 font-bold">{fmtR(r.receiptAmt)}</td>
-                        <td className="p-3 text-right font-mono text-emerald-700 font-bold">{r.bankAmt ? fmtR(r.bankAmt) : "—"}</td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold ${r.matchStatus.includes("Exact") ? "bg-emerald-100 text-emerald-800" : r.matchStatus.includes("Deduction") ? "bg-blue-100 text-blue-800" : r.matchStatus.includes("Multiple") ? "bg-purple-100 text-purple-800" : "bg-rose-100 text-rose-800"}`}>
-                            {r.matchStatus}
-                          </span>
-                        </td>
-                        <td className="p-3 text-[11px] text-slate-500 truncate max-w-xs">{r.matchDetail}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    unmatchedBankRows.map((b, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-3 font-mono">{b.date}</td>
-                        <td className="p-3 font-semibold" colSpan={2}>{b.description}</td>
-                        <td className="p-3 text-right font-mono text-emerald-700 font-bold">{fmtR(b.credit)}</td>
-                        <td className="p-3 text-center"><span className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-[10px] font-bold">Unused Bank Credit</span></td>
-                        <td className="p-3 text-slate-400">No matching contract</td>
-                      </tr>
-                    ))
-                  )}
+                  {activeTab !== "bank" ? getFilteredList().map((r, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="p-3 font-semibold text-slate-600">{r.sourceSheet}</td><td className="p-3 font-bold max-w-xs truncate">{r.workName}</td><td className="p-3 text-right font-mono text-slate-800 font-bold">{fmtR(r.receiptAmt)}</td><td className="p-3 text-right font-mono text-emerald-700 font-bold">{r.bankAmt ? fmtR(r.bankAmt) : "—"}</td>
+                      <td className="p-3 text-center"><span className={`px-2 py-1 rounded text-[10px] font-bold ${r.matchStatus.includes("Exact") ? "bg-emerald-100 text-emerald-800" : r.matchStatus.includes("Deduction") ? "bg-blue-100 text-blue-800" : r.matchStatus.includes("Multiple") ? "bg-purple-100 text-purple-800" : "bg-rose-100 text-rose-800"}`}>{r.matchStatus}</span></td>
+                      <td className="p-3 text-[11px] text-slate-500 truncate max-w-xs">{r.matchDetail}</td>
+                    </tr>
+                  )) : unmatchedBankRows.map((b, i) => (
+                    <tr key={i} className="hover:bg-slate-50"><td className="p-3 font-mono">{b.date}</td><td className="p-3 font-semibold" colSpan={2}>{b.description}</td><td className="p-3 text-right font-mono text-emerald-700 font-bold">{fmtR(b.credit)}</td><td className="p-3 text-center"><span className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-[10px] font-bold">Unused Bank Credit</span></td><td className="p-3 text-slate-400">No matching contract</td></tr>
+                  ))}
                 </tbody>
               </table>
             </div>

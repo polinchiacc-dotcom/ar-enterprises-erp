@@ -4532,14 +4532,8 @@ function AdminAgentsPage({
 // END OF AGENT PART 3
 // ============================================================
 // ============================================================
-// AGENT FEATURE — PART 4 of 5
-// AgentDashboardPage + Manager-ல் Agent Add feature
-//
-// 📌 எங்கே paste செய்வது:
-//    AdminAgentsPage (Part 3) க்கு கீழே paste செய்யவும்
+// AGENT DASHBOARD PAGE (MERGED & CLEANED STYLE)
 // ============================================================
-
-// ── Agent Dashboard (Agent login ஆனால் காண்பிக்கும் page) ──
 function AgentDashboardPage({
   agent, transactions, vendors, bills, agentWallet, agentOverrides, commissionSlabs,
   onAddVendor, onAddTransaction, onAddBill, onBulkAddBill, onLogout
@@ -4560,12 +4554,10 @@ function AgentDashboardPage({
   const [page, setPage] = useState<"dashboard" | "vendors" | "transactions" | "bills" | "wallet">("dashboard");
   const [selectedDistrict, setSelectedDistrict] = useState(agent.managerDistrict);
 
-  // Agent's own data
-  const myTxns   = transactions.filter(t => t.createdByAgent === agent.agentId);
+  const myTxns   = transactions.filter(t => (t as any).createdByAgent === agent.agentId);
   const myBills  = bills.filter(b => myTxns.some(t => t.txnId === b.txnId));
   const myWallet = agentWallet.filter(w => w.agentId === agent.id);
 
-  // Filter vendors by selected district
   const districtVendors = vendors.filter(v => v.district === selectedDistrict);
   const districtOpenTxns = myTxns.filter(t => t.district === selectedDistrict && t.status === "Open");
 
@@ -4574,11 +4566,8 @@ function AgentDashboardPage({
   const openTxns         = myTxns.filter(t => t.status === "Open").length;
   const closedTxns       = myTxns.filter(t => t.status === "Closed").length;
 
-  // Month filter for wallet
   const [walletMonth, setWalletMonth] = useState("");
-  const filteredWallet = myWallet.filter(w =>
-    !walletMonth || w.date.startsWith(walletMonth)
-  );
+  const filteredWallet = myWallet.filter(w => !walletMonth || w.date.startsWith(walletMonth));
 
   const navItems = [
     { id: "dashboard",    label: "Dashboard",    icon: "📊" },
@@ -4590,45 +4579,54 @@ function AgentDashboardPage({
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5" }}>
-      {/* Sidebar */}
       <div className="w-56 flex-shrink-0" style={{ background: "#1c3d6e" }}>
         <div className="p-4 border-b" style={{ borderColor: "#e2e6ea" }}>
           <p className="font-bold text-sm" style={{ color: "#f0d060" }}>AR Enterprises</p>
           <p className="text-xs text-gray-400">Agent Portal</p>
         </div>
         <div style={{ margin:"10px 10px 6px", padding:"8px 10px", background:"#f2f5f8", borderRadius:8, borderLeft:"3px solid #1c3d6e" }}>
-          <p className="text-xs text-gray-400">🤝 Agent</p>
-          <p className="text-xs font-bold text-white truncate">{agent.fullName}</p>
-          <p className="text-xs text-green-400 mt-1">💰 {fmt(agent.commissionBalance)}</p>
+          <p className="text-xs text-gray-500">🤝 Agent</p>
+          <p className="text-xs font-bold text-gray-800 truncate">{agent.fullName}</p>
+          <p className="text-xs text-green-600 font-bold mt-1">💰 {fmt(agent.commissionBalance)}</p>
         </div>
         <nav className="p-2 space-y-1">
           {navItems.map(n => (
-            <button key={n.id} onClick={() => setPage(n.id)}
-              style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:8, marginBottom:2, fontSize:13, fontWeight:page===n.id?600:400, color:page===n.id?"#1c3d6e":"#6b7c93", background:page===n.id?"#eef2f8":"transparent", border:"none", cursor:"pointer", borderLeft:page===n.id?"3px solid #1c3d6e":"3px solid transparent", width:"100%" }}
-              style={page === n.id ? { background: "linear-gradient(135deg, #f0d060, #c9a227)" } : {}}
+            <button
+              key={n.id}
+              onClick={() => setPage(n.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                marginBottom: 2,
+                fontSize: 13,
+                fontWeight: page === n.id ? 700 : 400,
+                color: page === n.id ? "#1c3d6e" : "#f1f5f9",
+                background: page === n.id ? "#f0d060" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                width: "100%"
+              }}
             >
               <span>{n.icon}</span><span>{n.label}</span>
             </button>
           ))}
         </nav>
         <div className="absolute bottom-4 left-0 w-56 px-3">
-          <button onClick={onLogout} style={{ width:"100%", padding:"7px 10px", borderRadius:8, fontSize:12, color:"#6b7c93", background:"none", border:"1px solid #e2e6ea", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🚪 Logout</button>
+          <button onClick={onLogout} style={{ width:"100%", padding:"7px 10px", borderRadius:8, fontSize:12, color:"#f1f5f9", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🚪 Logout</button>
         </div>
       </div>
 
-      {/* Main */}
       <div className="flex-1 overflow-y-auto">
-
-        {/* District Selector — always visible */}
-        <div className="sticky top-0 z-10 px-6 py-3 flex items-center gap-3" style={{ background: "rgba(240,242,245,0.95)", borderBottom: "1px solid #e5e7eb" }}>
+        <div className="sticky top-0 z-10 px-6 py-3 flex items-center gap-3 bg-white border-b border-gray-200">
           <span className="text-sm font-medium text-gray-600">🏛️ Working District:</span>
           <select value={selectedDistrict} onChange={e => setSelectedDistrict(e.target.value)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:border-blue-500 bg-white">
             {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
-          <span className="text-xs text-gray-400">| எந்த district-லும் work செய்யலாம்</span>
         </div>
 
-        {/* Dashboard */}
         {page === "dashboard" && (
           <div style={{ padding:"24px 28px", display:"flex", flexDirection:"column", gap:20 }}>
             <div>
@@ -4650,32 +4648,16 @@ function AgentDashboardPage({
               ))}
             </div>
 
-            {/* Commission Info */}
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
               <h2 className="font-bold text-gray-800 mb-3">💰 My Commission Setup</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg" style={{ background: "#f0f7ff", border: "1px solid #bfdbfe" }}>
-                  <p className="text-sm font-medium text-blue-700">Commission Type</p>
-                  <p className="text-lg font-bold text-blue-900 mt-1">
-                    {agent.commissionType === "custom"
-                      ? `✏️ Custom — ${agent.customCommissionPercent}%`
-                      : "📊 Auto (GST-based Slab)"}
-                  </p>
-                </div>
-                {agent.commissionType === "auto" && (
-                  <div className="p-4 rounded-lg" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                    <p className="text-sm font-medium text-green-700">Current Slab Rates</p>
-                    <div className="mt-2 space-y-1">
-                      {commissionSlabs.filter(s => s.agentCommission > 0).map(s => (
-                        <p key={s.gstPercent} className="text-xs text-green-700">GST {s.gstPercent}% → Commission {s.agentCommission}%</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm font-medium text-blue-700">Commission Type</p>
+                <p className="text-lg font-bold text-blue-900 mt-1">
+                  {agent.commissionType === "custom" ? `✏️ Custom — ${agent.customCommissionPercent}%` : "📊 Auto (GST-based Slab)"}
+                </p>
               </div>
             </div>
 
-            {/* Recent transactions */}
             <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
               <div className="p-4 border-b border-gray-100"><h2 className="font-bold text-gray-800">Recent Transactions</h2></div>
               <div className="overflow-x-auto">
@@ -4693,73 +4675,47 @@ function AgentDashboardPage({
                           <td className="px-4 py-3 text-gray-600">{t.district}</td>
                           <td className="px-4 py-3 font-semibold">{fmt(t.expectedAmount)}</td>
                           <td className="px-4 py-3">{t.gstPercent}%</td>
-                          <td className="px-4 py-3 text-green-700 font-semibold">
-                            {t.status === "Closed"
-                              ? (() => { const w = myWallet.find(w => w.txnId === t.txnId); return w ? fmt(w.commissionAmount) : "—"; })()
-                              : `~${fmt(comm.amount)} (${comm.percent}%)`}
-                          </td>
-                          <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${t.status === "Closed" ? "bg-green-100 text-green-700" : t.status === "PendingClose" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{t.status}</span></td>
+                          <td className="px-4 py-3 text-green-700 font-semibold">{comm.amount > 0 ? `${fmt(comm.amount)} (${comm.percent}%)` : "—"}</td>
+                          <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${t.status === "Closed" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>{t.status}</span></td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                {myTxns.length === 0 && <p className="text-center py-8 text-gray-400">No transactions yet</p>}
               </div>
             </div>
           </div>
         )}
 
-        {/* Wallet Page */}
         {page === "wallet" && (
           <div className="p-6 space-y-4">
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1c2b3a", margin: 0 }}>💰 My Commission Wallet</h1>
-
             <div className="rounded-xl p-6 text-white" style={{ background: "#1c3d6e" }}>
               <p className="text-sm text-gray-300">Current Balance</p>
               <p className="text-5xl font-bold mt-2" style={{ color: "#f0d060" }}>{fmt(agent.commissionBalance)}</p>
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-white/10">
-                <div><p className="text-xs text-gray-400">Total Earned</p><p className="font-bold text-lg mt-1">{fmt(round2(totalCommission))}</p></div>
-                <div><p className="text-xs text-gray-400">Transactions</p><p className="font-bold text-lg mt-1">{closedTxns} closed</p></div>
-                <div><p className="text-xs text-gray-400">Pending</p><p className="font-bold text-lg mt-1">{openTxns} open</p></div>
-              </div>
             </div>
-
-            {/* Month/Date filter */}
-            <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-600">Month Filter:</label>
-              <input type="month" value={walletMonth} onChange={e => setWalletMonth(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-blue-500" />
-              {walletMonth && <button onClick={() => setWalletMonth("")} className="text-xs text-gray-400 hover:text-gray-600">Clear ✕</button>}
-            </div>
-
             <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead style={{ background: "#1a1a2e" }}>
-                    <tr>{["Date","Vendor","TXN","Amount","GST%","Commission%","Earned","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {[...filteredWallet].reverse().map(w => (
-                      <tr key={w.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 text-xs text-gray-500">{w.date}</td>
-                        <td className="px-3 py-3 font-semibold text-gray-800">{w.vendorName}</td>
-                        <td className="px-3 py-3 font-mono text-xs text-blue-700">{w.txnId}</td>
-                        <td className="px-3 py-3">{fmt(w.billAmount)}</td>
-                        <td className="px-3 py-3">{w.gstPercent}%</td>
-                        <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${w.commissionType === "custom" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{w.commissionPercent}%</span></td>
-                        <td className="px-3 py-3 font-bold text-green-700">{fmt(w.commissionAmount)}</td>
-                        <td className="px-3 py-3 font-bold text-gray-800">{fmt(w.balance)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredWallet.length === 0 && <p className="text-center py-8 text-gray-400">No commission entries found</p>}
-              </div>
+              <table className="w-full text-sm">
+                <thead style={{ background: "#f2f5f8" }}>
+                  <tr>{["Date","Vendor","TXN","Amount","Commission","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[...filteredWallet].reverse().map(w => (
+                    <tr key={w.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-3 text-xs text-gray-500">{w.date}</td>
+                      <td className="px-3 py-3 font-semibold text-gray-800">{w.vendorName}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-blue-700">{w.txnId}</td>
+                      <td className="px-3 py-3">{fmt(w.billAmount)}</td>
+                      <td className="px-3 py-3 font-bold text-green-700">{fmt(w.commissionAmount)}</td>
+                      <td className="px-3 py-3 font-bold text-gray-800">{fmt(w.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* Vendors, Transactions, Bills — reuse existing pages with district filter */}
         {page === "vendors" && (
           <VendorsPage
             isAdmin={false} district={selectedDistrict}
@@ -4774,7 +4730,7 @@ function AgentDashboardPage({
             isAdmin={false} district={selectedDistrict}
             transactions={myTxns.filter(t => t.district === selectedDistrict)}
             vendors={districtVendors} bills={myBills}
-            onAdd={(txn, advance) => onAddTransaction({ ...txn, createdByAgent: agent.agentId, agentName: agent.fullName }, advance)}
+            onAdd={(txn, advance) => onAddTransaction({ ...txn, createdByAgent: agent.agentId, agentName: agent.fullName } as any, advance)}
             onClose={() => {}} onUpdate={() => {}} onDelete={() => {}}
           />
         )}
@@ -4787,7 +4743,6 @@ function AgentDashboardPage({
             onAdd={onAddBill} onBulkAdd={onBulkAddBill} onUpdate={() => {}} onDelete={() => {}}
           />
         )}
-
       </div>
     </div>
   );

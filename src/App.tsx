@@ -6592,7 +6592,3 @@ export function ReconciliationPage({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
-      </div>
-    </div>
-  );
-}

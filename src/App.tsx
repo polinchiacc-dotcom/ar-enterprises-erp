@@ -4072,17 +4072,8 @@ function AuditLogsPage({ logs }: { logs: AuditLog[] }) {
   );
 }
 // ============================================================
-// SETTINGS PAGE
+// ADMIN AGENTS PAGE (CLEAN IMPLEMENTATION)
 // ============================================================
-// ============================================================
-// AGENT FEATURE — PART 3 of 5
-// AdminAgentsPage — புதிய Component
-//
-// 📌 எங்கே paste செய்வது:
-//    App.tsx PART 4-ல் SettingsPage function-க்கு முன்னால்
-//    இந்த முழு component-ஐ paste செய்யவும்
-// ============================================================
-
 function AdminAgentsPage({
   agents, agentWallet, agentOverrides, commissionSlabs,
   transactions, vendors, bills,
@@ -4110,29 +4101,25 @@ function AdminAgentsPage({
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "txns" | "wallet" | "overrides">("overview");
 
-  // Approve modal state
   const [approveAgentId, setApproveAgentId] = useState<string | null>(null);
   const [approveType, setApproveType] = useState<"auto" | "custom">("auto");
   const [approvePct, setApprovePct] = useState("1");
 
-  // Override modal state
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [overrideVendorCode, setOverrideVendorCode] = useState("");
   const [overridePct, setOverridePct] = useState("1");
 
-  // Commission edit modal
   const [editCommAgent, setEditCommAgent] = useState<Agent | null>(null);
   const [editCommType, setEditCommType] = useState<"auto" | "custom">("auto");
   const [editCommPct, setEditCommPct] = useState("1");
 
-  // Slab editor state
   const [editSlabs, setEditSlabs] = useState<CommissionSlab[]>([...commissionSlabs]);
 
   const pending  = agents.filter(a => a.status === "pending");
   const approved = agents.filter(a => a.status === "approved");
 
   const getAgentStats = (agent: Agent) => {
-    const agentTxns = transactions.filter(t => t.createdByAgent === agent.agentId);
+    const agentTxns = transactions.filter(t => (t as any).createdByAgent === agent.agentId);
     const agentBills = bills.filter(b => agentTxns.some(t => t.txnId === b.txnId));
     const agentVendors = [...new Set(agentTxns.map(t => t.vendorCode))];
     const walletEntries = agentWallet.filter(w => w.agentId === agent.id);
@@ -4147,10 +4134,9 @@ function AdminAgentsPage({
     };
   };
 
-  // ── Selected Agent Detail View ────────────────────────────
   if (selectedAgent) {
     const stats = getAgentStats(selectedAgent);
-    const agentTxns = transactions.filter(t => t.createdByAgent === selectedAgent.agentId);
+    const agentTxns = transactions.filter(t => (t as any).createdByAgent === selectedAgent.agentId);
     const walletEntries = agentWallet.filter(w => w.agentId === selectedAgent.id);
     const myOverrides = agentOverrides.filter(o => o.agentId === selectedAgent.id);
 
@@ -4167,7 +4153,6 @@ function AdminAgentsPage({
           </span>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Transactions", value: stats.txnCount, color: "#0369a1" },
@@ -4182,7 +4167,6 @@ function AdminAgentsPage({
           ))}
         </div>
 
-        {/* Commission Settings */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -4191,11 +4175,10 @@ function AdminAgentsPage({
                 Type: <strong>{selectedAgent.commissionType === "custom" ? `Custom — ${selectedAgent.customCommissionPercent}%` : "Auto (Slab)"}</strong>
               </p>
             </div>
-            <button onClick={() => { setEditCommAgent(selectedAgent); setEditCommType(selectedAgent.commissionType); setEditCommPct(String(selectedAgent.customCommissionPercent)); }} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#eef2f8" }}>✏️ மாற்று</button>
+            <button onClick={() => { setEditCommAgent(selectedAgent); setEditCommType(selectedAgent.commissionType); setEditCommPct(String(selectedAgent.customCommissionPercent)); }} className="px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100">✏️ மாற்று</button>
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 border-b border-gray-200">
           {(["overview","txns","wallet","overrides"] as const).map(t => (
             <button key={t} onClick={() => setDetailTab(t)} className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${detailTab === t ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
@@ -4209,7 +4192,7 @@ function AdminAgentsPage({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead style={{ background: "#f2f5f8" }}>
-                  <tr>{["TXN ID","Vendor","District","Amount","GST%","Commission","Status"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                  <tr>{["TXN ID","Vendor","District","Amount","GST%","Commission","Status"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {agentTxns.map(t => {
@@ -4238,7 +4221,7 @@ function AdminAgentsPage({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead style={{ background: "#f2f5f8" }}>
-                  <tr>{["Date","Vendor","TXN","Txn Amt","GST%","Commission%","Commission","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                  <tr>{["Date","Vendor","TXN","Txn Amt","GST%","Commission%","Commission","Balance"].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {[...walletEntries].reverse().map(w => (
@@ -4263,13 +4246,13 @@ function AdminAgentsPage({
         {detailTab === "overrides" && (
           <div className="space-y-4">
             <div className="flex justify-end">
-              <button onClick={() => setShowOverrideModal(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "#7c3aed" }}>+ Custom Override சேர்</button>
+              <button onClick={() => setShowOverrideModal(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700">+ Custom Override சேர்</button>
             </div>
             <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead style={{ background: "#f2f5f8" }}>
-                    <tr>{["Vendor Code","Vendor Name","Commission%","Set By","Set At","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300">{h}</th>)}</tr>
+                    <tr>{["Vendor Code","Vendor Name","Commission%","Set By","Set At","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {myOverrides.map(o => (
@@ -4284,13 +4267,12 @@ function AdminAgentsPage({
                     ))}
                   </tbody>
                 </table>
-                {myOverrides.length === 0 && <p className="text-center py-8 text-gray-400">No custom overrides. All vendors use slab/auto commission.</p>}
+                {myOverrides.length === 0 && <p className="text-center py-8 text-gray-400">No custom overrides.</p>}
               </div>
             </div>
           </div>
         )}
 
-        {/* Override Modal */}
         {showOverrideModal && (
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.6)" }}>
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl space-y-4">
@@ -4326,8 +4308,7 @@ function AdminAgentsPage({
                     setShowOverrideModal(false);
                     setOverrideVendorCode(""); setOverridePct("1");
                   }}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white"
-                  style={{ background: "#7c3aed" }}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-purple-600 hover:bg-purple-700"
                 >
                   💾 Save Override
                 </button>
@@ -4337,7 +4318,6 @@ function AdminAgentsPage({
           </div>
         )}
 
-        {/* Edit Commission Modal */}
         {editCommAgent && (
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.6)" }}>
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl space-y-4">
@@ -4365,8 +4345,7 @@ function AdminAgentsPage({
                     setSelectedAgent(prev => prev ? { ...prev, commissionType: editCommType, customCommissionPercent: parseFloat(editCommPct) || 0 } : null);
                     setEditCommAgent(null);
                   }}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white"
-                  style={{ background: "#16a34a" }}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-green-600 hover:bg-green-700"
                 >
                   💾 Save
                 </button>
@@ -4379,7 +4358,6 @@ function AdminAgentsPage({
     );
   }
 
-  // ── Main Agents List View ─────────────────────────────────
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -4394,7 +4372,6 @@ function AdminAgentsPage({
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         {(["list","pending","slabs"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
@@ -4403,7 +4380,6 @@ function AdminAgentsPage({
         ))}
       </div>
 
-      {/* Pending Approvals */}
       {tab === "pending" && (
         <div className="space-y-4">
           {pending.length === 0 && <p className="text-center py-12 text-gray-400">Pending approvals இல்லை</p>}
@@ -4413,31 +4389,21 @@ function AdminAgentsPage({
                 <div>
                   <p className="font-bold text-gray-800 text-lg">{agent.fullName}</p>
                   <p style={{ fontSize: 12, color: "#8899aa", margin: "3px 0 0" }}>{agent.agentId} | {agent.mobile}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Manager: <strong>{agent.managerName}</strong> ({agent.managerDistrict})
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Registered: {new Date(agent.createdAt).toLocaleDateString('en-IN')}
-                  </p>
+                  <p className="text-sm text-gray-500 mt-1">Manager: <strong>{agent.managerName}</strong> ({agent.managerDistrict})</p>
                 </div>
                 <div className="flex flex-col gap-2 min-w-[200px]">
                   {approveAgentId === agent.id ? (
                     <div className="space-y-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-xs font-bold text-green-700">Commission Type செலக்ட் செய்யவும்:</p>
+                      <p className="text-xs font-bold text-green-700">Commission Type:</p>
                       <div className="flex gap-2">
-                        <button onClick={() => setApproveType("auto")} className={`flex-1 py-1.5 rounded text-xs font-semibold border ${approveType === "auto" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-600"}`}>Auto Slab</button>
+                        <button onClick={() => setApproveType("auto")} className={`flex-1 py-1.5 rounded text-xs font-semibold border ${approveType === "auto" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-600"}`}>Auto</button>
                         <button onClick={() => setApproveType("custom")} className={`flex-1 py-1.5 rounded text-xs font-semibold border ${approveType === "custom" ? "border-purple-500 bg-purple-50 text-purple-700" : "border-gray-300 text-gray-600"}`}>Custom %</button>
                       </div>
                       {approveType === "custom" && (
-                        <input type="number" step="0.1" value={approvePct} onChange={e => setApprovePct(e.target.value)} placeholder="Commission %" className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm outline-none" />
+                        <input type="number" step="0.1" value={approvePct} onChange={e => setApprovePct(e.target.value)} placeholder="%" className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm outline-none" />
                       )}
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => { onApprove(agent.id, approveType, parseFloat(approvePct) || 0); setApproveAgentId(null); }}
-                          className="flex-1 py-1.5 rounded text-xs font-bold text-white bg-green-600 hover:bg-green-700"
-                        >
-                          ✅ Confirm Approve
-                        </button>
+                        <button onClick={() => { onApprove(agent.id, approveType, parseFloat(approvePct) || 0); setApproveAgentId(null); }} className="flex-1 py-1.5 rounded text-xs font-bold text-white bg-green-600 hover:bg-green-700">Confirm</button>
                         <button onClick={() => setApproveAgentId(null)} className="px-3 py-1.5 rounded text-xs font-semibold text-gray-600 border border-gray-300">Cancel</button>
                       </div>
                     </div>
@@ -4454,13 +4420,12 @@ function AdminAgentsPage({
         </div>
       )}
 
-      {/* Agents List */}
       {tab === "list" && (
         <div style={{ background:"#fff", borderRadius:10, border:"1px solid #e8ecf0", overflow:"hidden" }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead style={{ background: "#f2f5f8" }}>
-                <tr>{["Agent","Manager","District","Commission","Wallet","Transactions","Status","Actions"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{["Agent","Manager","District","Commission","Wallet","Transactions","Status","Actions"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {agents.filter(a => a.status !== "pending").map(agent => {
@@ -4497,25 +4462,20 @@ function AdminAgentsPage({
                 })}
               </tbody>
             </table>
-            {agents.filter(a => a.status !== "pending").length === 0 && (
-              <p className="text-center py-12 text-gray-400">No agents yet. District managers add agents from their dashboard.</p>
-            )}
           </div>
         </div>
       )}
 
-      {/* Commission Slabs Editor */}
       {tab === "slabs" && (
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-bold text-gray-800 text-lg">📊 Commission Slab Configuration</h2>
-              <p className="text-sm text-gray-500 mt-1">GST % → Agent commission % mapping. Admin மட்டும் மாற்றலாம்.</p>
+              <p className="text-sm text-gray-500 mt-1">GST % → Agent commission % mapping.</p>
             </div>
             <button
               onClick={() => setEditSlabs(prev => [...prev, { gstPercent: 0, agentCommission: 0 }])}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "#1c3d6e", color:"#fff", borderRadius:8, border:"none", cursor:"pointer" }}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800"
             >
               + Row சேர்
             </button>
@@ -4525,10 +4485,10 @@ function AdminAgentsPage({
             <table className="w-full text-sm">
               <thead style={{ background: "#eef2f8" }}>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">GST %</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">Agent Commission %</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300">Note</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300"></th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">GST %</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Agent Commission %</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Note</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -4543,7 +4503,7 @@ function AdminAgentsPage({
                       <span className="ml-1 text-gray-500">%</span>
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-400">
-                      {slab.agentCommission === 0 ? "🔴 Threshold — இதற்கு மேல் commission இல்லை" : `Transaction amount-ல் ${slab.agentCommission}% commission`}
+                      {slab.agentCommission === 0 ? "🔴 Threshold" : `Commission: ${slab.agentCommission}%`}
                     </td>
                     <td className="px-4 py-2">
                       {editSlabs.length > 1 && (
@@ -4556,17 +4516,9 @@ function AdminAgentsPage({
             </table>
           </div>
 
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700 space-y-1">
-            <p className="font-bold">📌 சூத்திரம் (Formula):</p>
-            <p>• Transaction ஒன்று GST 4%-ல் close ஆனால் → agent commission = 0.5% of transaction amount</p>
-            <p>• Threshold row (0%) — இந்த GST% மற்றும் அதற்கு மேல் → commission கிடையாது</p>
-            <p>• Vendor-specific override இருந்தால் → slab-ஐ override செய்யும்</p>
-          </div>
-
           <button
             onClick={() => { onUpdateSlabs(editSlabs); alert("✅ Commission slabs saved!"); }}
-            className="px-8 py-3 rounded-lg text-sm font-bold text-white hover:scale-105 transition-all"
-            style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}
+            className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-green-600 hover:bg-green-700"
           >
             💾 Save Slabs
           </button>

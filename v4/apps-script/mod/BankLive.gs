@@ -5,7 +5,7 @@
  * - Contract work 2024-25 gid 1782489685: 65 entries
  * - Contract work 2025-26 gid 790298656: 68 entries
  * - Contract work 2022-24 gid 1882690159: 67 entries
- * - Bank Statement gid 2024650928: confirmation by date + amount
+ * - Bank Statement gid 2024650928: confirmation by date + amount (BY credits only)
  * If new Contract Work sheet created, auto-include (name contains "Contract")
  */
 var BankLive = (function () {
@@ -46,6 +46,58 @@ var BankLive = (function () {
     return null;
   }
 
+  // Robust date parser: returns YYYY-MM-DD or "" 
+  function parseDateAny(raw) {
+    if (!raw) return "";
+    if (raw instanceof Date && !isNaN(raw.getTime())) {
+      return Utilities.formatDate(raw, "Asia/Kolkata", "yyyy-MM-dd");
+    }
+    var s = String(raw).trim();
+    if (!s) return "";
+    // Already ISO YYYY-MM-DD
+    var iso = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (iso) {
+      var y = iso[1], mo = iso[2].padStart(2, "0"), d = iso[3].padStart(2, "0");
+      return y + "-" + mo + "-" + d;
+    }
+    // DD/MM/YYYY or DD-MM-YYYY or DD/MM/YY
+    var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      var d1 = m[1].padStart(2, "0");
+      var mo1 = m[2].padStart(2, "0");
+      var y1 = m[3];
+      if (y1.length === 2) y1 = "20" + y1;
+      // Basic sanity: if day>31 swap? Assume DD/MM
+      return y1 + "-" + mo1 + "-" + d1;
+    }
+    // DD-MMM-YY or DD-MMM-YYYY or DD-MMM-YY with spaces: 21-Apr-25, 24-Dec-25, 21-Jun-25, 13/02/2023 handled above
+    var m2 = s.match(/^(\d{1,2})[\-\/]([A-Za-z]{3,9})[\-\/](\d{2,4})$/);
+    if (m2) {
+      var months = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12", jna: "01" };
+      var mon = months[m2[2].toLowerCase().slice(0,3)] || "01";
+      var yr = m2[3]; if (yr.length === 2) yr = "20" + yr;
+      return yr + "-" + mon + "-" + m2[1].padStart(2, "0");
+    }
+    // MMM-YY or MMM-YYYY or MMM YY: Dec-25, Nov-23, Mar-23, Sep-25, Aug-25, Jan-26, Feb-23, etc
+    var m3 = s.match(/^([A-Za-z]{3,9})[\-\s\/\.]+(\d{2,4})$/);
+    if (m3) {
+      var months2 = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12", jna: "01" };
+      var mon2 = months2[m3[1].toLowerCase().slice(0,3)] || "";
+      if (mon2) {
+        var yr2 = m3[2]; if (yr2.length === 2) yr2 = "20" + yr2;
+        return yr2 + "-" + mon2 + "-01"; // first day of month
+      }
+    }
+    // Try Date.parse as fallback
+    try {
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return Utilities.formatDate(d, "Asia/Kolkata", "yyyy-MM-dd");
+      }
+    } catch (e) {}
+    return "";
+  }
+
   function parseBankSheet() {
     var ss = openExternal();
     var sheet = getSheetByGid(ss, GIDS.bank);
@@ -55,7 +107,7 @@ var BankLive = (function () {
     var headerRow = -1;
     for (var r = 0; r < Math.min(10, values.length); r++) {
       var rowStr = values[r].join("|").toLowerCase();
-      if (rowStr.indexOf("description") >= 0 && rowStr.indexOf("credit") >= 0) { headerRow = r; break; }
+      if (rowStr.indexOf("description") >= 0 && (rowStr.indexOf("credit") >= 0 || rowStr.indexOf("running") >= 0)) { headerRow = r; break; }
     }
     if (headerRow < 0) headerRow = 4;
     var headers = values[headerRow].map(function (h) { return String(h).toLowerCase().trim(); });
@@ -81,29 +133,46 @@ var BankLive = (function () {
       var desc = String(v[descIdx] || "").trim();
       if (!desc) continue;
       if (desc.toLowerCase().indexOf("description") >= 0) continue;
-      var dateRaw = v[dateIdx];
-      var dateStr = "";
-      if (dateRaw instanceof Date) {
-        dateStr = Utilities.formatDate(dateRaw, "Asia/Kolkata", "yyyy-MM-dd");
-      } else {
-        dateStr = String(dateRaw || "").trim();
-        var m = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-        if (m) {
-          var d = m[1].padStart(2, "0");
-          var mo = m[2].padStart(2, "0");
-          var y = m[3];
-          if (y.length === 2) y = "20" + y;
-          dateStr = y + "-" + mo + "-" + d;
+      var dateStr = parseDateAny(v[dateIdx]);
+      // Amount parsing: credit column may contain both BY and TO amounts
+      var amtRaw = 0;
+      try { amtRaw = Number(String(v[creditIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
+      if (amtRaw === 0) {
+        try { amtRaw = Number(String(v[debitIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e2) {}
+      }
+      // If still 0, try to find amount in row (but not balance) — look for column with $ and numbers
+      if (amtRaw === 0) {
+        // Try column 5,6,7
+        for (var cc = 4; cc < Math.min(9, v.length); cc++) {
+          if (cc === balIdx) continue;
+          var num = Number(String(v[cc] || "0").replace(/[^0-9.\-]/g, ""));
+          if (num > 0 && num < 100000000) { amtRaw = num; break; }
         }
       }
-      var credit = 0, debit = 0, balance = 0;
-      try { credit = Number(String(v[creditIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
-      try { debit = Number(String(v[debitIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
-      try { balance = Number(String(v[balIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
-      // FIX: Don't fallback to any number — that caused huge total ₹4,12,24,78,61,42,09,98,660 (was picking balance as credit)
-      // Only keep row if credit>0 or debit>0 and description exists — bank confirmation only needs date+amount+details
-      if (credit === 0 && debit === 0) continue;
+      if (amtRaw === 0) continue;
       if (!dateStr && !desc) continue;
+
+      var isCredit = desc.toUpperCase().indexOf("BY ") === 0 || desc.toUpperCase().indexOf("BY") === 0;
+      var isDebit = desc.toUpperCase().indexOf("TO ") === 0 || desc.toUpperCase().indexOf("TO") === 0;
+      // If description contains BY TRANSFER, BY CASH, BY RTGS, etc -> credit
+      // TO TRANSFER, TO NEFT, TO CHQ -> debit
+      var credit = 0, debit = 0;
+      if (isCredit || desc.toLowerCase().indexOf("by ") >= 0 && desc.toLowerCase().indexOf("to ") < 0) {
+        credit = amtRaw;
+      } else if (isDebit || desc.toLowerCase().indexOf("to ") >= 0) {
+        debit = amtRaw;
+      } else {
+        // Default: if BY in description -> credit else if TO -> debit else treat as credit if amount small?
+        // For safety, treat as credit if description contains transfer/rtgs/neft/cash and not charges
+        if (desc.toLowerCase().indexOf("charges") >= 0 || desc.toLowerCase().indexOf("fee") >= 0 || desc.toLowerCase().indexOf("maintenance") >= 0) {
+          debit = amtRaw;
+        } else {
+          credit = amtRaw;
+        }
+      }
+      var balance = 0;
+      try { balance = Number(String(v[balIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
+
       var type = "other";
       var dl = desc.toLowerCase();
       if (dl.indexOf("rtgs") >= 0) type = "rtgs";
@@ -113,6 +182,8 @@ var BankLive = (function () {
       else if (dl.indexOf("loan") >= 0) type = "loan";
       else if (dl.indexOf("transfer") >= 0) type = "transfer";
 
+      // Only keep credit entries for confirmation (BY) to avoid huge total and wrong matching
+      // Keep debit as well but mark, but for stats we sum only credits
       rows.push({
         id: "B" + i,
         date: dateStr,
@@ -120,7 +191,8 @@ var BankLive = (function () {
         credit: credit,
         debit: debit,
         balance: balance,
-        type: type
+        type: type,
+        isCredit: credit > 0
       });
     }
     return rows;
@@ -170,81 +242,83 @@ var BankLive = (function () {
     if (workNameIdx < 0) workNameIdx = 2;
     if (receiptAmtIdx < 0) receiptAmtIdx = 4;
     if (workPlaceIdx < 0) workPlaceIdx = 5;
+    if (receiptDateIdx < 0) receiptDateIdx = 19;
 
     var rows = [];
     for (var i = headerRow + 1; i < values.length; i++) {
       var v = values[i];
       if (!v || v.length < 2) continue;
-      var sNo = String(v[0] || "").trim();
-      // Skip if S.No empty and entire row empty
+      var sNoRaw = v[0];
+      var sNo = String(sNoRaw || "").trim();
+      // Skip if entire row empty
       var hasAnyData = false;
       for (var cc = 0; cc < v.length; cc++) { if (String(v[cc] || "").trim() !== "") { hasAnyData = true; break; } }
       if (!hasAnyData) continue;
-      // Skip total row
-      var firstCellLower = String(v[0] || "").toLowerCase() + String(v[2] || "").toLowerCase();
-      if (firstCellLower.indexOf("total") >= 0) continue;
+      // Skip total rows: any cell contains "total" and S.No empty or S.No is total
+      var rowJoinedLower = v.join("|").toLowerCase();
+      if (rowJoinedLower.indexOf("total") >= 0) {
+        // If S.No empty or S.No is not numeric or contains total, skip
+        if (!sNo || isNaN(Number(sNo)) || sNo.toLowerCase().indexOf("total") >= 0) continue;
+        // Also if workName empty and S.No empty? Already handled
+        // If row has Total in last columns and S.No empty, skip
+        if (!sNo) continue;
+      }
+      // Skip if S.No empty — user says S.No mandatory, empty columns kept as empty but S.No must exist
+      if (!sNo) continue;
+      // Skip if S.No is header like "S.No"
+      if (sNo.toLowerCase().indexOf("s.no") >= 0) continue;
 
       var workName = String(v[workNameIdx] || "").trim();
       var fileNameTmp = fileNameIdx >= 0 ? String(v[fileNameIdx] || "").trim() : "";
-      // If Work Name empty, use S.No + File Name or fallback to keep empty columns as empty per user request
-      if (!workName) {
-        if (fileNameTmp) workName = fileNameTmp;
-        else if (sNo) workName = "Work S.No " + sNo;
-        else workName = ""; // Keep empty as empty, but still include row
-      }
-      // Still include even if workName empty — user wants all data, empty columns kept as empty
+      // Keep empty as empty per user — don't fallback to placeholder, keep "" if empty
+      // Only for display we show placeholder, but store empty
       if (workName.toLowerCase().indexOf("work name") >= 0) continue;
 
-      var receiptAmt = 0;
-      try { receiptAmt = Number(String(v[receiptAmtIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0; } catch (e) {}
-      // Try other amount columns if receiptAmt 0 — contract sheets have Taxable Value, Invoice Value etc
+      // Amounts
+      function numAt(idx) {
+        if (idx < 0 || idx >= v.length) return 0;
+        return Number(String(v[idx] || "0").replace(/[^0-9.\-]/g, "")) || 0;
+      }
+      var receiptAmt = numAt(receiptAmtIdx);
+      var taxable = numAt(taxableIdx);
+      var labour = numAt(labourIdx);
+      var gst = numAt(gstIdx);
+      var invoice = numAt(invoiceIdx);
+      var tds = numAt(tdsIdx);
+      var gstTds = numAt(gstTdsIdx);
+      var withHeld = numAt(withHeldIdx);
+      var emd = numAt(emdIdx);
+      var otherDed = numAt(otherDedIdx);
+      var receivable = numAt(receivableIdx);
+
+      // If receiptAmt 0, try fallback to known amount columns in priority
       if (receiptAmt === 0) {
-        // Priority: try columns that look like amounts: Receipt Amount (E), Taxable (I), Invoice (L), Receivable (S)
-        var tryCols = [receiptAmtIdx, taxableIdx, invoiceIdx, 18, 20, 4, 8, 10, 11];
+        var tryCols = [receivableIdx, invoiceIdx, taxableIdx, 21, 22]; // 21,22 are duplicate Receipt Amount columns
         for (var ac = 0; ac < tryCols.length; ac++) {
           var col = tryCols[ac];
-          if (col >= 0 && col < v.length) {
-            var num = Number(String(v[col] || "").replace(/[^0-9.\-]/g, ""));
-            if (num > 0) { receiptAmt = num; break; }
-          }
-        }
-        // Last resort: any number > 1000 in row
-        if (receiptAmt === 0) {
-          for (var ac2 = 0; ac2 < v.length; ac2++) {
-            var num2 = Number(String(v[ac2] || "").replace(/[^0-9.\-]/g, ""));
-            if (num2 > 1000) { receiptAmt = num2; break; }
-          }
+          var num = numAt(col);
+          if (num > 0) { receiptAmt = num; break; }
         }
       }
-      // Keep row even if receiptAmt 0? User wants all data, but we need amount for matching — keep with 0 and show as empty
-      // For now, include even if 0, but mark receiptAmount 0 — will show as empty in UI, can be updated later in Google Sheet
-      if (receiptAmt === 0) {
-        // Check if row has any other data — if S.No exists, include with 0 amount to keep empty columns as empty
-        if (!sNo) continue;
+      // Keep row even if receiptAmt 0, but only if S.No exists and has at least one other amount or workName
+      // This keeps empty columns as empty for future update
+      var hasAmount = receiptAmt > 0 || taxable > 0 || invoice > 0 || receivable > 0 || gst > 0;
+      if (!hasAmount && !workName && !fileNameTmp) {
+        // Row with only S.No but no data — skip (likely blank)
+        continue;
       }
-      var dateRaw = v[receiptDateIdx];
-      var dateStr = "";
-      if (dateRaw instanceof Date) {
-        dateStr = Utilities.formatDate(dateRaw, "Asia/Kolkata", "yyyy-MM-dd");
-      } else {
-        dateStr = String(dateRaw || "").trim();
-        var m = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-        if (m) {
-          var d = m[1].padStart(2, "0");
-          var mo = m[2].padStart(2, "0");
-          var y = m[3];
-          if (y.length === 2) y = "20" + y;
-          dateStr = y + "-" + mo + "-" + d;
-        } else {
-          var m2 = dateStr.match(/(\d{1,2})\-([A-Za-z]{3})\-(\d{2,4})/);
-          if (m2) {
-            var months = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12" };
-            var mon = months[m2[2].toLowerCase()] || "01";
-            var yr = m2[3]; if (yr.length === 2) yr = "20" + yr;
-            dateStr = yr + "-" + mon + "-" + m2[1].padStart(2, "0");
-          }
+
+      var dateStr = parseDateAny(v[receiptDateIdx]);
+      // If date empty, try other date-like columns (col 19, 20)
+      if (!dateStr) {
+        // Try col 19, 20, 1?
+        for (var dc = 18; dc <= 22; dc++) {
+          if (dc === receiptDateIdx) continue;
+          var dTry = parseDateAny(v[dc]);
+          if (dTry) { dateStr = dTry; break; }
         }
       }
+
       var fy = fyIdx >= 0 ? String(v[fyIdx] || fyLabel || "").trim() : fyLabel;
       if (!fy) fy = fyLabel;
       var fileName = fileNameIdx >= 0 ? String(v[fileNameIdx] || "").trim() : "";
@@ -252,16 +326,6 @@ var BankLive = (function () {
       var party = partyIdx >= 0 ? String(v[partyIdx] || "").trim() : "";
       var workType = workTypeIdx >= 0 ? String(v[workTypeIdx] || "").trim() : "";
       var engName = engNameIdx >= 0 ? String(v[engNameIdx] || "").trim() : "";
-      var taxable = taxableIdx >= 0 ? Number(String(v[taxableIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var labour = labourIdx >= 0 ? Number(String(v[labourIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var gst = gstIdx >= 0 ? Number(String(v[gstIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var invoice = invoiceIdx >= 0 ? Number(String(v[invoiceIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var tds = tdsIdx >= 0 ? Number(String(v[tdsIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var gstTds = gstTdsIdx >= 0 ? Number(String(v[gstTdsIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var withHeld = withHeldIdx >= 0 ? Number(String(v[withHeldIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var emd = emdIdx >= 0 ? Number(String(v[emdIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var otherDed = otherDedIdx >= 0 ? Number(String(v[otherDedIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
-      var receivable = receivableIdx >= 0 ? Number(String(v[receivableIdx] || "0").replace(/[^0-9.\-]/g, "")) || 0 : 0;
       var dept = deptIdx >= 0 ? String(v[deptIdx] || "").trim() : "";
 
       rows.push({
@@ -298,24 +362,20 @@ var BankLive = (function () {
     var ss = openExternal();
     var allSheets = ss.getSheets();
     var contractSheets = [];
-    // Known gids
     var knownGids = [GIDS.contract2024, GIDS.contract2025, GIDS.contract2022];
     for (var i = 0; i < allSheets.length; i++) {
       var sh = allSheets[i];
       var name = sh.getName().toLowerCase();
       var gid = sh.getSheetId();
-      // Auto-include if name contains "contract" or gid is known
-      if (name.indexOf("contract") >= 0 || knownGids.indexOf(gid) >= 0) {
+      if (knownGids.indexOf(gid) >= 0 || name.indexOf("contract") >= 0) {
         contractSheets.push({ sheet: sh, gid: gid, name: sh.getName() });
       }
     }
-    // Sort by gid to keep consistent
     var rows = [];
     var counts = {};
     for (var j = 0; j < contractSheets.length; j++) {
       var cs = contractSheets[j];
       var fyLabel = cs.name;
-      // Extract FY from name if possible
       var fyMatch = cs.name.match(/(20\d{2}[\-–]?\d{2})/);
       if (fyMatch) fyLabel = fyMatch[1];
       var parsed = parseContractSheet(cs.gid, fyLabel);
@@ -326,8 +386,10 @@ var BankLive = (function () {
   }
 
   function smartMatch(bank, contract) {
-    var bAmt = bank.credit || bank.debit || 0;
-    var cAmt = contract.receiptAmount || 0;
+    var bAmt = bank.credit || 0;
+    if (bAmt === 0) return { type: "unmatched", confidence: 0, dateDiff: 999, amountDiff: 100 };
+    var cAmt = contract.receiptAmount || contract.receivableAmount || contract.invoiceValue || 0;
+    if (cAmt === 0) return { type: "unmatched", confidence: 0, dateDiff: 999, amountDiff: 100 };
     var denom = Math.max(bAmt, cAmt, 1);
     var amountDiff = Math.abs(bAmt - cAmt) / denom * 100;
     var bTime = bank.date ? new Date(bank.date).getTime() : 0;
@@ -335,82 +397,119 @@ var BankLive = (function () {
     var dateDiff = (bTime && cTime) ? Math.abs(bTime - cTime) / (1000 * 60 * 60 * 24) : 999;
     var confidence = 0;
     var type = "unmatched";
-    // Amount exact is strongest signal — give 80 directly for Tally BRS exact match
-    if (amountDiff === 0) { confidence += 80; type = "exact"; }
-    else if (amountDiff <= 0.5) { confidence += 70; type = "exact"; }
-    else if (amountDiff <= 2) { confidence += 50; type = "near"; }
-    else if (amountDiff <= 5) { confidence += 30; type = "partial"; }
-    else if (amountDiff <= 10) { confidence += 10; type = "near"; }
 
-    if (dateDiff === 0) confidence += 20;
-    else if (dateDiff <= 3) confidence += 15;
-    else if (dateDiff <= 7) confidence += 8;
-    else if (dateDiff <= 15) confidence += 3;
-    else if (dateDiff === 999) {
-      // Date missing — don't penalize, keep amount confidence, but don't show 999d
-      confidence += 0;
+    // Strict matching: same date same amount is exact
+    if (amountDiff === 0 && dateDiff === 0) {
+      confidence = 100; type = "exact";
+    } else if (amountDiff === 0 && dateDiff <= 1) {
+      confidence = 95; type = "exact";
+    } else if (amountDiff === 0 && dateDiff <= 3) {
+      confidence = 90; type = "exact";
+    } else if (amountDiff === 0 && dateDiff <= 7) {
+      confidence = 80; type = "exact";
+    } else if (amountDiff === 0 && dateDiff <= 15) {
+      confidence = 60; type = "partial"; // same amount but date far
+    } else if (amountDiff <= 0.5 && dateDiff === 0) {
+      confidence = 85; type = "exact";
+    } else if (amountDiff <= 0.5 && dateDiff <= 3) {
+      confidence = 75; type = "partial";
+    } else if (amountDiff <= 1 && dateDiff <= 3) {
+      confidence = 65; type = "partial";
+    } else if (amountDiff <= 2 && dateDiff <= 7) {
+      confidence = 50; type = "near";
+    } else if (amountDiff <= 5 && dateDiff <= 3) {
+      confidence = 40; type = "near";
+    } else {
+      confidence = 0; type = "unmatched";
     }
 
-    var workWords = String(contract.workName || "").toLowerCase().split(/\s+/).filter(function (w) { return w.length > 3; });
-    var descLower = String(bank.description || "").toLowerCase();
-    var keywordMatches = 0;
-    for (var i = 0; i < workWords.length; i++) { if (descLower.indexOf(workWords[i]) >= 0) keywordMatches++; }
-    if (keywordMatches > 0) confidence += Math.min(10, keywordMatches * 3);
+    // If dateDiff > 30 days, force unmatched unless amount exact and keyword matches work place
+    if (dateDiff > 30) {
+      if (amountDiff !== 0) {
+        confidence = 0; type = "unmatched";
+      } else {
+        // Same amount but date far — keep as near with low confidence, but not exact
+        if (confidence > 50) confidence = 30;
+        type = "near";
+      }
+    }
 
-    if (confidence >= 80) type = "exact";
-    else if (confidence >= 50) type = "partial";
-    else if (confidence >= 25) type = "near";
-    else type = "unmatched";
+    // Keyword boost only if dateDiff <=7
+    if (dateDiff <= 7) {
+      var workWords = String(contract.workName || "").toLowerCase().split(/\s+/).filter(function (w) { return w.length > 3; });
+      var descLower = String(bank.description || "").toLowerCase();
+      var keywordMatches = 0;
+      for (var i = 0; i < workWords.length; i++) { if (descLower.indexOf(workWords[i]) >= 0) keywordMatches++; }
+      if (keywordMatches > 0) confidence = Math.min(100, confidence + Math.min(10, keywordMatches * 2));
+    }
 
-    // For display, hide 999 diff
     var displayDateDiff = dateDiff === 999 ? 0 : Math.round(dateDiff);
-    return { type: type, confidence: Math.min(100, confidence), dateDiff: displayDateDiff, amountDiff: Math.round(amountDiff * 100) / 100 };
+    return { type: type, confidence: Math.min(100, confidence), dateDiff: displayDateDiff, amountDiff: Math.round(amountDiff * 100) / 100, _rawDateDiff: dateDiff };
   }
 
   function liveRecon(p, requestId, user) {
-    var bankRows = parseBankSheet();
+    var bankRowsAll = parseBankSheet();
+    // For matching, only consider credit rows (BY) — incoming
+    var bankRows = bankRowsAll.filter(function (b) { return b.credit > 0; });
     var contractData = parseAllContractSheets();
     var contractRows = contractData.rows;
 
-    // FOCUS: 200 entries from contract sheets only as main list
-    // Bank is confirmation at end
     var filterStatus = p.filterStatus || "all";
     var filterFY = p.filterFY || "all";
     var search = (p.search || "").toLowerCase();
     var dateFrom = p.dateFrom || "";
     var dateTo = p.dateTo || "";
-
-    // Build bank lookup by date+amount for fast confirmation
-    var bankByDateAmount = {};
-    for (var bi = 0; bi < bankRows.length; bi++) {
-      var b = bankRows[bi];
-      var key = (b.date || "") + "|" + (b.credit || b.debit);
-      if (!bankByDateAmount[key]) bankByDateAmount[key] = [];
-      bankByDateAmount[key].push(b);
-    }
+    var workPlaceFilter = p.workPlace || "all";
 
     var combined = [];
     for (var ci = 0; ci < contractRows.length; ci++) {
       var c = contractRows[ci];
-      // Find matching bank entry by date + amount (exact) or near date
       var bestMatch = null;
       var bestScore = null;
+      // First try exact date+amount map for speed
       for (var bj = 0; bj < bankRows.length; bj++) {
         var bb = bankRows[bj];
+        // Quick filter: if amount diff >5% skip
+        var bAmt = bb.credit;
+        var cAmt = c.receiptAmount || c.receivableAmount || c.invoiceValue || 0;
+        if (cAmt === 0) continue;
+        var denom = Math.max(bAmt, cAmt, 1);
+        var amtDiffQuick = Math.abs(bAmt - cAmt) / denom * 100;
+        if (amtDiffQuick > 5) continue;
         var m = smartMatch(bb, c);
         if (m.type !== "unmatched" && (!bestScore || m.confidence > bestScore.confidence)) {
           bestScore = m;
           bestMatch = bb;
         }
       }
+      // If no match found with quick filter, try all with exact amount
+      if (!bestMatch) {
+        for (var bj2 = 0; bj2 < bankRows.length; bj2++) {
+          var bb2 = bankRows[bj2];
+          if (bb2.credit === c.receiptAmount && bb2.credit > 0) {
+            var m2 = smartMatch(bb2, c);
+            if (m2.type !== "unmatched" && (!bestScore || m2.confidence > bestScore.confidence)) {
+              bestScore = m2;
+              bestMatch = bb2;
+            }
+          }
+        }
+      }
       var matchType = bestScore ? bestScore.type : "unmatched";
       var confidence = bestScore ? bestScore.confidence : 0;
       var dateDiff = bestScore ? bestScore.dateDiff : 0;
       var amountDiff = bestScore ? bestScore.amountDiff : 0;
+      // If bestScore has raw dateDiff >30 and type not exact, force unmatched for clean BRS
+      if (bestScore && bestScore._rawDateDiff > 30 && bestScore.amountDiff !== 0) {
+        matchType = "unmatched";
+        confidence = 0;
+        dateDiff = 0;
+        bestMatch = null;
+      }
 
       combined.push({
         contract: c,
-        bank: bestMatch, // Bank confirmation attached at end
+        bank: bestMatch,
         matchType: matchType,
         confidence: confidence,
         dateDiff: dateDiff,
@@ -418,14 +517,24 @@ var BankLive = (function () {
       });
     }
 
-    // Apply filters — but main list is always 200 contract entries
     var filtered = combined.filter(function (r) {
       if (filterStatus !== "all" && r.matchType !== filterStatus) return false;
       if (filterFY !== "all") {
-        if (r.contract.fy !== filterFY) return false;
+        var f = String(filterFY).toLowerCase();
+        var cfy = String(r.contract.fy || "").toLowerCase();
+        // substring match both ways
+        if (cfy.indexOf(f) < 0 && f.indexOf(cfy) < 0) {
+          // Also try to match 2024-25 with 24-25 etc
+          var fShort = f.replace("20", "");
+          if (cfy.indexOf(fShort) < 0) return false;
+        }
+      }
+      if (workPlaceFilter !== "all") {
+        var wp = String(r.contract.workPlace || "").toLowerCase();
+        if (wp.indexOf(String(workPlaceFilter).toLowerCase()) < 0) return false;
       }
       if (search) {
-        var hay = (r.contract.workName || "") + " " + (r.contract.workPlace || "") + " " + (r.contract.fileName || "") + " " + ((r.bank && r.bank.description) || "");
+        var hay = (r.contract.workName || "") + " " + (r.contract.workPlace || "") + " " + (r.contract.fileName || "") + " " + ((r.bank && r.bank.description) || "") + " " + (r.contract.sNo || "");
         if (hay.toLowerCase().indexOf(search) < 0) return false;
       }
       if (dateFrom && r.contract.receiptDate && r.contract.receiptDate < dateFrom) return false;
@@ -433,7 +542,6 @@ var BankLive = (function () {
       return true;
     });
 
-    // Sort by receipt date descending (latest first) like Tally Day Book
     filtered.sort(function (a, b) {
       var da = a.contract.receiptDate || "";
       var db = b.contract.receiptDate || "";
@@ -452,7 +560,7 @@ var BankLive = (function () {
     }
 
     return {
-      bankRows: bankRows,
+      bankRows: bankRowsAll,
       contractRows: contractRows,
       combined: filtered,
       allCombined: combined,
@@ -464,7 +572,8 @@ var BankLive = (function () {
         near: near,
         unmatched: unmatched,
         total: combined.length,
-        bankCount: bankRows.length,
+        bankCount: bankRowsAll.length,
+        bankCreditCount: bankRows.length,
         contractCount: contractRows.length,
         countsBySheet: contractData.counts
       },
@@ -509,10 +618,10 @@ var BankLive = (function () {
       if (headers[c].indexOf("work name") >= 0) workNameCol = c;
       if (headers[c].indexOf("work place") >= 0) workPlaceCol = c;
     }
-    if (workNameCol >= 0 && p.workName) {
+    if (workNameCol >= 0 && p.workName !== undefined) {
       sheet.getRange(p.rowIndex, workNameCol + 1).setValue(p.workName);
     }
-    if (workPlaceCol >= 0 && p.workPlace) {
+    if (workPlaceCol >= 0 && p.workPlace !== undefined) {
       sheet.getRange(p.rowIndex, workPlaceCol + 1).setValue(p.workPlace);
     }
     Audit.log(user, "UPDATE", "bank_live", p.gid + ":" + p.rowIndex, null, { workName: p.workName, workPlace: p.workPlace }, "Live sheet edit", requestId);

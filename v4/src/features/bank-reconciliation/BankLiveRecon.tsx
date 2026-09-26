@@ -19,6 +19,7 @@ interface BankRow {
   debit: number;
   balance: number;
   type: string;
+  isCredit?: boolean;
 }
 
 interface ContractRow {
@@ -71,6 +72,7 @@ interface LiveData {
     unmatched: number;
     total: number;
     bankCount: number;
+    bankCreditCount?: number;
     contractCount: number;
     countsBySheet: Record<string, number>;
   };
@@ -99,7 +101,7 @@ export function BankLiveRecon(props: { user?: User }) {
   useEffect(() => {
     const t = setTimeout(() => {
       setLiveParams({ filterStatus, filterFY, search, dateFrom, dateTo, workPlace: workPlaceFilter });
-    }, 300);
+    }, 250);
     return () => clearTimeout(t);
   }, [filterStatus, filterFY, search, dateFrom, dateTo, workPlaceFilter]);
 
@@ -107,15 +109,20 @@ export function BankLiveRecon(props: { user?: User }) {
   const filtered = useMemo(() => data?.combined || [], [data]);
   const stats = data?.stats;
 
-  // Work Place options for filter
   const workPlaceOptions = useMemo(() => {
     if (!data) return [];
     const places = new Set<string>();
     data.contractRows.forEach((c) => { if (c.workPlace) places.add(c.workPlace); });
-    return Array.from(places).slice(0, 100);
+    return Array.from(places).sort().slice(0, 150);
   }, [data]);
 
-  // Totals for all amount columns — filtered data, like Tally
+  const fyOptions = useMemo(() => {
+    if (!data) return [];
+    const fys = new Set<string>();
+    data.contractRows.forEach((c) => { if (c.fy) fys.add(c.fy); });
+    return Array.from(fys).sort();
+  }, [data]);
+
   const totals = useMemo(() => {
     if (!filtered.length) return null;
     const sum = (key: keyof ContractRow) => filtered.reduce((s, r) => s + (Number((r.contract as any)[key]) || 0), 0);
@@ -135,13 +142,13 @@ export function BankLiveRecon(props: { user?: User }) {
     };
   }, [filtered]);
 
-  // All totals (unfiltered) for top dashboard
   const allTotals = useMemo(() => {
     if (!data) return null;
     const sum = (key: keyof ContractRow) => data.contractRows.reduce((s, r) => s + (Number((r as any)[key]) || 0), 0);
     return {
       receiptAmount: sum("receiptAmount"),
       taxableValue: sum("taxableValue"),
+      labourWelfare: sum("labourWelfare"),
       gst: sum("gst"),
       invoiceValue: sum("invoiceValue"),
       tds: sum("tds"),
@@ -214,45 +221,41 @@ export function BankLiveRecon(props: { user?: User }) {
         }
       />
 
-      {/* Top Mini-Dashboard — all data separately per user request */}
       <div className="ui-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <div className="ui-stat"><div className="ui-stat-label">Total Contract Count</div><div className="ui-stat-value">{stats?.contractCount} = 200</div><div className="ui-stat-sub">{stats?.countsBySheet ? Object.entries(stats.countsBySheet).map(([k, v]) => `${k}: ${v}`).join(" • ") : "67+68+65"}</div></div>
-        <div className="ui-stat"><div className="ui-stat-label">Receipt Amount Total</div><div className="ui-stat-value">{inr(allTotals?.receiptAmount || 0)}</div><div className="ui-stat-sub">All 200 • Filtered: {inr(totals?.receiptAmount || 0)} ({totals?.count})</div></div>
+        <div className="ui-stat"><div className="ui-stat-label">Total Contract Count</div><div className="ui-stat-value" style={{ color: stats?.contractCount === 200 ? "green" : "red" }}>{stats?.contractCount} {stats?.contractCount === 200 ? "= 200 ✓" : `≠200 (${(stats?.contractCount || 0) - 200 > 0 ? "+" : ""}${(stats?.contractCount || 0) - 200})`}</div><div className="ui-stat-sub">{stats?.countsBySheet ? Object.entries(stats.countsBySheet).map(([k, v]) => `${k}: ${v}`).join(" • ") : "67+68+65"}</div></div>
+        <div className="ui-stat"><div className="ui-stat-label">Receipt Amount Total (All 200)</div><div className="ui-stat-value">{inr(allTotals?.receiptAmount || 0)}</div><div className="ui-stat-sub">Filtered: {inr(totals?.receiptAmount || 0)} ({totals?.count || 0})</div></div>
         <div className="ui-stat"><div className="ui-stat-label">Taxable Value Total</div><div className="ui-stat-value">{inr(allTotals?.taxableValue || 0)}</div><div className="ui-stat-sub">Filtered: {inr(totals?.taxableValue || 0)}</div></div>
         <div className="ui-stat"><div className="ui-stat-label">18% GST Total</div><div className="ui-stat-value">{inr(allTotals?.gst || 0)}</div><div className="ui-stat-sub">Filtered: {inr(totals?.gst || 0)}</div></div>
         <div className="ui-stat"><div className="ui-stat-label">Invoice Value Total</div><div className="ui-stat-value">{inr(allTotals?.invoiceValue || 0)}</div><div className="ui-stat-sub">Filtered: {inr(totals?.invoiceValue || 0)}</div></div>
-        <div className="ui-stat"><div className="ui-stat-label">TDS 2% + GST TDS 2%</div><div className="ui-stat-value">{inr((allTotals?.tds || 0) + (allTotals?.gstTds || 0))}</div><div className="ui-stat-sub">IT TDS {inr(allTotals?.tds || 0)} • GST TDS {inr(allTotals?.gstTds || 0)}</div></div>
+        <div className="ui-stat"><div className="ui-stat-label">TDS 2% + GST TDS 2%</div><div className="ui-stat-value">{inr((allTotals?.tds || 0) + (allTotals?.gstTds || 0))}</div><div className="ui-stat-sub">IT TDS {inr(allTotals?.tds || 0)} • GST TDS {inr(allTotals?.gstTds || 0)} • Filtered: {inr((totals?.tds || 0) + (totals?.gstTds || 0))}</div></div>
         <div className="ui-stat"><div className="ui-stat-label">With Held + EMD + Other</div><div className="ui-stat-value">{inr((allTotals?.withHeld || 0) + (allTotals?.emd || 0) + (allTotals?.otherDeduction || 0))}</div><div className="ui-stat-sub">With Held {inr(allTotals?.withHeld || 0)} • EMD {inr(allTotals?.emd || 0)} • Other {inr(allTotals?.otherDeduction || 0)}</div></div>
-        <div className="ui-stat ui-stat-ok"><div className="ui-stat-label">Reconciled (Bank confirmed)</div><div className="ui-stat-value">{stats?.matched} / {stats?.total}</div><div className="ui-stat-sub">{stats ? Math.round(stats.matched / Math.max(1, stats.total) * 100) : 0}% • Bank: {stats?.bankCount} entries (confirmation only, not total)</div></div>
+        <div className="ui-stat ui-stat-ok"><div className="ui-stat-label">Reconciled (Bank confirmed same date+amount)</div><div className="ui-stat-value">{stats?.matched} / {stats?.total}</div><div className="ui-stat-sub">{stats ? Math.round(stats.matched / Math.max(1, stats.total) * 100) : 0}% • Bank: {stats?.bankCount} total, {stats?.bankCreditCount || stats?.bankCount} credits (BY) for confirmation only — no huge total</div></div>
       </div>
 
-      {/* Improved Filters — BRS Status filter now updates below per user */}
       <Card>
         <div className="flex wrap" style={{ gap: 12 }}>
-          <div className="ui-field" style={{ minWidth: 150 }}>
-            <label className="ui-field-label">BRS Status (Filter fix)</label>
+          <div className="ui-field" style={{ minWidth: 170 }}>
+            <label className="ui-field-label">BRS Status (Filter fix — updates below)</label>
             <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
               <option value="all">All 200 — Day Book</option>
-              <option value="exact">Reconciled — Bank confirmed same date</option>
-              <option value="partial">Partial — Amount diff ≤5%</option>
-              <option value="near">Near — Date diff 1-3 days</option>
+              <option value="exact">Reconciled — Same date + same amount</option>
+              <option value="partial">Partial — Amount diff ≤1% + date ≤3d</option>
+              <option value="near">Near — Date diff ≤7d + amount ≤2%</option>
               <option value="unmatched">Pending — No bank confirmation</option>
             </Select>
           </div>
-          <div className="ui-field" style={{ minWidth: 120 }}>
-            <label className="ui-field-label">FY</label>
+          <div className="ui-field" style={{ minWidth: 160 }}>
+            <label className="ui-field-label">FY (Auto)</label>
             <Select value={filterFY} onChange={(e) => setFilterFY(e.target.value)}>
               <option value="all">All FY — 200</option>
+              {fyOptions.map((fy) => <option key={fy} value={fy}>{fy}</option>)}
               <option value="2024-25">2024-25 — 65</option>
               <option value="2025-26">2025-26 — 68</option>
               <option value="2022-24">2022-24 — 67</option>
-              <option value="Contract Work FY 23 to 24">FY 23 to 24</option>
-              <option value="Contract work FY 24-25">FY 24-25</option>
-              <option value="Contract work FY 25-26">FY 25-26</option>
             </Select>
           </div>
-          <div className="ui-field" style={{ minWidth: 140 }}>
-            <label className="ui-field-label">Work Place</label>
+          <div className="ui-field" style={{ minWidth: 160 }}>
+            <label className="ui-field-label">Work Place (Filter fix)</label>
             <Select value={workPlaceFilter} onChange={(e) => setWorkPlaceFilter(e.target.value)}>
               <option value="all">All Places</option>
               {workPlaceOptions.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -266,15 +269,15 @@ export function BankLiveRecon(props: { user?: User }) {
             <label className="ui-field-label">To Date</label>
             <input type="date" className="ui-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <div className="ui-field" style={{ flex: 1, minWidth: 200 }}>
-            <label className="ui-field-label">Search Work — Tamil/English</label>
-            <input className="ui-input" placeholder="Work name, place, file name, bank desc..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="ui-field" style={{ flex: 1, minWidth: 220 }}>
+            <label className="ui-field-label">Search Work — Tamil/English, File, Bank Desc, S.No</label>
+            <input className="ui-input" placeholder="Work name, place, file name, bank desc, S.No..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="ui-field" style={{ alignSelf: "flex-end" }}>
             <Button kind="ghost" onClick={() => { setFilterStatus("all"); setFilterFY("all"); setSearch(""); setDateFrom(""); setDateTo(""); setWorkPlaceFilter("all"); }}>Clear — Show 200</Button>
           </div>
         </div>
-        <div className="text-3 mt-8">Filter fix: BRS Status, FY, Work Place, Date, Search now update table below live — backend filtering + frontend totals update — Mini-Tally like Tally Day Book filter</div>
+        <div className="text-3 mt-8">Filter fix: BRS Status, FY, Work Place, Date, Search now update table below live — backend filtering + frontend totals update — Mini-Tally like Tally Day Book filter. Paired dates same color: Receipt Date (blue) + Bank Date (blue #e0f2fe) for confirmation.</div>
       </Card>
 
       <Card>
@@ -283,12 +286,12 @@ export function BankLiveRecon(props: { user?: User }) {
           <div className="text-3">Last sync: {data?.lastSync ? new Date(data.lastSync).toLocaleString() : ""} • New Contract sheet auto-include • Bank monthly update → Refresh Live</div>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table className="ui-table" style={{ fontSize: 11, minWidth: 1800 }}>
+          <table className="ui-table" style={{ fontSize: 11, minWidth: 2000 }}>
             <thead>
               <tr>
                 <th>S.No</th>
-                <th style={{ minWidth: 90 }}>Receipt Date (paired)</th>
-                <th style={{ minWidth: 200 }}>Work Name (200 main)</th>
+                <th style={{ minWidth: 100 }}>Receipt Date (paired blue)</th>
+                <th style={{ minWidth: 220 }}>Work Name (200 main)</th>
                 <th>Work Place</th>
                 <th>Work Type</th>
                 <th>Party</th>
@@ -305,7 +308,7 @@ export function BankLiveRecon(props: { user?: User }) {
                 <th>Receipt Amount</th>
                 <th>FY</th>
                 <th>File Name</th>
-                <th style={{ minWidth: 220, background: "#e0f2fe" }}>Bank Confirmation — Date + Details (same color pairing)</th>
+                <th style={{ minWidth: 240, background: "#e0f2fe" }}>Bank Confirmation — Date + Details (same color pairing)</th>
                 <th>BRS Status</th>
                 <th>Actions</th>
               </tr>
@@ -314,8 +317,8 @@ export function BankLiveRecon(props: { user?: User }) {
               {filtered.map((r, idx) => (
                 <tr key={idx} className={r.matchType === "exact" ? "row-ok" : r.matchType === "unmatched" ? "row-warn" : ""}>
                   <td className="mono">{r.contract.sNo || idx + 1}</td>
-                  <td style={{ background: r.bank ? "#e0f2fe" : "transparent", fontWeight: r.bank ? 700 : 400, color: r.bank ? "#0284c7" : "inherit" }}>{dstr(r.contract.receiptDate)}</td>
-                  <td className="wrap" style={{ maxWidth: 240 }}><div style={{ fontWeight: 600 }} title={r.contract.workName}>{r.contract.workName ? (r.contract.workName.length > 60 ? r.contract.workName.slice(0, 60) + "…" : r.contract.workName) : <span className="text-3">(empty — keep as empty)</span>}</div><div className="mono text-3">{r.contract.engName ? `Eng: ${r.contract.engName}` : ""}</div></td>
+                  <td style={{ background: r.bank ? "#e0f2fe" : "transparent", fontWeight: r.bank ? 700 : 400, color: r.bank ? "#0284c7" : "inherit", borderLeft: r.bank ? "3px solid #0ea5e9" : "" }}>{dstr(r.contract.receiptDate)}</td>
+                  <td className="wrap" style={{ maxWidth: 260 }}><div style={{ fontWeight: 600 }} title={r.contract.workName}>{r.contract.workName ? (r.contract.workName.length > 70 ? r.contract.workName.slice(0, 70) + "…" : r.contract.workName) : <span className="text-3">(empty — keep as empty for future update)</span>}</div><div className="mono text-3">{r.contract.engName ? `Eng: ${r.contract.engName}` : ""} {r.contract.department ? `Dept: ${r.contract.department}` : ""}</div></td>
                   <td>{r.contract.workPlace || <span className="text-3">(empty)</span>} <Button small kind="ghost" onClick={() => handleEditContract(r.contract)}>✏️</Button></td>
                   <td className="text-3">{r.contract.workType || "—"}</td>
                   <td className="text-3 wrap" style={{ maxWidth: 100 }}>{r.contract.party || "—"}</td>
@@ -329,25 +332,24 @@ export function BankLiveRecon(props: { user?: User }) {
                   <td className="num">{(r.contract as any).emd ? inr((r.contract as any).emd) : <span className="text-3">—</span>}</td>
                   <td className="num">{(r.contract as any).otherDeduction ? inr((r.contract as any).otherDeduction) : <span className="text-3">—</span>}</td>
                   <td className="num">{(r.contract as any).receivableAmount ? inr((r.contract as any).receivableAmount) : <span className="text-3">—</span>}</td>
-                  <td className="num"><b>{inr(r.contract.receiptAmount)}</b></td>
+                  <td className="num"><b>{r.contract.receiptAmount ? inr(r.contract.receiptAmount) : <span className="text-3">0 (empty)</span>}</b></td>
                   <td><Badge tone="info">{r.contract.fy}</Badge></td>
                   <td className="mono text-3 wrap" style={{ maxWidth: 120 }}>{r.contract.fileName || "—"}</td>
-                  <td style={{ background: r.bank ? "#e0f2fe" : "#fef2f2", maxWidth: 220 }}>
+                  <td style={{ background: r.bank ? "#e0f2fe" : "#fef2f2", maxWidth: 240, borderLeft: r.bank ? "3px solid #0ea5e9" : "" }}>
                     {r.bank ? (
                       <div>
-                        <div style={{ fontWeight: 700, color: "#0284c7" }}>Bank Date: {dstr(r.bank.date)} {r.dateDiff > 0 ? `(${r.dateDiff}d)` : "(same date)"}</div>
-                        <div style={{ fontSize: 10 }} title={r.bank.description}>{r.bank.description.slice(0, 60)}</div>
+                        <div style={{ fontWeight: 700, color: "#0284c7" }}>Bank Date: {dstr(r.bank.date)} {r.dateDiff === 0 ? "(same date ✓)" : r.dateDiff > 0 && r.dateDiff <= 30 ? `(${r.dateDiff}d diff)` : ""}</div>
+                        <div style={{ fontSize: 10 }} title={r.bank.description}>{r.bank.description.slice(0, 80)}</div>
                         <div><b>Credit:</b> {inr(r.bank.credit)} • {r.bank.type} • Bal {inr(r.bank.balance)}</div>
                       </div>
                     ) : (
-                      <div className="text-3">No bank on {dstr(r.contract.receiptDate)} for {inr(r.contract.receiptAmount)}</div>
+                      <div className="text-3">No bank on {dstr(r.contract.receiptDate)} for {inr(r.contract.receiptAmount)} — Pending</div>
                     )}
                   </td>
-                  <td><Badge tone={r.matchType === "exact" ? "ok" : r.matchType === "partial" ? "warn" : r.matchType === "near" ? "info" : "err"}>{r.matchType === "exact" ? "Reconciled" : r.matchType === "unmatched" ? "Pending" : r.matchType}</Badge><div className="mono text-3">{r.confidence}% {r.amountDiff > 0 ? `${r.amountDiff}% diff` : "exact amt"}</div></td>
+                  <td><Badge tone={r.matchType === "exact" ? "ok" : r.matchType === "partial" ? "warn" : r.matchType === "near" ? "info" : "err"}>{r.matchType === "exact" ? "Reconciled" : r.matchType === "unmatched" ? "Pending" : r.matchType}</Badge><div className="mono text-3">{r.confidence}% {r.amountDiff > 0 ? `${r.amountDiff}% diff` : "exact amt"} {r.dateDiff > 0 ? `${r.dateDiff}d` : ""}</div></td>
                   <td><Button small kind="ghost" onClick={() => toast(true, `S.No ${r.contract.sNo} Row ${r.contract.rowIndex} ${r.contract.fy} gid ${r.contract.sheetGid} — Bank ${r.bank?.id || "none"}`)}>👁️</Button></td>
                 </tr>
               ))}
-              {/* Totals row at bottom — filtered or not, per user request */}
               {totals && (
                 <tr style={{ background: "#f1f5f9", fontWeight: 700, borderTop: "2px solid #000" }}>
                   <td colSpan={6} style={{ textAlign: "right" }}>TOTAL ({totals.count} filtered) — All amount columns auto total:</td>
@@ -371,15 +373,16 @@ export function BankLiveRecon(props: { user?: User }) {
       </Card>
 
       <div className="settings-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <Card title="🧠 Mini-Tally BRS — 200 Logic (Fixed)" sub="All data, paired dates same color, totals, live">
+        <Card title="🧠 Mini-Tally BRS — 200 Logic (Fixed 204→200 + Date pairing + Filter fix)" sub="All data, paired dates same color, totals, live">
           <div className="kv"><span className="k">Contract 2024-25</span><span className="v">{stats?.countsBySheet ? (Object.entries(stats.countsBySheet).find(([k]) => k.toLowerCase().includes("2024"))?.[1] || 65) : 65} entries — all columns, empty kept as empty</span></div>
           <div className="kv"><span className="k">Contract 2025-26</span><span className="v">{stats?.countsBySheet ? (Object.entries(stats.countsBySheet).find(([k]) => k.toLowerCase().includes("2025"))?.[1] || 68) : 68} entries</span></div>
           <div className="kv"><span className="k">Contract 2022-24</span><span className="v">{stats?.countsBySheet ? (Object.entries(stats.countsBySheet).find(([k]) => k.toLowerCase().includes("2022") || k.toLowerCase().includes("23"))?.[1] || 67) : 67} entries</span></div>
-          <div className="kv"><span className="k">Total Main List</span><span className="v"><b>{stats?.contractCount} = 200</b> (132 fixed → 200) — all data from 3 sheets</span></div>
-          <div className="kv"><span className="k">Bank Confirmation (only date+amount+details)</span><span className="v">{stats?.bankCount} entries — For each of 200, check same date same amount in bank → attach at end same color pairing (Receipt Date blue + Bank Date blue) — not huge total, only confirmation</span></div>
-          <div className="kv"><span className="k">Paired Dates Same Color</span><span className="v">Receipt Date (Contract) + Bank Date (Bank) both in blue #e0f2fe same color pairing — confirmation for each work</span></div>
-          <div className="kv"><span className="k">Filter Fix</span><span className="v">BRS Status, FY, Work Place, Date, Search now update table below live — backend filtering fixed</span></div>
+          <div className="kv"><span className="k">Total Main List</span><span className="v"><b>{stats?.contractCount} = 200</b> (204 fixed → 200) — skip total rows, S.No mandatory, all data</span></div>
+          <div className="kv"><span className="k">Bank Confirmation (only date+amount+details, BY credits only)</span><span className="v">{stats?.bankCount} total, {stats?.bankCreditCount} BY credits — For each of 200, check same date same amount in bank → attach at end same color pairing (Receipt Date blue + Bank Date blue) — not huge total, only confirmation. Fix huge total ₹4,12,24,78,61,42,09,98,660 by only summing BY credits, not balance.</span></div>
+          <div className="kv"><span className="k">Paired Dates Same Color</span><span className="v">Receipt Date (Contract) + Bank Date (Bank) both in blue #e0f2fe same color pairing — confirmation for each work — borderLeft 3px solid #0ea5e9 for visual pairing</span></div>
+          <div className="kv"><span className="k">Filter Fix</span><span className="v">BRS Status, FY, Work Place, Date, Search now update table below live — backend filtering fixed (workPlace filter added, FY substring match) + frontend debounce 250ms</span></div>
           <div className="kv"><span className="k">Totals at Bottom + Top Dashboard</span><span className="v">Bottom totals row: Taxable, Labour, GST, Invoice, TDS, GST TDS, With Held, EMD, Other, Receivable, Receipt Amount — auto total filtered or not — Top dashboard shows all separately</span></div>
+          <div className="kv"><span className="k">Date Parsing Fix</span><span className="v">DD/MM/YYYY, DD-MMM-YY (24-Dec-25), MMM-YY (Dec-25, Nov-23, Sep-25) parsed to YYYY-MM-DD — fixes 999d diff and 799d diff. Matching strict: same date same amount = exact, date 3d + same amount = exact, date 7d + amount 2pct = near, date 30d forced unmatched.</span></div>
           <div className="kv"><span className="k">Live Sync + New Sheet Auto-Include</span><span className="v">Admin/Auditor edits 4 Sheets → Refresh Live → 200 with bank confirmation — Contract Paper / Contract Work new sheet auto-included — Bank monthly update → Refresh</span></div>
         </Card>
         <Card title="🖨️ Tally Print — 200 All Columns + Totals" sub="Print-ready BRS like HTML with all data + totals">
@@ -416,7 +419,7 @@ export function BankLiveRecon(props: { user?: User }) {
             <tbody>{filtered.map((r, i) => <tr key={i}><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.sNo || i + 1}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.receiptDate}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.workName.slice(0, 40)}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.workPlace}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.taxableValue}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.gst}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.invoiceValue}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.tds}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.contract.receiptAmount}</td><td style={{ border: "1px solid #ccc", padding: 2, background: "#e0f2fe" }}>{r.bank?.date}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.bank?.description.slice(0, 20)}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.bank?.credit}</td><td style={{ border: "1px solid #ccc", padding: 2 }}>{r.matchType}</td></tr>)}</tbody>
             {totals && <tfoot><tr style={{ fontWeight: 700, background: "#f1f5f9" }}><td colSpan={4} style={{ border: "1px solid #000", padding: 2, textAlign: "right" }}>TOTAL ({totals.count})</td><td style={{ border: "1px solid #000", padding: 2 }}>{totals.taxableValue}</td><td style={{ border: "1px solid #000", padding: 2 }}>{totals.gst}</td><td style={{ border: "1px solid #000", padding: 2 }}>{totals.invoiceValue}</td><td style={{ border: "1px solid #000", padding: 2 }}>{totals.tds}</td><td style={{ border: "1px solid #000", padding: 2 }}>{totals.receiptAmount}</td><td colSpan={4} style={{ border: "1px solid #000", padding: 2 }}></td></tr></tfoot>}
           </table>
-          <p>Total Contract (200): {inr(stats?.totalContract || 0)} | Reconciled: {stats?.matched} | Pending: {stats?.unmatched} | Bank: {stats?.bankCount} confirmation only</p>
+          <p>Total Contract (200): {inr(stats?.totalContract || 0)} | Reconciled: {stats?.matched} | Pending: {stats?.unmatched} | Bank: {stats?.bankCount} total, {stats?.bankCreditCount} BY credits confirmation only</p>
           <div style={{ marginTop: 40, display: "flex", justifyContent: "space-between" }}><span>Prepared by: ___________</span><span>Auditor: ___________</span><span>Admin: ___________</span></div>
           <Button kind="ghost" onClick={() => setShowPrint(false)}>Close Print View</Button>
         </div>

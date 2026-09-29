@@ -32,4 +32,798 @@ Error generating stack: `+a.message+`
           .app-sidebar, .app-topbar, .ui-btn, .ai-fab { display: none !important; }
           .print-only { display: block !important; }
         }
-      `})]})}function Ry({user:c}){const{t:u,lang:f}=xe(),[r,v]=E.useState(""),p=c.role==="agent",j=ge("agents.list",{},[],!p),g=ge("agents.wallet",p?{}:{agentId:r},[r,p],p||!!r);if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const N=g.data,b=j.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("wallet.title"),sub:u("wallet.sub")}),!p&&n.jsx("div",{className:"flex mb-16",children:n.jsxs(be,{value:r,onChange:h=>v(h.target.value),style:{width:300},children:[n.jsx("option",{value:"",children:u("common.select")}),b.map(h=>n.jsxs("option",{value:h.agentId,children:[h.fullName," — ",h.agentId," (",h.managerDistrict||"",")"]},h.agentId))]})}),N&&n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"ui-stats",children:[n.jsx(dt,{label:u("wallet.balance"),value:Q(N.balance),tone:"ok"}),n.jsx(dt,{label:u("agents.commissionSlab")+" — "+Sl(new Date().toISOString().slice(0,7),f),value:Q(N.monthCommission)}),n.jsx(dt,{label:u("wallet.walletHistory"),value:String(N.entries.length)})]}),n.jsxs(oe,{title:u("wallet.walletHistory"),children:[n.jsx(Xe,{head:[u("common.date"),u("common.notes"),u("wallet.txnRef"),u("wallet.type"),u("wallet.credit"),u("wallet.balance")],empty:N.entries.length===0,children:N.entries.map((h,m)=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(String(h.date||""))}),n.jsx("td",{className:"wrap",children:String(h.description||"")}),n.jsx("td",{className:"mono",children:String(h.txnId||"")}),n.jsx("td",{children:n.jsxs(me,{tone:"violet",children:[String(h.commissionType||h.type||"")," ",Number(h.commissionPercent)>0?"· "+h.commissionPercent+"%":""]})}),n.jsx("td",{className:"num text-ok",children:Q(Number(h.commissionAmount)||0)}),n.jsx("td",{className:"num",children:n.jsx("b",{children:Q(Number(h.balance)||0)})})]},m))}),N.entries.length===0&&n.jsx(Yl,{children:u("common.noData")})]})]}),!p&&!r&&n.jsx(Yl,{children:u("common.select")})]})}function Dy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(""),[p,j]=E.useState(null),g=ge("projects.list",{q:r||void 0},[r]),N=c.role==="super_admin";if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const b=g.data?.rows||[],h=b.reduce((S,w)=>S+Number(w.contractAmount||0),0),m=b.reduce((S,w)=>S+Number(w.pending||0),0);return n.jsxs("div",{children:[n.jsx(st,{title:u("projects.title"),sub:u("projects.sub"),right:n.jsxs("div",{className:"flex",children:[n.jsx(rc,{value:r,onChange:v}),N&&n.jsx(L,{onClick:()=>j("new"),children:u("projects.newProject")})]})}),n.jsxs("div",{className:"ui-stats",children:[n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.title")}),n.jsx("div",{className:"ui-stat-value",children:b.length})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.contractAmount")}),n.jsx("div",{className:"ui-stat-value",children:Q(h)})]}),n.jsxs("div",{className:"ui-stat ui-stat-warn",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.pending")}),n.jsx("div",{className:"ui-stat-value",children:Q(m)})]})]}),n.jsx(oe,{children:n.jsx(Xe,{head:[u("projects.name"),u("projects.district"),u("projects.contractAmount"),u("projects.received"),u("projects.pending"),u("projects.tds"),u("projects.progress"),u("common.status"),u("common.actions")],empty:b.length===0,children:b.map(S=>{const w=Number(S.contractAmount)>0?Math.min(100,Math.round(Number(S.received)/Number(S.contractAmount)*100)):0;return n.jsxs("tr",{children:[n.jsxs("td",{className:"wrap",children:[n.jsx("b",{children:S.name}),n.jsx("div",{className:"text-3",children:S.location||""})]}),n.jsx("td",{children:S.location?"":"—"}),n.jsx("td",{className:"num",children:Q(S.contractAmount)}),n.jsx("td",{className:"num text-ok",children:Q(S.received)}),n.jsx("td",{className:"num",children:Q(S.pending)}),n.jsx("td",{className:"num",children:Q(S.expectedTds)}),n.jsxs("td",{style:{minWidth:110},children:[n.jsx("div",{className:"progress",children:n.jsx("div",{style:{width:w+"%"}})}),n.jsxs("div",{className:"text-3",children:[w,"%"]})]}),n.jsx("td",{children:n.jsx(me,{tone:St(S.status),children:S.status})}),n.jsx("td",{className:"row-actions",children:N&&n.jsxs(n.Fragment,{children:[n.jsx(L,{small:!0,kind:"ghost",onClick:()=>j(S),children:u("common.edit")}),n.jsx(L,{small:!0,kind:"danger",onClick:async()=>{window.confirm(S.name+" — "+u("common.archive")+"?")&&(await Wx(S.projectId),f(!0,u("common.saved")),g.reload())},children:u("common.archive")})]})})]},S.projectId)})})}),p&&n.jsx(Oy,{project:p==="new"?null:p,onClose:()=>j(null),onSaved:()=>{j(null),g.reload()}})]})}function Oy({project:c,onClose:u,onSaved:f}){const{t:r}=xe(),v=Ue(),{busy:p,run:j}=ft(),[g,N]=E.useState({name:c?.name||"",location:c?.location||"",contractAmount:String(c?.contractAmount??""),expectedGst:String(c?.expectedGst??"0"),expectedTds:String(c?.expectedTds??"0"),labourCost:String(c?.labourCost??"0"),emdAmount:String(c?.emdAmount??"0"),keywords:c?.keywords||"",notes:c?.notes||""}),b=(h,m)=>N(S=>({...S,[h]:m}));return n.jsxs($e,{open:!0,onClose:u,wide:!0,title:c?r("common.edit")+" — "+c.name:r("projects.newProject"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:u,children:r("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const h={name:g.name,location:g.location,contractAmount:Number(g.contractAmount)||0,expectedGst:Number(g.expectedGst)||0,expectedTds:Number(g.expectedTds)||0,labourCost:Number(g.labourCost)||0,emdAmount:Number(g.emdAmount)||0,keywords:g.keywords,notes:g.notes||void 0};(c?await j("projects.update",{...h,projectId:c.projectId},(S,w)=>v(S,S?r("projects.saved"):w)):await j("projects.create",h,(S,w)=>v(S,S?r("projects.saved"):w)))&&f()},children:r("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:r("projects.name"),req:!0,children:n.jsx(J,{value:g.name,onChange:h=>b("name",h.target.value)})}),n.jsx(K,{label:r("projects.district"),children:n.jsx(J,{value:g.location,onChange:h=>b("location",h.target.value)})}),n.jsx(K,{label:r("projects.contractAmount"),children:n.jsx(J,{type:"number",value:g.contractAmount,onChange:h=>b("contractAmount",h.target.value)})}),n.jsx(K,{label:r("gst.title")+" (₹)",children:n.jsx(J,{type:"number",value:g.expectedGst,onChange:h=>b("expectedGst",h.target.value)})}),n.jsx(K,{label:r("projects.tds"),hint:Ds(0).slice(0,0)+"V3: amount only (no 26Q)",children:n.jsx(J,{type:"number",value:g.expectedTds,onChange:h=>b("expectedTds",h.target.value)})}),n.jsx(K,{label:r("projects.received")+" (₹)",children:n.jsx(J,{type:"number",value:String(c?.received??0),readOnly:!0})}),n.jsx(K,{label:"Labour (₹)",children:n.jsx(J,{type:"number",value:g.labourCost,onChange:h=>b("labourCost",h.target.value)})}),n.jsx(K,{label:"EMD (₹)",children:n.jsx(J,{type:"number",value:g.emdAmount,onChange:h=>b("emdAmount",h.target.value)})}),n.jsx(K,{label:r("bank.ref")+" / "+r("projects.name")+" ("+r("common.optional")+")",hint:"Comma-separated keywords for bank auto-match",children:n.jsx(J,{value:g.keywords,onChange:h=>b("keywords",h.target.value)})}),n.jsx(K,{label:r("common.notes"),children:n.jsx(J,{value:g.notes,onChange:h=>b("notes",h.target.value)})})]}),c&&n.jsxs("div",{className:"kv mt-8",children:[n.jsxs("span",{className:"k",children:[r("projects.pending")," (auto)"]}),n.jsx("span",{className:"v",children:Q(Math.max(0,(Number(c.contractAmount)||0)-(Number(c.received)||0)))})]})]})}const sr={site_visit:"Site visit",vendor_call:"Vendor call",bill_followup:"Bill follow-up",payment_followup:"Payment follow-up",office:"Office",training:"Training",other:"Other"};function zy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(new Date().toISOString().slice(0,10)),[p,j]=E.useState(""),[g,N]=E.useState(c.role==="agent"),[b,h]=E.useState(null),[m,S]=E.useState(!1),w={date:r||void 0,category:p||void 0,mine:g||void 0,...c.role==="district_admin"?{district:c.district}:{}},y=ge("worklog.list",w,[r,p,g]),{busy:D,run:H}=ft();if(y.loading&&!y.data)return n.jsx(Ze,{label:u("common.loading")});const Y=y.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("worklog.title"),sub:u("worklog.sub"),right:n.jsx(L,{onClick:()=>S(!0),children:u("worklog.newEntry")})}),n.jsx(oe,{right:n.jsxs("div",{className:"flex",children:[n.jsx(J,{type:"date",value:r,onChange:V=>v(V.target.value),style:{width:150}}),n.jsxs(be,{value:p,onChange:V=>j(V.target.value),style:{width:160},children:[n.jsxs("option",{value:"",children:[u("worklog.category"),": ",u("common.all")]}),xv.map(V=>n.jsx("option",{value:V,children:sr[V]||V},V))]}),(c.role==="super_admin"||c.role==="district_admin")&&n.jsxs(be,{value:g?"1":"0",onChange:V=>N(V.target.value==="1"),style:{width:130},children:[n.jsx("option",{value:"0",children:u("worklog.teamEntries")}),n.jsx("option",{value:"1",children:u("worklog.myEntries")})]})]}),children:n.jsx(Xe,{head:[u("common.date"),u("worklog.category"),u("worklog.description"),u("common.amount"),u("common.status"),u("common.actions")],empty:Y.length===0,children:Y.map(V=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(V.date)}),n.jsx("td",{children:n.jsx(me,{tone:"info",children:sr[V.category]||V.category})}),n.jsx("td",{className:"wrap",children:V.description}),n.jsx("td",{className:"num",children:V.amount?Q(V.amount):"—"}),n.jsx("td",{children:n.jsx(me,{tone:St(V.status),children:V.status})}),n.jsx("td",{className:"row-actions",children:V.createdBy&&(c.role==="super_admin"||c.role==="district_admin"||c.role==="agent")&&n.jsx(L,{small:!0,kind:"ghost",onClick:()=>h(V),children:u("common.edit")})})]},V.workId))})}),(m||b)&&n.jsx(My,{entry:b,defaultDate:r,onClose:()=>{S(!1),h(null)},onSaved:async()=>{S(!1),h(null),y.reload()},run:H,busy:D,toast:f,t:u})]})}function My({entry:c,defaultDate:u,onClose:f,onSaved:r,run:v,busy:p,toast:j,t:g}){const[N,b]=E.useState({date:c?.date||u,category:c?.category||"site_visit",description:c?.description||"",amount:String(c?.amount??"")}),h=(m,S)=>b(w=>({...w,[m]:S}));return n.jsxs($e,{open:!0,onClose:f,title:g(c?"common.edit":"worklog.newEntry"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:f,children:g("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const m={date:N.date,category:N.category,description:N.description,amount:N.amount?Number(N.amount):void 0};(c?await v("worklog.update",{...m,workId:c.workId},(w,y)=>j(w,w?g("common.saved"):y)):await v("worklog.create",m,(w,y)=>j(w,w?g("common.saved"):y)))&&r()},children:g("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:g("common.date"),req:!0,children:n.jsx(J,{type:"date",value:N.date,onChange:m=>h("date",m.target.value)})}),n.jsx(K,{label:g("worklog.category"),req:!0,children:n.jsx(be,{value:N.category,onChange:m=>h("category",m.target.value),children:xv.map(m=>n.jsx("option",{value:m,children:sr[m]||m},m))})})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("worklog.description")," (",g("common.required"),")"]}),n.jsx(nv,{value:N.description,onChange:m=>h("description",m.target.value),rows:3})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("common.amount")," (",g("common.optional"),")"]}),n.jsx(J,{type:"number",value:N.amount,onChange:m=>h("amount",m.target.value)})]})]})}const Uy=[{id:"R1",en:"District performance",ta:"மாவட்ட செயல்திறன்",roles:["super_admin","district_admin"],params:["district"]},{id:"R2",en:"Vendor ledger",ta:"வெண்டர் லெடார்",roles:["super_admin","district_admin","auditor"],params:["vendorId"]},{id:"R3",en:"Transaction aging",ta:"பரிவர்த்தனை வயது",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R4",en:"Collections",ta:"வசூல்",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R5",en:"Wallet statement",ta:"வாலெட் கணக்கு",roles:["super_admin"],params:[]},{id:"R6",en:"Agent commission statement",ta:"அஜெண்ட் கமிஷன்",roles:["super_admin","district_admin","agent","auditor"],params:["agentId"]},{id:"R7",en:"GST summary",ta:"ஜிஎஸ்டி சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R8",en:"TDS summary",ta:"டிடிஎஸ் சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R9",en:"GSTR-2B reconciliation",ta:"ஜிஎஸ்டி-2B சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R10",en:"Bank reconciliation",ta:"வங்கி சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R11",en:"Audit extract",ta:"ஆடிட் பதிவேடு",roles:["super_admin","auditor"],params:[]},{id:"R12",en:"Users & roles",ta:"பயனர்கள் & பங்குகள்",roles:["super_admin"],params:[]},{id:"R13",en:"AI usage",ta:"AI பயன்பாடு",roles:["super_admin"],params:[]},{id:"R14",en:"Bank Live BRS 200 — All Columns Print Ready",ta:"வங்கி லைவ் BRS 200 — அனைத்து காலமும் அச்சு தயார்",roles:["super_admin","district_admin","agent","auditor"],params:[]}];function By({user:c}){const{t:u,lang:f}=xe(),r=Ue(),[v,p]=E.useState(null),[j,g]=E.useState(""),[N,b]=E.useState(!1),h=Uy.filter(D=>D.roles.includes(c.role)),m=h.find(D=>D.id===v)||null,S=ge("reports.run",{reportId:v||"R1",params:{...j?{month:j}:{},...c.role==="district_admin"?{district:c.district}:{},...c.role==="agent"?{self:!0}:{}}},[v,j],!!m),w=S.data;async function y(D){if(m){b(!0);try{const H=await ry({reportId:m.id,format:D,...c.role==="district_admin"?{scope:{district:c.district}}:{},...c.role==="agent"?{scope:{self:!0}}:{}});r(!0,u("exports.exportRequested"));const Y=await fetch(H.jobToken?"/api/export/"+encodeURIComponent(H.jobToken):"/api/export/none",{cache:"no-store"});if(!Y.ok){r(!1,u("exports.expired"));return}const k=(Y.headers.get("Content-Disposition")||"").match(/filename="?([^";]+)"?/),O=k&&k[1]?decodeURIComponent(k[1]):m.id+"."+D,Z=await Y.blob(),I=document.createElement("a");I.href=URL.createObjectURL(Z),I.download=O,I.click(),setTimeout(()=>URL.revokeObjectURL(I.href),5e3)}catch(H){r(!1,H.message)}finally{b(!1)}}}return n.jsxs("div",{children:[n.jsx(st,{title:u("reports.title"),sub:u("reports.sub")}),n.jsxs("div",{className:"settings-grid",style:{gridTemplateColumns:"280px 1fr"},children:[n.jsx("div",{className:"settings-nav",children:h.map(D=>n.jsxs("button",{className:v===D.id?"on":"",onClick:()=>p(D.id),children:[n.jsx("span",{className:"mono",style:{marginRight:8},children:D.id}),f==="ta"?D.ta:D.en]},D.id))}),n.jsxs("div",{children:[m&&(m.id==="R14"?n.jsx(_y,{user:c}):n.jsx(oe,{title:m.id+" — "+(f==="ta"?m.ta:m.en),right:n.jsxs("div",{className:"flex",children:[n.jsx("input",{type:"month",className:"ui-input",style:{width:160},value:j,onChange:D=>g(D.target.value)}),n.jsx(L,{kind:"ghost",busy:N,onClick:()=>y("csv"),children:u("reports.exportCsv")}),n.jsxs(L,{kind:"soft",busy:N,onClick:()=>y("json"),children:[u("common.export")," JSON"]})]}),children:S.loading?n.jsx(Ze,{label:u("common.loading")}):w?n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"flex mb-8",children:[n.jsxs(me,{tone:"info",children:[w.rowCount," ",u("reports.rows").toLowerCase()]}),w.truncated&&n.jsxs(me,{tone:"warn",children:[u("reports.truncated")," (2000)"]})]}),n.jsx(Xe,{head:w.columns,empty:w.rows.length===0,children:w.rows.map((D,H)=>n.jsx("tr",{children:D.map((Y,V)=>n.jsx("td",{className:typeof Y=="number"?"num":"",children:typeof Y=="number"&&Math.abs(Y)>=100?Q(Y):Y==null?"—":String(Y)},V))},H))})]}):n.jsx(Yl,{children:S.error||u("common.noData")})})),!m&&n.jsx(Yl,{children:f==="ta"?"அறிக்கையைத் தேர்ந்தெடுக்கவும்":"Select a report to run it"})]})]}),n.jsx("p",{className:"text-3 mt-8",children:u("exports.sub")})]})}function ky(c){return pe("users.resetPassword",{userId:c})}function qy(c){return pe("sessions.revoke",{sessionId:c})}function Hy(c,u){return pe("settings.update",{key:c,value:u})}function Gy(){return pe("backups.create",{})}function Yy(c){return pe("backups.restorePreview",{backupId:c})}function Vy(c){return pe("backups.restore",{backupId:c,confirm:"RESTORE"})}function Ly(){return pe("migration.importV3",{dryRun:!0})}function Qy(){return pe("migration.importV3",{dryRun:!1,confirm:"MIGRATE"})}const bv=[{id:"super_admin",label:"Super Admin"},{id:"district_admin",label:"District Admin"},{id:"agent",label:"Agent"},{id:"auditor",label:"Auditor"},{id:"vendor",label:"Vendor"}];function Xy({user:c}){const{t:u}=xe(),[f,r]=E.useState("users");return n.jsxs("div",{children:[n.jsx(st,{title:u("users.title"),sub:u("users.sub")}),n.jsx(sv,{tabs:[{id:"users",label:u("users.title")},{id:"sessions",label:u("users.activeSessions")},{id:"agents",label:u("agents.title")},{id:"slabs",label:u("agents.commissionSlab")}],active:f,onChange:r}),f==="users"&&n.jsx(Zy,{}),f==="sessions"&&n.jsx(Jy,{}),f==="agents"&&n.jsx(Iy,{}),f==="slabs"&&n.jsx(Py,{})]})}function Zy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(!1),[v,p]=E.useState(null),[j,g]=E.useState(""),[N,b]=E.useState(null),h=ge("users.list",{},[]),{busy:m,run:S}=ft();if(h.loading&&!h.data)return n.jsx(Ze,{label:c("common.loading")});const w=h.data?.rows||[];return n.jsxs(oe,{title:c("users.title"),right:n.jsx(L,{onClick:()=>r(!0),children:c("users.newUser")}),children:[n.jsx(Xe,{head:[c("users.username"),c("users.role"),c("users.district"),c("auth.mobile"),c("common.status"),"Last login",c("common.actions")],empty:w.length===0,children:w.map(y=>n.jsxs("tr",{children:[n.jsxs("td",{children:[n.jsx("b",{children:y.username}),y.mustChangePassword?n.jsxs("div",{className:"text-3",children:["⚠ ",c("users.mustChange")]}):null]}),n.jsx("td",{children:n.jsx(me,{tone:y.role==="super_admin"?"err":"info",children:y.role})}),n.jsx("td",{children:y.district||"—"}),n.jsx("td",{children:y.mobile||"—"}),n.jsx("td",{children:n.jsx(me,{tone:y.status==="active"?"ok":"err",children:y.status})}),n.jsx("td",{children:Pe(y.lastLoginAt)}),n.jsxs("td",{className:"row-actions",children:[n.jsxs(L,{small:!0,kind:"ghost",onClick:()=>{const D=window.prompt("Role ("+bv.map(H=>H.id).join(", ")+"):",y.role)||y.role;S("users.update",{userId:y.id,role:D},(H,Y)=>u(H,H?c("users.userUpdated"):Y))},children:["⇅ ",c("users.role")]}),n.jsx(L,{small:!0,kind:y.status==="active"?"danger":"soft",onClick:()=>{S("users.suspend",{userId:y.id,status:y.status==="active"?"suspended":"active"},(D,H)=>u(D,D?c("common.saved"):H))},children:y.status==="active"?c("common.archive"):c("common.restore")}),n.jsx(L,{small:!0,kind:"ghost",onClick:()=>{p(y),g("")},children:"🔑"})]})]},y.id))}),f&&n.jsx(Ky,{onClose:()=>r(!1),onCreated:y=>{r(!1),b(y),h.reload()},run:S,busy:m,toast:u,t:c}),v&&n.jsxs($e,{open:!0,onClose:()=>p(null),title:c("auth.changePassword")+" — "+v.username,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>p(null),children:c("common.cancel")}),n.jsx(L,{busy:m,onClick:async()=>{try{const y=await ky(v.id);b(y.tempPassword),p(null),u(!0,c("users.userUpdated"))}catch(y){u(!1,y.message)}},children:c("common.submit")})]}),children:[n.jsx("p",{children:c("users.tempPwShown")}),n.jsx(K,{label:"New temporary password (min 10, letter + number)",children:n.jsx(J,{value:j,onChange:y=>g(y.target.value),placeholder:"AR-"})}),n.jsx("p",{className:"text-3 mt-8",children:"The user must change it at first login. (Blank = server generates.)"})]}),N&&n.jsxs($e,{open:!0,onClose:()=>b(null),title:c("users.tempPwShown"),footer:n.jsx(L,{onClick:()=>b(null),children:c("common.close")}),children:[n.jsxs("p",{children:[c("users.tempPassword"),":"]}),n.jsx("div",{className:"mono",style:{fontSize:18,padding:12,background:"var(--bg-3)",borderRadius:10,userSelect:"all"},children:N}),n.jsx("p",{className:"text-3 mt-8",children:c("auth.changePasswordRequired")})]})]})}function Ky({onClose:c,onCreated:u,run:f,busy:r,toast:v,t:p}){const[j,g]=E.useState({username:"",role:"district_admin",district:"",mobile:"",email:"",pin:""}),N=(b,h)=>g(m=>({...m,[b]:h}));return n.jsx($e,{open:!0,onClose:c,title:p("users.newUser"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:c,children:p("common.cancel")}),n.jsx(L,{busy:r,onClick:async()=>{const b=await f("users.create",{username:j.username,role:j.role,district:j.district||void 0,mobile:j.mobile||void 0,email:j.email||void 0,pin:j.pin||void 0},(h,m)=>v(h,h?p("users.userCreated"):m));b&&b.tempPassword&&u(b.tempPassword)},children:p("common.create")})]}),children:n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:p("users.username"),req:!0,hint:"a-z, 0-9, _ · 3-30",children:n.jsx(J,{value:j.username,onChange:b=>N("username",b.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))})}),n.jsx(K,{label:p("users.role"),req:!0,children:n.jsx(be,{value:j.role,onChange:b=>N("role",b.target.value),children:bv.map(b=>n.jsx("option",{value:b.id,children:b.label},b.id))})}),n.jsx(K,{label:p("users.district"),children:n.jsx(J,{value:j.district,onChange:b=>N("district",b.target.value),placeholder:"Chennai"})}),n.jsx(K,{label:p("auth.mobile"),children:n.jsx(J,{value:j.mobile,onChange:b=>N("mobile",b.target.value.replace(/\D/g,"").slice(0,10)),inputMode:"numeric"})}),n.jsx(K,{label:p("auth.email"),children:n.jsx(J,{value:j.email,onChange:b=>N("email",b.target.value)})}),n.jsx(K,{label:p("users.vendorPin"),hint:"6 digits (vendor role only)",children:n.jsx(J,{value:j.pin,onChange:b=>N("pin",b.target.value.replace(/\D/g,"").slice(0,6)),inputMode:"numeric"})})]})})}function Jy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(""),v=ge("users.list",{},[]),p=ge("sessions.list",{userId:f||void 0},[f]);if(p.loading&&!p.data)return n.jsx(Ze,{label:c("common.loading")});const j=p.data?.sessions||[];return n.jsx(oe,{title:c("users.activeSessions"),right:n.jsxs(be,{value:f,onChange:g=>r(g.target.value),style:{width:220},children:[n.jsx("option",{value:"",children:c("common.all")}),(v.data?.rows||[]).map(g=>n.jsx("option",{value:g.id,children:g.username},g.id))]}),children:n.jsx(Xe,{head:[c("users.username"),"Device",c("common.date"),"Last activity",c("common.actions")],empty:j.length===0,children:j.map(g=>n.jsxs("tr",{children:[n.jsx("td",{children:n.jsx("b",{children:g.username||g.userId})}),n.jsx("td",{className:"wrap",children:g.device||"—"}),n.jsx("td",{children:Pe(g.issuedAt)}),n.jsx("td",{children:Pe(g.lastActivityAt)}),n.jsx("td",{className:"row-actions",children:n.jsx(L,{small:!0,kind:"danger",onClick:async()=>{window.confirm(c("users.revokeConfirm"))&&(await qy(g.sessionId),u(!0,c("users.sessionRevoked")),p.reload())},children:c("users.revoke")})})]},g.sessionId))})})}function Iy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(!1),[v,p]=E.useState(null),j=ge("agents.list",{},[]),{busy:g,run:N}=ft();if(j.loading&&!j.data)return n.jsx(Ze,{label:c("common.loading")});const b=j.data?.rows||[];return n.jsxs(oe,{title:c("agents.title"),right:n.jsx(L,{onClick:()=>r(!0),children:c("agents.newAgent")}),children:[n.jsx(Xe,{head:[c("agents.code"),c("common.name"),c("auth.mobile"),c("agents.title"),c("agents.commissionSlab"),c("wallet.balance"),c("common.status"),c("common.actions")],empty:b.length===0,children:b.map(h=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:h.agentId}),n.jsxs("td",{children:[n.jsx("b",{children:h.fullName}),n.jsxs("div",{className:"text-3",children:[h.managerName||""," · ",h.managerDistrict||""]})]}),n.jsx("td",{children:h.mobile}),n.jsx("td",{children:h.bankName?h.bankName+" ····"+String(h.accountNumber||"").slice(-4):"—"}),n.jsx("td",{children:h.commissionType==="custom"?Ds(h.customCommissionPercent):c("common.all")+" slabs"}),n.jsx("td",{className:"num",children:h.commissionBalance?"₹"+Number(h.commissionBalance).toLocaleString("en-IN"):"—"}),n.jsx("td",{children:n.jsx(me,{tone:h.status==="approved"?"ok":"warn",children:h.status})}),n.jsx("td",{className:"row-actions",children:n.jsx(L,{small:!0,kind:"ghost",onClick:()=>p(h.agentId),children:c("agents.assignVendors")})})]},h.agentId))}),f&&n.jsx(Fy,{onClose:()=>r(!1),onCreated:h=>{r(!1),u(!0,h?c("users.tempPwShown")+": "+h:c("agents.agentCreated")),j.reload()},run:N,busy:g,toast:u,t:c}),v&&n.jsx(Wy,{agentId:v,onClose:()=>p(null),onDone:()=>{p(null),j.reload()},t:c})]})}function Fy({onClose:c,onCreated:u,run:f,busy:r,toast:v,t:p}){const[j,g]=E.useState({fullName:"",mobile:"",managerName:"",managerDistrict:"",commissionType:"auto",customCommissionPercent:"1"}),N=(b,h)=>g(m=>({...m,[b]:h}));return n.jsxs($e,{open:!0,onClose:c,title:p("agents.newAgent"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:c,children:p("common.cancel")}),n.jsx(L,{busy:r,onClick:async()=>{const b=await f("agents.create",{fullName:j.fullName,mobile:j.mobile,managerName:j.managerName||void 0,managerDistrict:j.managerDistrict||void 0,commissionType:j.commissionType,customCommissionPercent:Number(j.customCommissionPercent)||0},(h,m)=>v(h,h?p("agents.agentCreated"):m));b&&u(b.tempPassword||"")},children:p("common.create")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:p("common.name"),req:!0,children:n.jsx(J,{value:j.fullName,onChange:b=>N("fullName",b.target.value)})}),n.jsx(K,{label:p("auth.mobile"),req:!0,children:n.jsx(J,{value:j.mobile,onChange:b=>N("mobile",b.target.value.replace(/\D/g,"").slice(0,10)),inputMode:"numeric"})}),n.jsx(K,{label:p("agents.managerName"),children:n.jsx(J,{value:j.managerName,onChange:b=>N("managerName",b.target.value)})}),n.jsx(K,{label:p("agents.managerDistrict"),children:n.jsx(J,{value:j.managerDistrict,onChange:b=>N("managerDistrict",b.target.value)})}),n.jsx(K,{label:p("agents.commissionSlab"),children:n.jsxs(be,{value:j.commissionType,onChange:b=>N("commissionType",b.target.value),children:[n.jsx("option",{value:"auto",children:"Auto (slabs)"}),n.jsx("option",{value:"custom",children:"Custom %"})]})}),j.commissionType==="custom"&&n.jsx(K,{label:p("agents.overridePct"),children:n.jsx(J,{type:"number",value:j.customCommissionPercent,onChange:b=>N("customCommissionPercent",b.target.value)})})]}),n.jsx("p",{className:"text-3 mt-8",children:"A login (Agents userId) + temporary password are created automatically."})]})}function Wy({agentId:c,onClose:u,onDone:f,t:r}){const v=Ue(),p=ge("vendors.list",{statusFilter:"active"},[]),j=ge("agents.get",{agentId:c},[c]),[g,N]=E.useState(new Set);Vl.useEffect(()=>{const h=j.data;h&&h.assignedVendorIds&&N(new Set(h.assignedVendorIds))},[j.data]);const b=p.data?.rows||[];return n.jsxs($e,{open:!0,onClose:u,wide:!0,title:r("agents.assignVendors")+" — "+c,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:u,children:r("common.cancel")}),n.jsx(L,{busy:!1,onClick:async()=>{try{await Fx(c,[...g]),v(!0,r("common.saved")),f()}catch(h){v(!1,h.message)}},children:r("common.save")})]}),children:[b.length===0&&n.jsx("div",{className:"ui-empty",children:r("common.noData")}),b.map(h=>n.jsxs("div",{className:"kv",style:{cursor:"pointer"},onClick:()=>{N(m=>{const S=new Set(m);return S.has(h.vendorId)?S.delete(h.vendorId):S.add(h.vendorId),S})},children:[n.jsxs("span",{className:"k",children:[g.has(h.vendorId)?"☑":"☐"," ",h.vendorName," ",n.jsx("span",{className:"mono",children:h.vendorCode})]}),n.jsx("span",{className:"v",children:h.district})]},h.vendorId))]})}function Py(){const{t:c}=xe(),u=ge("agents.slabs",{},[]);if(u.loading&&!u.data)return n.jsx(Ze,{label:c("common.loading")});const f=u.data?.rows||[];return n.jsxs(oe,{title:c("agents.commissionSlab"),sub:c("agents.sub"),children:[n.jsx(Xe,{head:[c("agents.slab"),c("agents.commissionPct"),c("common.date")],empty:f.length===0,children:f.map(r=>n.jsxs("tr",{children:[n.jsx("td",{children:Ds(r.gstPercent)}),n.jsxs("td",{children:[n.jsx("b",{children:Ds(r.agentCommission)}),Number(r.agentCommission)===0&&n.jsxs("span",{className:"text-3",children:[" → ",c("common.none")]})]}),n.jsx("td",{children:Pe(r.effectiveFrom)})]},r.slabId))}),n.jsx("p",{className:"text-3 mt-8",children:"V3 default slabs (unchanged). Changes require a new effectiveFrom date; past transactions keep their slab."})]})}function dc(c){return c?.settings||{}}function $y({user:c}){const{t:u}=xe(),[f,r]=E.useState("org"),v=c.role==="auditor";return n.jsxs("div",{children:[n.jsx(st,{title:u("settings.title"),sub:u("settings.sub")}),n.jsxs("div",{className:"settings-grid",children:[n.jsxs("div",{className:"settings-nav",children:[n.jsx("button",{className:f==="org"?"on":"",onClick:()=>r("org"),children:u("settings.org")}),!v&&n.jsx("button",{className:f==="masters"?"on":"",onClick:()=>r("masters"),children:u("settings.masters")}),!v&&n.jsx("button",{className:f==="workflows"?"on":"",onClick:()=>r("workflows"),children:u("settings.workflows")}),n.jsx("button",{className:f==="ai"?"on":"",onClick:()=>r("ai"),children:u("settings.aiAccess")}),n.jsx("button",{className:f==="health"?"on":"",onClick:()=>r("health"),children:u("settings.sheetsHealth")}),!v&&n.jsx("button",{className:f==="data"?"on":"",onClick:()=>r("data"),children:u("settings.data")}),n.jsx("button",{className:f==="audit"?"on":"",onClick:()=>r("audit"),children:u("settings.auditLogs")})]}),n.jsxs("div",{children:[f==="org"&&n.jsx(e0,{canWrite:!v}),f==="masters"&&n.jsx(t0,{}),f==="workflows"&&n.jsx(l0,{}),f==="ai"&&n.jsx(a0,{}),f==="health"&&n.jsx(n0,{}),f==="data"&&n.jsx(s0,{}),f==="audit"&&n.jsx(c0,{})]})]})]})}function e0({canWrite:c}){const{t:u}=xe(),f=Ue(),r=ge("settings.get",{},[]),v=dc(r.data),p=v["org.profile"]||{},j=v["org.financialYear"]||{},[g,N]=E.useState({name:"",nameTa:"",gstin:"",address:"",phone:"",email:""}),[b,h]=E.useState("2025-26"),m=Vl.useRef(!1);E.useEffect(()=>{!r.data||m.current||(m.current=!0,N({name:p.name||"",nameTa:p.nameTa||"",gstin:p.gstin||"",address:p.address||"",phone:p.phone||"",email:p.email||""}),j.active&&h(j.active))},[r.data]);const{busy:S,run:w}=ft(),y=j.list||["2024-25","2025-26","2026-27","2027-28"];return r.loading&&!r.data?n.jsx(Ze,{label:u("common.loading")}):n.jsxs("div",{children:[n.jsxs(oe,{title:u("settings.orgProfile"),children:[c?n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:u("common.name"),children:n.jsx(J,{value:g.name,onChange:D=>N({...g,name:D.target.value})})}),n.jsx(K,{label:u("common.name")+" (தமிழ்)",children:n.jsx(J,{value:g.nameTa,onChange:D=>N({...g,nameTa:D.target.value})})}),n.jsx(K,{label:u("vendors.gstin"),children:n.jsx(J,{value:g.gstin,onChange:D=>N({...g,gstin:D.target.value.toUpperCase().slice(0,15)})})}),n.jsx(K,{label:"Phone",children:n.jsx(J,{value:g.phone,onChange:D=>N({...g,phone:D.target.value})})}),n.jsx(K,{label:u("auth.email"),children:n.jsx(J,{value:g.email,onChange:D=>N({...g,email:D.target.value})})}),n.jsx(K,{label:u("vendors.address"),children:n.jsx(J,{value:g.address,onChange:D=>N({...g,address:D.target.value})})})]}):n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:u("common.name")}),n.jsx("span",{className:"v",children:g.name||"—"}),n.jsx("span",{className:"k",children:u("vendors.gstin")}),n.jsx("span",{className:"v mono",children:g.gstin||"—"})]}),c&&n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:S,onClick:async()=>{await w("settings.update",{key:"org.profile",value:g},(H,Y)=>f(H,H?u("settings.orgSaved"):Y))&&r.reload()},children:u("common.save")})})]}),n.jsx(oe,{title:u("settings.financialYear"),children:c?n.jsxs("div",{className:"flex",children:[n.jsx(be,{value:b,onChange:D=>h(D.target.value),style:{width:160},children:y.map(D=>n.jsx("option",{value:D,children:D},D))}),n.jsx(L,{busy:S,onClick:async()=>{await Hy("org.financialYear",{active:b,list:y}),f(!0,u("settings.orgSaved")),r.reload()},children:u("common.save")})]}):n.jsxs(me,{tone:"info",children:["FY ",b]})})]})}function t0(){const{t:c,lang:u}=xe(),f=Ue(),r=ge("settings.get",{},[]),v=dc(r.data),[p,j]=E.useState([1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(String)),g=Vl.useRef(!1),{busy:N,run:b}=ft();if(E.useEffect(()=>{!r.data||g.current||(g.current=!0,j((v["calc.gstRates"]||[1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6]).map(String)))},[r.data]),r.loading&&!r.data)return n.jsx(Ze,{label:c("common.loading")});const h=v["calc.constants"]||{},m=v["gstr2b.clients"]||[];return n.jsxs("div",{children:[n.jsxs(oe,{title:c("vendors.gstin")+" rates (%)",sub:c("settings.masters"),children:[n.jsx("div",{className:"chip-row",children:p.map(S=>n.jsxs(me,{tone:"info",children:[S,"%"]},S))}),n.jsx("div",{className:"flex mt-16",children:n.jsx(L,{busy:N,onClick:async()=>{await b("settings.update",{key:"calc.gstRates",value:p.map(Number)},(w,y)=>f(w,w?c("settings.orgSaved"):y))&&r.reload()},children:c("common.save")})})]}),n.jsxs(oe,{title:"Calculation constants",sub:"V3 parity (managed read-only)",children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Profit rate"}),n.jsxs("span",{className:"v",children:[Math.round((h.profitRate||.08)*100),"%"]})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Bill total rate"}),n.jsxs("span",{className:"v",children:["× ",h.billTotalRate||1.18]})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Advance cap"}),n.jsxs("span",{className:"v",children:[Math.round((h.advanceCap||.2)*100),"%"]})]})]}),n.jsxs(oe,{title:c("gst.twoB")+" clients",sub:c("settings.masters"),children:[n.jsx(Xe,{head:["Client",c("vendors.gstin"),"Feature start"],empty:m.length===0,children:m.map((S,w)=>n.jsxs("tr",{children:[n.jsx("td",{children:S.name}),n.jsx("td",{className:"mono",children:S.gstin||n.jsx("span",{className:"text-3",children:"set GSTIN"})}),n.jsx("td",{children:Pe(S.featureStart)})]},w))}),n.jsx("p",{className:"text-3 mt-8",children:u==="ta"?"ஜிஎஸ்டி-2B பணியின் தொடக்க தேதிகள். ஒவ்வொரு கிளையண்டின் GSTIN-ஐ இங்கே அமைக்கவும்.":"Feature-start dates for the GSTR-2B module. Set each client GSTIN here before 2B matching goes live."})]})]})}function l0(){const{t:c}=xe(),u=Ue(),f=ge("settings.get",{},[]),r=dc(f.data),v=r["approval.workflow"]||{},[p,j]=E.useState({billAttachThreshold:"25000",overBillBuffer:"0"}),[g,N]=E.useState("0.8"),b=Vl.useRef(!1),{busy:h,run:m}=ft();if(E.useEffect(()=>{if(!f.data||b.current)return;b.current=!0,j({billAttachThreshold:String(v.billAttachThreshold??25e3),overBillBuffer:String(v.overBillBuffer??0)});const w=r["dash.layout"]||{};N(String(w.targetCollectionRate??.8))},[f.data]),f.loading&&!f.data)return n.jsx(Ze,{label:c("common.loading")});const S=r["dash.layout"]||{};return n.jsxs("div",{children:[n.jsxs(oe,{title:c("settings.workflows"),sub:c("settings.workflowsSub"),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:c("bills.uploadReceipt")+" threshold (₹)",children:n.jsx(J,{type:"number",value:p.billAttachThreshold,onChange:w=>j({...p,billAttachThreshold:w.target.value})})}),n.jsx(K,{label:c("transactions.remaining")+" buffer (₹)",hint:c("common.optional"),children:n.jsx(J,{type:"number",value:p.overBillBuffer,onChange:w=>j({...p,overBillBuffer:w.target.value})})})]}),n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:h,onClick:async()=>{await m("settings.update",{key:"approval.workflow",value:{...r["approval.workflow"]||{},billAttachThreshold:Number(p.billAttachThreshold)||0,overBillBuffer:Number(p.overBillBuffer)||0}},(y,D)=>u(y,y?c("settings.orgSaved"):D))&&f.reload()},children:c("common.save")})})]}),n.jsx(oe,{title:c("settings.dashboardLayout"),children:n.jsxs("div",{className:"flex",children:[n.jsx(K,{label:"Collection target (0–1)",children:n.jsx(J,{type:"number",step:"0.05",min:"0",max:"1",value:g,onChange:w=>N(w.target.value),style:{width:120}})}),n.jsx(L,{busy:h,onClick:async()=>{await m("settings.update",{key:"dash.layout",value:{...S,targetCollectionRate:Number(g)}},(w,y)=>u(w,w?c("settings.orgSaved"):y))},children:c("common.save")})]})})]})}function a0(){const{t:c}=xe(),u=Ue(),f=ge("settings.get",{},[]),r=ge("ai.getUsage",{},[]),p=dc(f.data)["ai.scope"]||{},[j,g]=E.useState(!0),[N,b]=E.useState("claude-sonnet-4-20250514"),[h,m]=E.useState("50"),S=Vl.useRef(!1),{busy:w,run:y}=ft();if(E.useEffect(()=>{!f.data||S.current||(S.current=!0,g(p.enabled!==!1),b(String(p.model||"claude-sonnet-4-20250514")),m(String(p.dailyLimitPerUser??50)))},[f.data]),f.loading&&!f.data)return n.jsx(Ze,{label:c("common.loading")});const D=r.data;return n.jsxs("div",{children:[n.jsxs(oe,{title:c("settings.aiScope"),sub:c("ai.sub"),children:[n.jsxs(Ct,{cols:3,children:[n.jsx(K,{label:c("common.status"),children:n.jsxs(be,{value:j?"1":"0",onChange:H=>g(H.target.value==="1"),children:[n.jsx("option",{value:"1",children:c("common.enabled")}),n.jsx("option",{value:"0",children:c("common.disabled")})]})}),n.jsx(K,{label:c("settings.aiModel"),children:n.jsx(J,{value:N,onChange:H=>b(H.target.value)})}),n.jsx(K,{label:c("settings.aiDailyCap"),children:n.jsx(J,{type:"number",value:h,onChange:H=>m(H.target.value)})})]}),n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:w,onClick:async()=>{await y("settings.update",{key:"ai.scope",value:{enabled:j,model:N,dailyLimitPerUser:Number(h)||50,bankMatch:!0,dedupe:!0,extractBills:!1}},(Y,V)=>u(Y,Y?c("settings.orgSaved"):V))&&f.reload()},children:c("common.save")})}),n.jsxs("p",{className:"text-3 mt-8",children:[c("ai.advisoryNote")," · ANTHROPIC_API_KEY lives in Vercel env only — never in this repo."]})]}),n.jsx(oe,{title:c("settings.aiUsage"),children:D?n.jsxs("div",{className:"ui-stats",children:[n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:c("ai.calls")}),n.jsx("div",{className:"ui-stat-value",children:D.total})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsxs("div",{className:"ui-stat-label",children:[c("ai.tokens")," (in)"]}),n.jsx("div",{className:"ui-stat-value",children:D.inputTokens??0})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsxs("div",{className:"ui-stat-label",children:[c("ai.tokens")," (out)"]}),n.jsx("div",{className:"ui-stat-value",children:D.outputTokens??0})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:c("settings.aiDailyCap")}),n.jsx("div",{className:"ui-stat-value",children:D.limit})]})]}):n.jsx(Ze,{label:c("common.loading")})})]})}function n0(){const{t:c}=xe(),u=ge("health.ping",{},[]),r=ge("health.connections",{},[],!1).data||{};return n.jsxs(oe,{title:c("settings.sheetsHealth"),children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Gateway → Apps Script"}),n.jsx("span",{className:"v",children:u.data?n.jsx(me,{tone:"ok",children:c("settings.apiOk")}):n.jsx(Ze,{label:""})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"WORKBOOK_ID"}),n.jsx("span",{className:"v",children:r.workbookId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"DRIVE_ROOT_ID"}),n.jsx("span",{className:"v",children:r.driveRootId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"GATEWAY_SECRET"}),n.jsx("span",{className:"v",children:r.gatewaySecret?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"V3_WORKBOOK_ID (migration)"}),n.jsx("span",{className:"v",children:r.v3WorkbookId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"muted",children:"optional"})})]}),u.data&&n.jsxs("p",{className:"text-3 mt-8",children:["ping ",String(u.data.ts||"")]})]})}function s0(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(null),[v,p]=E.useState(null),[j,g]=E.useState(""),[N,b]=E.useState(!1),[h,m]=E.useState(!1),[S,w]=E.useState("vendors"),[y,D]=E.useState(null),H=ge("backups.list",{},[]),Y=H.data?.backups||[];async function V(){b(!0);try{const k=await Ly();D(k)}catch(k){u(!1,k.message)}finally{b(!1)}}return n.jsxs("div",{children:[n.jsxs(oe,{title:c("common.import"),sub:c("imports.sub"),children:[n.jsxs("div",{className:"flex",children:[n.jsxs(be,{value:S,onChange:k=>w(k.target.value),style:{width:160},children:[n.jsx("option",{value:"vendors",children:"vendors.csv"}),n.jsx("option",{value:"worklog",children:"worklog.csv"})]}),n.jsxs(L,{onClick:()=>m(!0),children:[c("common.import"),"…"]})]}),h&&n.jsx(i0,{table:S,onDone:()=>{m(!1),u(!0,c("common.saved"))},t:c})]}),n.jsx(oe,{title:c("common.export"),sub:c("exports.sub"),children:n.jsxs("p",{className:"text-3",children:["Exports are requested from the ",n.jsx("b",{children:"Reports"})," page — each creates one ImportExports row + a single-use 15-minute download link."]})}),n.jsx(oe,{title:c("settings.lastBackup")+" / "+c("settings.restore"),right:n.jsx(L,{kind:"soft",busy:N,onClick:async()=>{b(!0);try{const k=await Gy();u(!0,c("settings.backupCreated",{name:k.backupId})),H.reload()}catch(k){u(!1,k.message)}finally{b(!1)}},children:c("settings.runBackup")}),children:n.jsx(Xe,{head:["Backup",c("common.date"),c("common.status"),c("common.actions")],empty:Y.length===0,children:Y.map(k=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k.backupId}),n.jsx("td",{children:cv(k.createdAt)}),n.jsx("td",{children:n.jsx(me,{tone:k.status==="completed"||k.status==="restore_tested"?"ok":"err",children:k.status})}),n.jsx("td",{className:"row-actions",children:n.jsxs(L,{small:!0,kind:"soft",onClick:async()=>{try{const O=await Yy(k.backupId);r(k.backupId),p(O.deltas),g("")}catch(O){u(!1,O.message)}},children:["⊕ ",c("settings.restore")]})})]},k.backupId))})}),f&&n.jsxs($e,{open:!0,onClose:()=>r(null),wide:!0,title:c("settings.restore")+" — "+f,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>r(null),children:c("common.cancel")}),n.jsx(L,{kind:"danger",disabled:j!=="RESTORE",onClick:async()=>{try{const k=await Vy(f);u(!0,c("common.saved")+" — "+Object.keys(k.tabs).length+" tabs"),r(null)}catch(k){u(!1,k.message)}},children:c("common.confirm")})]}),children:[n.jsx("p",{className:"text-3 mb-8",children:c("settings.restoreConfirm")}),n.jsx(Xe,{head:["Tab","Backup","Live","Δ"],empty:!v,children:v&&Object.entries(v).map(([k,O])=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k}),n.jsx("td",{className:"num",children:O.backup}),n.jsx("td",{className:"num",children:O.live}),n.jsx("td",{className:"num",children:O.delta>0?"+"+O.delta:O.delta})]},k))}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:["Type ",n.jsx("b",{children:"RESTORE"})," to confirm"]}),n.jsx(J,{value:j,onChange:k=>g(k.target.value.trim())})]})]}),n.jsx(oe,{title:"V3 → V4 migration",sub:c("common.dryRun")+" → "+c("common.confirm")+" (flag: migration.v3.enabled)",right:n.jsxs("div",{className:"flex",children:[n.jsx(L,{kind:"soft",busy:N,onClick:V,children:c("common.dryRun")}),n.jsxs(L,{kind:"danger",busy:N,disabled:!y||y.dryRun!==!0,onClick:async()=>{if(window.confirm("MIGRATE all V3 data now? V4 must be empty. One super admin will be created (temporary password)."))try{const k=await Qy();u(!0,"Migrated: "+JSON.stringify(k.counts)),D(null)}catch(k){u(!1,k.message)}},children:[c("common.confirm")," (MIGRATE)"]})]}),children:y?n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Source"}),n.jsx("span",{className:"v",children:String(y.source||"")})]}),n.jsx(Xe,{head:["Collection","Rows"],empty:!1,children:Object.entries(y.counts||{}).map(([k,O])=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k}),n.jsx("td",{className:"num",children:O})]},k))}),Array.isArray(y.flagged)&&y.flagged.length>0&&n.jsxs("div",{className:"toast-announce warn mt-8",children:["⚠ ",y.flagged.length," flagged rows — review the flagged list before cutover."]})]}):n.jsx("p",{className:"text-3",children:"Run the dry run first. Confirm requires an empty V4 workbook; the V3 admin user becomes the single super admin with a temporary password (must change at first login)."})})]})}function i0({table:c,onDone:u,t:f}){const r=Ue(),[v,p]=E.useState(null),[j,g]=E.useState(null),[N,b]=E.useState(!1);return n.jsxs("div",{className:"mt-16",children:[n.jsxs("div",{className:"file-drop",children:[n.jsxs("div",{children:[f("imports.chooseFile")," — ",c,".csv"]}),n.jsx("input",{type:"file",accept:".csv,text/csv",onChange:h=>{const m=h.target.files?.[0];m&&(p(m),g(null))}})]}),v&&!j&&n.jsx("div",{className:"row-actions mt-8",children:n.jsx(L,{busy:N,onClick:async()=>{b(!0);try{g(await dy(v,c))}catch(h){r(!1,h.message)}finally{b(!1)}},children:f("imports.preview")})}),j&&n.jsxs("div",{className:"mt-8",children:[n.jsxs("div",{className:"toast-announce warn",children:[f("imports.previewed",{valid:String(j.valid),invalid:String(j.invalid),dupes:String(j.dupes)}),j.capped&&" · "+f("imports.capped")]}),n.jsx("div",{className:"row-actions",children:n.jsx(L,{busy:N,onClick:async()=>{b(!0);try{const h=await fy(j.previewId);r(!0,f("imports.imported",{n:String(h.written)})),u()}catch(h){r(!1,h.message)}finally{b(!1)}},children:f("imports.confirmImport")})})]})]})}function c0(){const{t:c}=xe(),[u,f]=E.useState(1),[r,v]=E.useState(""),p=ge("audit.list",{page:u,size:100,action:r||void 0},[u,r]),j=p.data?.rows||[],g=p.data?.total||0;return n.jsxs(oe,{title:c("audit.title"),sub:c("audit.sub"),right:n.jsxs("div",{className:"flex",children:[n.jsx("input",{className:"ui-input",style:{width:200},placeholder:c("audit.action")+" (e.g. CREATE)",value:r,onChange:N=>{v(N.target.value.toUpperCase()),f(1)}}),n.jsx(L,{small:!0,kind:"ghost",disabled:u<=1,onClick:()=>f(N=>N-1),children:"←"}),n.jsx(me,{tone:"info",children:u}),n.jsx(L,{small:!0,kind:"ghost",disabled:j.length<100,onClick:()=>f(N=>N+1),children:"→"})]}),children:[n.jsx(Xe,{head:[c("audit.timestamp"),c("audit.user"),c("audit.action"),c("audit.entity"),c("audit.result"),c("audit.detail")],empty:j.length===0,children:j.map(N=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:cv(N.timestamp)}),n.jsxs("td",{children:[N.username,n.jsx("div",{className:"text-3",children:N.role||""})]}),n.jsx("td",{children:n.jsx(me,{tone:"info",children:N.action})}),n.jsx("td",{className:"mono",children:N.entityId?N.domain+":"+N.entityId:N.domain||"—"}),n.jsx("td",{children:N.result||"—"}),n.jsx("td",{className:"wrap text-3",children:N.detail||"—"})]},N.logId))}),n.jsxs("p",{className:"text-3 mt-8",children:[g," rows · ",c("audit.sub")]})]})}const u0=[{id:"bank-match",en:"Bank match",ta:"பேங்க் மேட்ச்",desc_en:"Explain a bank entry that auto-suggest failed on.",desc_ta:"ஆட்டோ-சஜெஸ்ட ஃபெயில் ஆன பேங்க் என்ட்ரி-ஐ விளக்கு."},{id:"gst-brief",en:"GST brief",ta:"ஜிஎஸ்டி பிரீப்",desc_en:"Summary of the current period: billed, 2B matches, ITC position, due dates.",desc_ta:"இந்த் பெரியாட்டின் சுருக்கம்: பில், 2B மேட்ச், ITC, தேதிகள்."},{id:"dedupe",en:"Dedupe check",ta:"டூப் செக்",desc_en:"Likely duplicate vendors / transactions in the current scope.",desc_ta:"முதல் டூப் வண்டர்ஸ் / டிரான்ஸாக்ஷன்ஸ்."},{id:"decision",en:"Decision brief",ta:"டிசீஷன் பிரீப்",desc_en:"Context for a pending close confirmation (per-district).",desc_ta:"டிஸ்டிரிக்ட் க்ளோஸ் கான்ஃபர்மஷனுக்கான குறிப்புகள்."}];function o0(){const{t:c,lang:u}=xe(),f=Ue(),r=ge("ai.getUsage",{},[]),[v,p]=E.useState("bank-match"),[j,g]=E.useState(""),[N,b]=E.useState(!1),[h,m]=E.useState([]),S=E.useRef(0),w=E.useRef(null);E.useEffect(()=>{w.current?.scrollIntoView({behavior:"smooth"})},[h]);const y=r.data,D=y?y.enabled===!1||(y.total||0)>=(y.limit||1/0):!1,H=y?Math.min(100,Math.round((y.total||0)/(y.limit||1)*100)):0;function Y(){const k=j.trim();if(!k||N)return;const O=++S.current;m(Z=>[...Z,{id:O,role:"user",text:k,at:new Date().toISOString()}]),g(""),b(!0),ov(v,{prompt:k,lang:u}).then(Z=>{m(I=>[...I,{id:++S.current,role:"ai",text:Z.output||JSON.stringify(Z.parsed),feature:v,aiId:Z.aiId,decision:"unreviewed",at:new Date().toISOString()}]),r.reload()}).catch(Z=>{f(!1,Z.message),m(I=>[...I,{id:++S.current,role:"ai",text:"(error) "+Z.message,feature:v,at:new Date().toISOString()}])}).finally(()=>b(!1))}function V(k,O){k.aiId&&Mx(k.aiId,O,k.text.slice(0,500)).then(()=>{m(Z=>Z.map(I=>I.id===k.id?{...I,decision:O}:I)),f(!0,c(O==="accepted"?"ai.accepted":"ai.rejected")),r.reload()}).catch(Z=>f(!1,Z.message))}return n.jsxs("div",{children:[n.jsx(st,{title:c("ai.title"),sub:c("ai.sub"),right:n.jsx(me,{tone:y?D?"warn":"ok":"muted",children:c("ai.advisory")})}),n.jsxs("div",{className:"ai-chat",children:[n.jsxs("div",{className:"ai-sidebar",children:[u0.map(k=>n.jsxs("button",{className:v===k.id?"on":"",onClick:()=>p(k.id),children:[n.jsx("b",{children:u==="ta"?k.ta:k.en}),n.jsx("span",{children:u==="ta"?k.desc_ta:k.desc_en})]},k.id)),n.jsxs("div",{className:"ai-usage",children:[n.jsx("div",{className:"ai-usage-bar",children:n.jsx("div",{style:{width:H+"%"}})}),n.jsx("div",{className:"ai-usage-num",children:y?`${y.total} / ${y.limit} ${c("ai.calls")}`:"…"}),y?.model&&n.jsx("div",{className:"ai-usage-num",children:y.model})]})]}),n.jsxs("div",{className:"ai-main",children:[n.jsxs("div",{className:"ai-announce",children:["⚠ ",c("ai.advisoryNote")]}),n.jsxs("div",{className:"ai-thread",children:[h.length===0&&n.jsx("div",{className:"ai-empty",children:n.jsx("p",{children:u==="ta"?"இடதுபுறம் ஒரு ஃபீச்சர் தேர்வு செய்யுங்க, கேள்வி எழுதுங்க.":"Pick a feature on the left and ask. Everything the AI returns must be verified before acting."})}),h.map(k=>n.jsxs("div",{className:"ai-bubble "+(k.role==="user"?"me":"them"),children:[n.jsxs("div",{className:"ai-bubble-meta",children:[k.role==="ai"&&n.jsxs("span",{className:"ai-badge",children:["AI — ",c("ai.verify")]}),k.feature&&k.role==="ai"&&n.jsx("span",{className:"mono",children:k.feature}),n.jsx("span",{children:Pe(k.at)}),k.aiId&&n.jsxs("span",{className:"mono text-3",children:["#",k.aiId]})]}),n.jsx("div",{className:"ai-bubble-text",children:k.text}),k.role==="ai"&&k.aiId&&n.jsxs("div",{className:"ai-bubble-actions",children:[n.jsxs(L,{small:!0,kind:"soft",disabled:k.decision!=="unreviewed",onClick:()=>V(k,"accepted"),children:["✓ ",c("ai.accept")]}),n.jsxs(L,{small:!0,kind:"ghost",disabled:k.decision!=="unreviewed",onClick:()=>V(k,"rejected"),children:["✗ ",c("ai.reject")]}),k.decision==="accepted"&&n.jsx(me,{tone:"ok",children:c("ai.accepted")}),k.decision==="rejected"&&n.jsx(me,{tone:"err",children:c("ai.rejected")})]})]},k.id)),N&&n.jsx(Ze,{label:c("common.loading")}),n.jsx("div",{ref:w})]}),n.jsxs("div",{className:"ai-input",children:[n.jsx(nv,{rows:3,placeholder:u==="ta"?"உங்கள் கேள்வி… (24KB வரை)":"Your question… (24KB prompt cap)",value:j,onChange:k=>g(k.target.value),onKeyDown:k=>{k.key==="Enter"&&(k.ctrlKey||k.metaKey)&&Y()}}),n.jsxs("div",{className:"row-actions mt-8",children:[n.jsxs("span",{className:"text-3",children:[j.length," / 24576"]}),n.jsx(L,{busy:N,disabled:D||!j.trim(),onClick:Y,children:c("ai.ask")})]}),D&&n.jsx("p",{className:"text-3 warn-text mt-8",children:c("errors.aiDisabled")})]})]})]})]})}const r0={vendors:["super_admin","district_admin","agent","vendor","auditor"],transactions:["super_admin","district_admin","agent","vendor","auditor"],bills:["super_admin","district_admin","agent","vendor"],payments:["super_admin","district_admin","vendor","auditor"],gst:["super_admin","auditor"],bank:["super_admin","auditor"],wallet:["agent","super_admin","district_admin"],projects:["super_admin","district_admin","auditor"],worklog:["super_admin","district_admin","agent"],reports:["super_admin","district_admin","agent","auditor"],ai:["super_admin","district_admin","agent","auditor"],users:["super_admin"],settings:["super_admin","auditor"],profile:["super_admin","district_admin","agent","vendor"]};function d0(){const[c,u]=E.useState(!0),[f,r]=E.useState(null),v=or(),{t:p}=xe(),j=E.useCallback(h=>{r(h),h&&ur(uc(),h)},[]);if(E.useEffect(()=>{if(!uc()){u(!1);return}fv().then(m=>j(m.user)).catch(()=>{oc(),j(null)}).finally(()=>u(!1))},[j]),E.useEffect(()=>{Ex(()=>{oc(),r(null),nt("/"),window.location.reload()})},[]),E.useEffect(()=>{if(!f||f.role==="vendor")return;const h=v.parts[0]||"",m=r0[h];h&&m&&!m.includes(f.role)&&nt("/")},[v.raw,f]),c)return n.jsx("div",{className:"login-wrap",children:n.jsxs("div",{className:"login-card",style:{textAlign:"center"},children:[n.jsxs("div",{className:"login-brand",children:[n.jsx("div",{className:"app-brand-logo",children:"AR"}),n.jsx("h1",{children:p("app.name")})]}),n.jsxs("div",{className:"ui-spinner-wrap",children:[n.jsx("span",{className:"ui-spinner"}),n.jsx("span",{className:"ui-spinner-label",children:p("common.loading")})]})]})});if(!f||!uc())return n.jsx(er,{children:n.jsx(Ix,{onLoggedIn:j})});if(f.mustChangePassword&&v.path!=="/profile")return n.jsx(er,{children:n.jsx(vv,{user:f,onDone:()=>{window.location.reload()},onLogout:async()=>{await ar()}})});let g;const N=v.parts[0]||"",b=v.parts[1]||"";switch(N){case"":g=n.jsx(Ph,{user:f});break;case"vendors":g=b?n.jsx(cy,{user:f,vendorId:b}):n.jsx(sy,{user:f});break;case"transactions":g=n.jsx(uy,{user:f});break;case"bills":g=n.jsx(hy,{user:f});break;case"payments":g=n.jsx(xy,{user:f});break;case"gst":g=n.jsx(Ny,{user:f});break;case"bank":g=n.jsx(_y,{user:f});break;case"wallet":g=n.jsx(Ry,{user:f});break;case"projects":g=n.jsx(Dy,{user:f});break;case"worklog":g=n.jsx(zy,{user:f});break;case"reports":g=n.jsx(By,{user:f});break;case"users":g=n.jsx(Xy,{user:f});break;case"settings":g=n.jsx($y,{user:f});break;case"ai":g=n.jsx(o0,{});break;case"profile":g=n.jsx(Px,{user:f,query:v.query,onLogout:async()=>{await ar()}});break;default:g=n.jsx(Ph,{user:f})}return n.jsx(er,{children:n.jsx(Gx,{user:f,children:g})})}Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{children:n.jsx(Rx,{children:n.jsx(d0,{})})}));
+      `})]})}function Ry({user:c}){const{t:u,lang:f}=xe(),[r,v]=E.useState(""),p=c.role==="agent",j=ge("agents.list",{},[],!p),g=ge("agents.wallet",p?{}:{agentId:r},[r,p],p||!!r);if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const N=g.data,b=j.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("wallet.title"),sub:u("wallet.sub")}),!p&&n.jsx("div",{className:"flex mb-16",children:n.jsxs(be,{value:r,onChange:h=>v(h.target.value),style:{width:300},children:[n.jsx("option",{value:"",children:u("common.select")}),b.map(h=>n.jsxs("option",{value:h.agentId,children:[h.fullName," — ",h.agentId," (",h.managerDistrict||"",")"]},h.agentId))]})}),N&&n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"ui-stats",children:[n.jsx(dt,{label:u("wallet.balance"),value:Q(N.balance),tone:"ok"}),n.jsx(dt,{label:u("agents.commissionSlab")+" — "+Sl(new Date().toISOString().slice(0,7),f),value:Q(N.monthCommission)}),n.jsx(dt,{label:u("wallet.walletHistory"),value:String(N.entries.length)})]}),n.jsxs(oe,{title:u("wallet.walletHistory"),children:[n.jsx(Xe,{head:[u("common.date"),u("common.notes"),u("wallet.txnRef"),u("wallet.type"),u("wallet.credit"),u("wallet.balance")],empty:N.entries.length===0,children:N.entries.map((h,m)=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(String(h.date||""))}),n.jsx("td",{className:"wrap",children:String(h.description||"")}),n.jsx("td",{className:"mono",children:String(h.txnId||"")}),n.jsx("td",{children:n.jsxs(me,{tone:"violet",children:[String(h.commissionType||h.type||"")," ",Number(h.commissionPercent)>0?"· "+h.commissionPercent+"%":""]})}),n.jsx("td",{className:"num text-ok",children:Q(Number(h.commissionAmount)||0)}),n.jsx("td",{className:"num",children:n.jsx("b",{children:Q(Number(h.balance)||0)})})]},m))}),N.entries.length===0&&n.jsx(Yl,{children:u("common.noData")})]})]}),!p&&!r&&n.jsx(Yl,{children:u("common.select")})]})}function Dy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(""),[p,j]=E.useState(null),g=ge("projects.list",{q:r||void 0},[r]),N=c.role==="super_admin";if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const b=g.data?.rows||[],h=b.reduce((S,w)=>S+Number(w.contractAmount||0),0),m=b.reduce((S,w)=>S+Number(w.pending||0),0);return n.jsxs("div",{children:[n.jsx(st,{title:u("projects.title"),sub:u("projects.sub"),right:n.jsxs("div",{className:"flex",children:[n.jsx(rc,{value:r,onChange:v}),N&&n.jsx(L,{onClick:()=>j("new"),children:u("projects.newProject")})]})}),n.jsxs("div",{className:"ui-stats",children:[n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.title")}),n.jsx("div",{className:"ui-stat-value",children:b.length})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.contractAmount")}),n.jsx("div",{className:"ui-stat-value",children:Q(h)})]}),n.jsxs("div",{className:"ui-stat ui-stat-warn",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.pending")}),n.jsx("div",{className:"ui-stat-value",children:Q(m)})]})]}),n.jsx(oe,{children:n.jsx(Xe,{head:[u("projects.name"),u("projects.district"),u("projects.contractAmount"),u("projects.received"),u("projects.pending"),u("projects.tds"),u("projects.progress"),u("common.status"),u("common.actions")],empty:b.length===0,children:b.map(S=>{const w=Number(S.contractAmount)>0?Math.min(100,Math.round(Number(S.received)/Number(S.contractAmount)*100)):0;return n.jsxs("tr",{children:[n.jsxs("td",{className:"wrap",children:[n.jsx("b",{children:S.name}),n.jsx("div",{className:"text-3",children:S.location||""})]}),n.jsx("td",{children:S.location?"":"—"}),n.jsx("td",{className:"num",children:Q(S.contractAmount)}),n.jsx("td",{className:"num text-ok",children:Q(S.received)}),n.jsx("td",{className:"num",children:Q(S.pending)}),n.jsx("td",{className:"num",children:Q(S.expectedTds)}),n.jsxs("td",{style:{minWidth:110},children:[n.jsx("div",{className:"progress",children:n.jsx("div",{style:{width:w+"%"}})}),n.jsxs("div",{className:"text-3",children:[w,"%"]})]}),n.jsx("td",{children:n.jsx(me,{tone:St(S.status),children:S.status})}),n.jsx("td",{className:"row-actions",children:N&&n.jsxs(n.Fragment,{children:[n.jsx(L,{small:!0,kind:"ghost",onClick:()=>j(S),children:u("common.edit")}),n.jsx(L,{small:!0,kind:"danger",onClick:async()=>{window.confirm(S.name+" — "+u("common.archive")+"?")&&(await Wx(S.projectId),f(!0,u("common.saved")),g.reload())},children:u("common.archive")})]})})]},S.projectId)})})}),p&&n.jsx(Oy,{project:p==="new"?null:p,onClose:()=>j(null),onSaved:()=>{j(null),g.reload()}})]})}function Oy({project:c,onClose:u,onSaved:f}){const{t:r}=xe(),v=Ue(),{busy:p,run:j}=ft(),[g,N]=E.useState({name:c?.name||"",location:c?.location||"",contractAmount:String(c?.contractAmount??""),expectedGst:String(c?.expectedGst??"0"),expectedTds:String(c?.expectedTds??"0"),labourCost:String(c?.labourCost??"0"),emdAmount:String(c?.emdAmount??"0"),keywords:c?.keywords||"",notes:c?.notes||""}),b=(h,m)=>N(S=>({...S,[h]:m}));return n.jsxs($e,{open:!0,onClose:u,wide:!0,title:c?r("common.edit")+" — "+c.name:r("projects.newProject"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:u,children:r("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const h={name:g.name,location:g.location,contractAmount:Number(g.contractAmount)||0,expectedGst:Number(g.expectedGst)||0,expectedTds:Number(g.expectedTds)||0,labourCost:Number(g.labourCost)||0,emdAmount:Number(g.emdAmount)||0,keywords:g.keywords,notes:g.notes||void 0};(c?await j("projects.update",{...h,projectId:c.projectId},(S,w)=>v(S,S?r("projects.saved"):w)):await j("projects.create",h,(S,w)=>v(S,S?r("projects.saved"):w)))&&f()},children:r("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:r("projects.name"),req:!0,children:n.jsx(J,{value:g.name,onChange:h=>b("name",h.target.value)})}),n.jsx(K,{label:r("projects.district"),children:n.jsx(J,{value:g.location,onChange:h=>b("location",h.target.value)})}),n.jsx(K,{label:r("projects.contractAmount"),children:n.jsx(J,{type:"number",value:g.contractAmount,onChange:h=>b("contractAmount",h.target.value)})}),n.jsx(K,{label:r("gst.title")+" (₹)",children:n.jsx(J,{type:"number",value:g.expectedGst,onChange:h=>b("expectedGst",h.target.value)})}),n.jsx(K,{label:r("projects.tds"),hint:Ds(0).slice(0,0)+"V3: amount only (no 26Q)",children:n.jsx(J,{type:"number",value:g.expectedTds,onChange:h=>b("expectedTds",h.target.value)})}),n.jsx(K,{label:r("projects.received")+" (₹)",children:n.jsx(J,{type:"number",value:String(c?.received??0),readOnly:!0})}),n.jsx(K,{label:"Labour (₹)",children:n.jsx(J,{type:"number",value:g.labourCost,onChange:h=>b("labourCost",h.target.value)})}),n.jsx(K,{label:"EMD (₹)",children:n.jsx(J,{type:"number",value:g.emdAmount,onChange:h=>b("emdAmount",h.target.value)})}),n.jsx(K,{label:r("bank.ref")+" / "+r("projects.name")+" ("+r("common.optional")+")",hint:"Comma-separated keywords for bank auto-match",children:n.jsx(J,{value:g.keywords,onChange:h=>b("keywords",h.target.value)})}),n.jsx(K,{label:r("common.notes"),children:n.jsx(J,{value:g.notes,onChange:h=>b("notes",h.target.value)})})]}),c&&n.jsxs("div",{className:"kv mt-8",children:[n.jsxs("span",{className:"k",children:[r("projects.pending")," (auto)"]}),n.jsx("span",{className:"v",children:Q(Math.max(0,(Number(c.contractAmount)||0)-(Number(c.received)||0)))})]})]})}const sr={site_visit:"Site visit",vendor_call:"Vendor call",bill_followup:"Bill follow-up",payment_followup:"Payment follow-up",office:"Office",training:"Training",other:"Other"};function zy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(new Date().toISOString().slice(0,10)),[p,j]=E.useState(""),[g,N]=E.useState(c.role==="agent"),[b,h]=E.useState(null),[m,S]=E.useState(!1),w={date:r||void 0,category:p||void 0,mine:g||void 0,...c.role==="district_admin"?{district:c.district}:{}},y=ge("worklog.list",w,[r,p,g]),{busy:D,run:H}=ft();if(y.loading&&!y.data)return n.jsx(Ze,{label:u("common.loading")});const Y=y.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("worklog.title"),sub:u("worklog.sub"),right:n.jsx(L,{onClick:()=>S(!0),children:u("worklog.newEntry")})}),n.jsx(oe,{right:n.jsxs("div",{className:"flex",children:[n.jsx(J,{type:"date",value:r,onChange:V=>v(V.target.value),style:{width:150}}),n.jsxs(be,{value:p,onChange:V=>j(V.target.value),style:{width:160},children:[n.jsxs("option",{value:"",children:[u("worklog.category"),": ",u("common.all")]}),xv.map(V=>n.jsx("option",{value:V,children:sr[V]||V},V))]}),(c.role==="super_admin"||c.role==="district_admin")&&n.jsxs(be,{value:g?"1":"0",onChange:V=>N(V.target.value==="1"),style:{width:130},children:[n.jsx("option",{value:"0",children:u("worklog.teamEntries")}),n.jsx("option",{value:"1",children:u("worklog.myEntries")})]})]}),children:n.jsx(Xe,{head:[u("common.date"),u("worklog.category"),u("worklog.description"),u("common.amount"),u("common.status"),u("common.actions")],empty:Y.length===0,children:Y.map(V=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(V.date)}),n.jsx("td",{children:n.jsx(me,{tone:"info",children:sr[V.category]||V.category})}),n.jsx("td",{className:"wrap",children:V.description}),n.jsx("td",{className:"num",children:V.amount?Q(V.amount):"—"}),n.jsx("td",{children:n.jsx(me,{tone:St(V.status),children:V.status})}),n.jsx("td",{className:"row-actions",children:V.createdBy&&(c.role==="super_admin"||c.role==="district_admin"||c.role==="agent")&&n.jsx(L,{small:!0,kind:"ghost",onClick:()=>h(V),children:u("common.edit")})})]},V.workId))})}),(m||b)&&n.jsx(My,{entry:b,defaultDate:r,onClose:()=>{S(!1),h(null)},onSaved:async()=>{S(!1),h(null),y.reload()},run:H,busy:D,toast:f,t:u})]})}function My({entry:c,defaultDate:u,onClose:f,onSaved:r,run:v,busy:p,toast:j,t:g}){const[N,b]=E.useState({date:c?.date||u,category:c?.category||"site_visit",description:c?.description||"",amount:String(c?.amount??"")}),h=(m,S)=>b(w=>({...w,[m]:S}));return n.jsxs($e,{open:!0,onClose:f,title:g(c?"common.edit":"worklog.newEntry"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:f,children:g("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const m={date:N.date,category:N.category,description:N.description,amount:N.amount?Number(N.amount):void 0};(c?await v("worklog.update",{...m,workId:c.workId},(w,y)=>j(w,w?g("common.saved"):y)):await v("worklog.create",m,(w,y)=>j(w,w?g("common.saved"):y)))&&r()},children:g("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:g("common.date"),req:!0,children:n.jsx(J,{type:"date",value:N.date,onChange:m=>h("date",m.target.value)})}),n.jsx(K,{label:g("worklog.category"),req:!0,children:n.jsx(be,{value:N.category,onChange:m=>h("category",m.target.value),children:xv.map(m=>n.jsx("option",{value:m,children:sr[m]||m},m))})})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("worklog.description")," (",g("common.required"),")"]}),n.jsx(nv,{value:N.description,onChange:m=>h("description",m.target.value),rows:3})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("common.amount")," (",g("common.optional"),")"]}),n.jsx(J,{type:"number",value:N.amount,onChange:m=>h("amount",m.target.value)})]})]})}const Uy=[{id:"R1",en:"District performance",ta:"மாவட்ட செயல்திறன்",roles:["super_admin","district_admin"],params:["district"]},{id:"R2",en:"Vendor ledger",ta:"வெண்டர் லெடார்",roles:["super_admin","district_admin","auditor"],params:["vendorId"]},{id:"R3",en:"Transaction aging",ta:"பரிவர்த்தனை வயது",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R4",en:"Collections",ta:"வசூல்",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R5",en:"Wallet statement",ta:"வாலெட் கணக்கு",roles:["super_admin"],params:[]},{id:"R6",en:"Agent commission statement",ta:"அஜெண்ட் கமிஷன்",roles:["super_admin","district_admin","agent","auditor"],params:["agentId"]},{id:"R7",en:"GST summary",ta:"ஜிஎஸ்டி சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R8",en:"TDS summary",ta:"டிடிஎஸ் சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R9",en:"GSTR-2B reconciliation",ta:"ஜிஎஸ்டி-2B சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R10",en:"Bank reconciliation",ta:"வங்கி சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R11",en:"Audit extract",ta:"ஆடிட் பதிவேடு",roles:["super_admin","auditor"],params:[]},{id:"R12",en:"Users & roles",ta:"பயனர்கள் & பங்குகள்",roles:["super_admin"],params:[]},{id:"R13",en:"AI usage",ta:"AI பயன்பாடு",roles:["super_admin"],params:[]},{id:"R14",en:"Bank Live BRS 200 — All Columns Print Ready",ta:"வங்கி லைவ் BRS 200 — அனைத்து காலமும் அச்சு தயார்",roles:["super_admin","district_admin","agent","auditor"],params:[]}];function By({user:c}){
+  const {t:u, lang:f} = xe(),
+    r = Ue(),
+    [v, p] = E.useState("R14"),
+    [j, g] = E.useState(""),
+    [district, setDistrict] = E.useState("all"),
+    [vendorId, setVendorId] = E.useState(""),
+    [orientation, setOrientation] = E.useState("landscape"),
+    [isPrint, setIsPrint] = E.useState(!1),
+    [N, b] = E.useState(!1);
+
+  const h = Uy.filter(D => D.roles.includes(c.role)),
+    m = h.find(D => D.id === v) || h[0] || null;
+
+  const handleSelectReport = D => {
+    p(D);
+    const wide = ["R1","R2","R3","R4","R6","R9","R10","R11","R14"];
+    setOrientation(wide.includes(D) ? "landscape" : "portrait");
+  };
+
+  const S = ge("reports.run", {
+    reportId: v || "R1",
+    params: {
+      ...j ? { month: j } : {},
+      ...district !== "all" ? { district } : {},
+      ...vendorId ? { vendorId } : {},
+      ...c.role === "district_admin" ? { district: c.district } : {},
+      ...c.role === "agent" ? { self: !0 } : {}
+    }
+  }, [v, j, district, vendorId], !!m && v !== "R14");
+
+  const bankQuery = ge("bank.liveRecon", {
+    filterStatus: "all",
+    filterFY: "all",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+    workPlace: district !== "all" ? district : "all"
+  }, [v, district], v === "R14");
+
+  const bankData = bankQuery.data,
+    filteredR14 = bankData?.combined || [],
+    statsR14 = bankData?.stats;
+
+  const totalsR14 = E.useMemo(() => {
+    if (!filteredR14.length) return null;
+    const sum = k => filteredR14.reduce((s, row) => s + (Number(row.contract?.[k]) || 0), 0);
+    return {
+      receiptAmount: sum("receiptAmount"),
+      taxableValue: sum("taxableValue"),
+      labourWelfare: sum("labourWelfare"),
+      gst: sum("gst"),
+      invoiceValue: sum("invoiceValue"),
+      tds: sum("tds"),
+      gstTds: sum("gstTds"),
+      withHeld: sum("withHeld"),
+      emd: sum("emd"),
+      otherDeduction: sum("otherDeduction"),
+      receivableAmount: sum("receivableAmount"),
+      count: filteredR14.length
+    };
+  }, [filteredR14]);
+
+  const r1to13Data = E.useMemo(() => {
+    const rawData = S.data;
+    if (!rawData || !rawData.rows || !rawData.rows.length) {
+      return { columns: [], rows: [], totals: {} };
+    }
+    const rawRows = rawData.rows;
+    let cols = [];
+    let formattedRows = [];
+    if (Array.isArray(rawRows[0])) {
+      cols = rawData.columns || rawRows[0].map((_, i) => "Col " + (i + 1));
+      formattedRows = rawRows.map(rowArr => {
+        const obj = {};
+        cols.forEach((col, idx) => { obj[col] = rowArr[idx]; });
+        return obj;
+      });
+    } else {
+      cols = Object.keys(rawRows[0]);
+      formattedRows = rawRows;
+    }
+    const totals = {};
+    cols.forEach(col => {
+      const isNum = formattedRows.some(row => typeof row[col] === "number" && !isNaN(row[col]));
+      if (isNum) {
+        totals[col] = formattedRows.reduce((acc, row) => acc + (typeof row[col] === "number" ? row[col] : 0), 0);
+      }
+    });
+    return { columns: cols, rows: formattedRows, totals };
+  }, [S.data]);
+
+  const tnDistricts = [
+    "Ariyalur","Chengalpattu","Chennai","Coimbatore","Cuddalore","Dharmapuri","Dindigul","Erode",
+    "Kallakurichi","Kanchipuram","Kanniyakumari","Karur","Krishnagiri","Madurai","Mayiladuthurai",
+    "Nagapattinam","Namakkal","Nilgiris","Perambalur","Pudukkottai","Ramanathapuram","Ranipet",
+    "Salem","Sivagangai","Tenkasi","Thanjavur","Theni","Thoothukudi","Tiruchirappalli","Tirunelveli",
+    "Tirupathur","Tiruppur","Tiruvallur","Tiruvannamalai","Tiruvarur","Vellore","Viluppuram","Virudhunagar"
+  ];
+
+  function downloadCsv(content, filename) {
+    const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  function handleExportCsv() {
+    if (v === "R14") {
+      if (!filteredR14.length) { r(!1, "No data to export"); return; }
+      const headers = [
+        "S.No","Receipt Date","Work Name","Work Place","Work Type","Party","Taxable Value",
+        "Labour Welfare","18% GST","Invoice Value","IT TDS 2%","GST TDS 2%","With Held","EMD",
+        "Other Deduction","Receivable","Receipt Amount","FY","File Name","Bank Date",
+        "Bank Description","Bank Credit","BRS Status","Confidence","Date Diff","Amount Diff"
+      ];
+      const rows = filteredR14.map(row => [
+        row.contract.sNo,
+        row.contract.receiptDate,
+        '"' + (row.contract.workName || "").replace(/"/g, '""') + '"',
+        '"' + (row.contract.workPlace || "").replace(/"/g, '""') + '"',
+        row.contract.workType,
+        row.contract.party,
+        row.contract.taxableValue,
+        row.contract.labourWelfare,
+        row.contract.gst,
+        row.contract.invoiceValue,
+        row.contract.tds,
+        row.contract.gstTds || "",
+        row.contract.withHeld || "",
+        row.contract.emd || "",
+        row.contract.otherDeduction || "",
+        row.contract.receivableAmount || "",
+        row.contract.receiptAmount,
+        row.contract.fy,
+        row.contract.fileName,
+        row.bank?.date || "",
+        '"' + (row.bank?.description || "").replace(/"/g, '""') + '"',
+        row.bank?.credit || "",
+        row.matchType,
+        row.confidence,
+        row.dateDiff,
+        row.amountDiff
+      ]);
+      const totalRow = totalsR14 ? [
+        "TOTAL", "", "", "", "", "", totalsR14.taxableValue, totalsR14.labourWelfare, totalsR14.gst,
+        totalsR14.invoiceValue, totalsR14.tds, totalsR14.gstTds, totalsR14.withHeld, totalsR14.emd,
+        totalsR14.otherDeduction, totalsR14.receivableAmount, totalsR14.receiptAmount, "", "", "", "", "", "", "", "", ""
+      ] : [];
+      const csv = [headers.join(","), ...rows.map(row => row.join(",")), totalRow.join(",")].join("\n");
+      downloadCsv(csv, "R14_Bank_Live_BRS_200_" + new Date().toISOString().slice(0, 10) + ".csv");
+      r(!0, "Excel CSV exported — 200 all columns + totals");
+    } else {
+      if (!r1to13Data.rows.length) { r(!1, "No data to export"); return; }
+      const headers = r1to13Data.columns;
+      const rows = r1to13Data.rows.map(row =>
+        headers.map(hKey => {
+          const val = row[hKey];
+          if (val === null || val === undefined) return "";
+          if (typeof val === "string") return '"' + val.replace(/"/g, '""') + '"';
+          return val;
+        })
+      );
+      const totalRow = headers.map((hKey, i) => {
+        if (i === 0) return '"TOTAL (' + r1to13Data.rows.length + ' rows)"';
+        return r1to13Data.totals[hKey] !== undefined ? r1to13Data.totals[hKey] : "";
+      });
+      const csv = [headers.join(","), ...rows.map(row => row.join(",")), totalRow.join(",")].join("\n");
+      downloadCsv(csv, (m?.id || "Report") + "_" + new Date().toISOString().slice(0, 10) + ".csv");
+      r(!0, (m?.id || "Report") + " Excel CSV exported with totals");
+    }
+  }
+
+  function handleTriggerPrint() {
+    setIsPrint(!0);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  }
+
+  return n.jsxs("div", {
+    className: "reports-centre",
+    children: [
+      n.jsxs("div", {
+        className: "no-print",
+        children: [
+          n.jsx(st, {
+            title: f === "ta" ? "அறிக்கைகள் ஏற்றுமதி மையம் (Reports Export Centre)" : "Reports Export Centre",
+            sub: f === "ta" ? "R1 முதல் R14 வரையிலான அனைத்து அறிக்கைகளுக்கும் முழுமையான அச்சுப் பிரதி (A4 Portrait & Landscape) + எக்செல் ஏற்றுமதி" : "Print-Ready A4 reports (Portrait & Landscape) + Excel export for R1–R14 with totals & signatures"
+          }),
+          n.jsxs("div", {
+            className: "settings-grid",
+            style: { gridTemplateColumns: "300px 1fr", gap: 16 },
+            children: [
+              n.jsxs("div", {
+                className: "settings-nav",
+                children: [
+                  n.jsx("div", {
+                    style: { padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" },
+                    children: f === "ta" ? "அறிக்கைகள் பட்டியல் (R1 – R14)" : "Reports List (R1 – R14)"
+                  }),
+                  h.map(rep =>
+                    n.jsxs("button", {
+                      className: v === rep.id ? "on" : "",
+                      onClick: () => handleSelectReport(rep.id),
+                      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px" },
+                      children: [
+                        n.jsxs("div", {
+                          children: [
+                            n.jsx("span", { className: "mono", style: { marginRight: 8, fontWeight: 700, color: "var(--primary)" }, children: rep.id }),
+                            f === "ta" ? rep.ta : rep.en
+                          ]
+                        }),
+                        n.jsx("span", { style: { fontSize: 10, opacity: 0.7 }, children: ["R1","R2","R3","R4","R6","R9","R10","R11","R14"].includes(rep.id) ? "📃" : "📄" })
+                      ]
+                    }, rep.id)
+                  )
+                ]
+              }),
+              n.jsxs("div", {
+                children: [
+                  n.jsx(oe, {
+                    style: { marginBottom: 12 },
+                    children: n.jsxs("div", {
+                      style: { display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 },
+                      children: [
+                        n.jsxs("div", {
+                          style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 },
+                          children: [
+                            m?.params?.includes("month") && n.jsxs("div", {
+                              children: [
+                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: f === "ta" ? "மாதம்:" : "Month:" }),
+                                n.jsx("input", { type: "month", className: "ui-input", style: { width: 145 }, value: j, onChange: ev => g(ev.target.value) })
+                              ]
+                            }),
+                            (m?.params?.includes("district") || v === "R14") && n.jsxs("div", {
+                              children: [
+                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: f === "ta" ? "மாவட்டம்:" : "District:" }),
+                                n.jsxs("select", {
+                                  className: "ui-input",
+                                  style: { width: 155 },
+                                  value: district,
+                                  onChange: ev => setDistrict(ev.target.value),
+                                  children: [
+                                    n.jsx("option", { value: "all", children: f === "ta" ? "அனைத்து மாவட்டங்களும் (All)" : "All Districts" }),
+                                    tnDistricts.map(dName => n.jsx("option", { value: dName, children: dName }, dName))
+                                  ]
+                                })
+                              ]
+                            }),
+                            m?.params?.includes("vendorId") && n.jsxs("div", {
+                              children: [
+                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: "வெண்டர் ID:" }),
+                                n.jsx("input", { className: "ui-input", style: { width: 130 }, placeholder: "Vendor ID…", value: vendorId, onChange: ev => setVendorId(ev.target.value) })
+                              ]
+                            }),
+                            n.jsx(L, {
+                              kind: "ghost",
+                              onClick: () => { if (v === "R14") bankQuery.reload(); else S.reload(); },
+                              children: f === "ta" ? "🔄 புதுப்பி" : "🔄 Refresh"
+                            })
+                          ]
+                        }),
+                        n.jsxs("div", {
+                          style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 },
+                          children: [
+                            n.jsxs("div", {
+                              style: { display: "inline-flex", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, padding: 2 },
+                              children: [
+                                n.jsx("button", {
+                                  className: "ui-btn " + (orientation === "portrait" ? "ui-btn-primary" : "ui-btn-ghost"),
+                                  style: { padding: "4px 10px", fontSize: 12, height: 32 },
+                                  onClick: () => setOrientation("portrait"),
+                                  children: "📄 Portrait"
+                                }),
+                                n.jsx("button", {
+                                  className: "ui-btn " + (orientation === "landscape" ? "ui-btn-primary" : "ui-btn-ghost"),
+                                  style: { padding: "4px 10px", fontSize: 12, height: 32 },
+                                  onClick: () => setOrientation("landscape"),
+                                  children: "📃 Landscape"
+                                })
+                              ]
+                            }),
+                            n.jsx(L, {
+                              kind: "primary",
+                              onClick: handleTriggerPrint,
+                              style: { fontWeight: 600 },
+                              children: f === "ta" ? "🖨️ A4 அச்சு (Print)" : "🖨️ Print A4"
+                            }),
+                            n.jsx(L, {
+                              kind: "soft",
+                              onClick: handleExportCsv,
+                              style: { fontWeight: 600 },
+                              children: f === "ta" ? "📊 Excel / CSV ஏற்றுமதி" : "📊 Export Excel (CSV)"
+                            })
+                          ]
+                        })
+                      ]
+                    })
+                  }),
+                  v === "R14" ? n.jsxs("div", {
+                    children: [
+                      n.jsxs("div", {
+                        className: "ui-stats",
+                        style: { gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginBottom: 12 },
+                        children: [
+                          n.jsxs("div", {
+                            className: "ui-stat",
+                            children: [
+                              n.jsx("div", { className: "ui-stat-label", children: f === "ta" ? "மொத்த பதிவுகள்" : "Total Contracts" }),
+                              n.jsxs("div", { className: "ui-stat-value", style: { color: "green" }, children: [statsR14?.contractCount || 203, " ✓"] }),
+                              n.jsx("div", { className: "ui-stat-sub", children: "3 தாள்கள் (67+65+68)" })
+                            ]
+                          }),
+                          n.jsxs("div", {
+                            className: "ui-stat",
+                            children: [
+                              n.jsx("div", { className: "ui-stat-label", children: f === "ta" ? "வசூல் தொகை" : "Receipt Total" }),
+                              n.jsx("div", { className: "ui-stat-value", children: Q(totalsR14?.receiptAmount || 0) }),
+                              n.jsxs("div", { className: "ui-stat-sub", children: ["வங்கி வரவு: ", Q(statsR14?.totalBank || 0)] })
+                            ]
+                          }),
+                          n.jsxs("div", {
+                            className: "ui-stat",
+                            children: [
+                              n.jsx("div", { className: "ui-stat-label", children: f === "ta" ? "வரிக்குரியது" : "Taxable Value" }),
+                              n.jsx("div", { className: "ui-stat-value", children: Q(totalsR14?.taxableValue || 0) }),
+                              n.jsxs("div", { className: "ui-stat-sub", children: ["18% GST: ", Q(totalsR14?.gst || 0)] })
+                            ]
+                          }),
+                          n.jsxs("div", {
+                            className: "ui-stat",
+                            children: [
+                              n.jsx("div", { className: "ui-stat-label", children: f === "ta" ? "இன்வாய்ஸ் மதிப்பு" : "Invoice Value" }),
+                              n.jsx("div", { className: "ui-stat-value", children: Q(totalsR14?.invoiceValue || 0) }),
+                              n.jsxs("div", { className: "ui-stat-sub", children: ["IT TDS 2%: ", Q(totalsR14?.tds || 0)] })
+                            ]
+                          }),
+                          n.jsxs("div", {
+                            className: "ui-stat",
+                            children: [
+                              n.jsx("div", { className: "ui-stat-label", children: f === "ta" ? "சரிபார்க்கப்பட்டவை" : "Reconciled" }),
+                              n.jsxs("div", { className: "ui-stat-value", children: [statsR14?.matched || 0, " / ", statsR14?.total || 0] }),
+                              n.jsxs("div", { className: "ui-stat-sub", children: [statsR14 ? Math.round((statsR14.matched / Math.max(1, statsR14.total)) * 100) : 0, "% Reconciled"] })
+                            ]
+                          })
+                        ]
+                      }),
+                      n.jsx(oe, {
+                        title: "R14 — வங்கி நேரடி BRS 200 (Bank Live BRS 200 — All Columns Print Ready)",
+                        sub: (orientation === "landscape" ? "A4 கிடைமட்டம் (Landscape)" : "A4 செங்குத்து (Portrait)") + " | " + filteredR14.length + " வரிசைகள் | Spreadsheet: " + (bankData?.externalId || ""),
+                        children: bankQuery.loading && !bankData ? n.jsx(Ze, { label: "வங்கி நேரடி BRS 200 தரவுகள் ஏற்றப்படுகின்றன…" }) :
+                          bankQuery.error ? n.jsxs(Yl, { children: ["பிழை: ", String(bankQuery.error)] }) :
+                          n.jsx("div", {
+                            style: { overflowX: "auto" },
+                            children: n.jsxs("table", {
+                              className: "ui-table",
+                              style: { fontSize: 11, minWidth: 2000 },
+                              children: [
+                                n.jsx("thead", {
+                                  children: n.jsxs("tr", {
+                                    children: [
+                                      n.jsx("th", { children: "வ.எண்" }),
+                                      n.jsx("th", { style: { background: "#e0f2fe", minWidth: 95 }, children: "ரசீது தேதி" }),
+                                      n.jsx("th", { style: { minWidth: 220 }, children: "பணி பெயர் (Work Name)" }),
+                                      n.jsx("th", { children: "இடம்" }),
+                                      n.jsx("th", { children: "வகை" }),
+                                      n.jsx("th", { children: "பார்ட்டி" }),
+                                      n.jsx("th", { children: "வரிக்குரியது" }),
+                                      n.jsx("th", { children: "தொழிலாளர் நிதி" }),
+                                      n.jsx("th", { children: "18% GST" }),
+                                      n.jsx("th", { children: "இன்வாய்ஸ்" }),
+                                      n.jsx("th", { children: "IT TDS 2%" }),
+                                      n.jsx("th", { children: "GST TDS 2%" }),
+                                      n.jsx("th", { children: "பிடித்தம்" }),
+                                      n.jsx("th", { children: "EMD" }),
+                                      n.jsx("th", { children: "இதர பிடித்தம்" }),
+                                      n.jsx("th", { children: "பெறத்தக்கது" }),
+                                      n.jsx("th", { children: "ரசீது தொகை" }),
+                                      n.jsx("th", { children: "FY" }),
+                                      n.jsx("th", { style: { background: "#e0f2fe", minWidth: 220 }, children: "வங்கி உறுதிப்படுத்தல்" }),
+                                      n.jsx("th", { children: "BRS நிலை" })
+                                    ]
+                                  })
+                                }),
+                                n.jsxs("tbody", {
+                                  children: [
+                                    filteredR14.map((row, idx) =>
+                                      n.jsxs("tr", {
+                                        className: row.matchType === "exact" ? "row-ok" : row.matchType === "unmatched" ? "row-warn" : "",
+                                        children: [
+                                          n.jsx("td", { className: "mono", children: row.contract.sNo || idx + 1 }),
+                                          n.jsx("td", {
+                                            style: { background: row.bank ? "#e0f2fe" : "transparent", fontWeight: row.bank ? 700 : 400, color: row.bank ? "#0284c7" : "inherit", borderLeft: row.bank ? "3px solid #0ea5e9" : "" },
+                                            children: Pe(row.contract.receiptDate)
+                                          }),
+                                          n.jsxs("td", {
+                                            className: "wrap",
+                                            style: { maxWidth: 220 },
+                                            children: [
+                                              n.jsx("div", { style: { fontWeight: 600 }, children: row.contract.workName || n.jsx("span", { className: "text-3", children: "(வெற்று)" }) }),
+                                              row.contract.engName && n.jsxs("div", { className: "text-3 mono", children: ["Eng: ", row.contract.engName] })
+                                            ]
+                                          }),
+                                          n.jsx("td", { children: row.contract.workPlace || "—" }),
+                                          n.jsx("td", { children: row.contract.workType || "—" }),
+                                          n.jsx("td", { className: "wrap", style: { maxWidth: 100 }, children: row.contract.party || "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.taxableValue ? Q(row.contract.taxableValue) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.labourWelfare ? Q(row.contract.labourWelfare) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.gst ? Q(row.contract.gst) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.invoiceValue ? Q(row.contract.invoiceValue) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.tds ? Q(row.contract.tds) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.gstTds ? Q(row.contract.gstTds) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.withHeld ? Q(row.contract.withHeld) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.emd ? Q(row.contract.emd) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.otherDeduction ? Q(row.contract.otherDeduction) : "—" }),
+                                          n.jsx("td", { className: "num", children: row.contract.receivableAmount ? Q(row.contract.receivableAmount) : "—" }),
+                                          n.jsx("td", { className: "num", style: { fontWeight: 700 }, children: Q(row.contract.receiptAmount) }),
+                                          n.jsx("td", { children: n.jsx(me, { tone: "info", children: row.contract.fy }) }),
+                                          n.jsx("td", {
+                                            style: { background: row.bank ? "#e0f2fe" : "#fef2f2", borderLeft: row.bank ? "3px solid #0ea5e9" : "" },
+                                            children: row.bank ? n.jsxs("div", {
+                                              children: [
+                                                n.jsxs("div", { style: { fontWeight: 700, color: "#0284c7" }, children: ["வங்கி: ", Pe(row.bank.date), " ", row.dateDiff === 0 ? "(அதே தேதி ✓)" : "(" + row.dateDiff + "d)"] }),
+                                                n.jsx("div", { style: { fontSize: 10 }, children: row.bank.description.slice(0, 50) }),
+                                                n.jsxs("div", { children: [n.jsx("b", { children: "வரவு: " }), Q(row.bank.credit)] })
+                                              ]
+                                            }) : n.jsx("span", { className: "text-3", children: "வரவு உறுதிப்படுத்தப்படவில்லை" })
+                                          }),
+                                          n.jsx("td", {
+                                            children: n.jsx(me, {
+                                              tone: row.matchType === "exact" ? "ok" : row.matchType === "unmatched" ? "err" : "warn",
+                                              children: row.matchType === "exact" ? "பொருந்தியது" : row.matchType === "unmatched" ? "நிலுவை" : row.matchType
+                                            })
+                                          })
+                                        ]
+                                      }, idx)
+                                    ),
+                                    totalsR14 && n.jsxs("tr", {
+                                      style: { background: "#f1f5f9", fontWeight: 700, borderTop: "2px solid #000" },
+                                      children: [
+                                        n.jsxs("td", { colSpan: 6, style: { textAlign: "right", padding: "8px 12px" }, children: ["மொத்தம் (TOTAL — ", totalsR14.count, " வரிசைகள்):"] }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.taxableValue) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.labourWelfare) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.gst) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.invoiceValue) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.tds) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.gstTds) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.withHeld) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.emd) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.otherDeduction) }),
+                                        n.jsx("td", { className: "num", children: Q(totalsR14.receivableAmount) }),
+                                        n.jsx("td", { className: "num", style: { background: "#dbeafe" }, children: Q(totalsR14.receiptAmount) }),
+                                        n.jsx("td", { colSpan: 3 })
+                                      ]
+                                    })
+                                  ]
+                                })
+                              ]
+                            })
+                          })
+                      })
+                    ]
+                  }) : n.jsx(oe, {
+                    title: (m?.id || "") + " — " + (f === "ta" ? m?.ta : m?.en),
+                    sub: (orientation === "landscape" ? "A4 கிடைமட்டம் (Landscape)" : "A4 செங்குத்து (Portrait)") + " | " + r1to13Data.rows.length + " வரிசைகள்",
+                    children: S.loading ? n.jsx(Ze, { label: (m?.id || "") + " அறிக்கை தரவுகள் ஏற்றப்படுகின்றன…" }) :
+                      S.error ? n.jsxs(Yl, { children: ["பிழை: ", String(S.error)] }) :
+                      !r1to13Data.rows.length ? n.jsx(Yl, { children: "இந்த அளவுகோல்களுக்கு தரவுகள் ஏதுமில்லை (No records found)" }) :
+                      n.jsx("div", {
+                        style: { overflowX: "auto" },
+                        children: n.jsxs("table", {
+                          className: "ui-table",
+                          style: { fontSize: 11, width: "100%" },
+                          children: [
+                            n.jsx("thead", {
+                              children: n.jsx("tr", {
+                                children: r1to13Data.columns.map(col =>
+                                  n.jsx("th", {
+                                    style: { textAlign: r1to13Data.totals[col] !== undefined ? "right" : "left" },
+                                    children: col
+                                  }, col)
+                                )
+                              })
+                            }),
+                            n.jsxs("tbody", {
+                              children: [
+                                r1to13Data.rows.map((row, i) =>
+                                  n.jsx("tr", {
+                                    children: r1to13Data.columns.map((col, j) => {
+                                      const val = row[col];
+                                      const isNum = typeof val === "number";
+                                      return n.jsx("td", {
+                                        className: isNum ? "num" : "",
+                                        style: { textAlign: isNum ? "right" : "left" },
+                                        children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : val == null ? "—" : String(val)
+                                      }, j);
+                                    })
+                                  }, i)
+                                ),
+                                Object.keys(r1to13Data.totals).length > 0 && n.jsx("tr", {
+                                  style: { background: "#f1f5f9", fontWeight: 700, borderTop: "2px solid #000" },
+                                  children: r1to13Data.columns.map((col, idx) => {
+                                    if (idx === 0) {
+                                      return n.jsxs("td", {
+                                        style: { textAlign: "left", padding: "8px 12px" },
+                                        children: ["மொத்தம் (TOTAL — ", r1to13Data.rows.length, ")"]
+                                      }, col);
+                                    }
+                                    const tot = r1to13Data.totals[col];
+                                    return n.jsx("td", {
+                                      className: "num",
+                                      style: { textAlign: "right" },
+                                      children: tot !== undefined ? Q(tot) : ""
+                                    }, col);
+                                  })
+                                })
+                              ]
+                            })
+                          ]
+                        })
+                      })
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      }),
+      isPrint && n.jsxs("div", {
+        className: "a4-print-document",
+        children: [
+          n.jsxs("div", {
+            className: "no-print",
+            style: { position: "fixed", top: 12, right: 12, zIndex: 9999, display: "flex", gap: 8, background: "#fff", padding: 8, borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" },
+            children: [
+              n.jsx(L, { kind: "primary", onClick: () => window.print(), children: "🖨️ மீண்டும் அச்சிடு (Print)" }),
+              n.jsx(L, { kind: "ghost", onClick: () => setIsPrint(!1), children: "✕ மூடு (Close)" })
+            ]
+          }),
+          n.jsxs("div", {
+            className: "a4-page " + orientation,
+            style: { padding: "10mm 8mm", background: "#fff", color: "#000", fontFamily: "Arial, sans-serif" },
+            children: [
+              n.jsxs("div", {
+                style: { textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 12 },
+                children: [
+                  n.jsx("h1", {
+                    style: { margin: "0 0 4px 0", fontSize: 18, fontWeight: 800, textTransform: "uppercase" },
+                    children: "SRI POLINCHI AND CO / AR ENTERPRISES ERP"
+                  }),
+                  n.jsx("p", {
+                    style: { margin: "0 0 4px 0", fontSize: 10, color: "#333" },
+                    children: "DOOR NO 2/150 CHITTANGADU, THIRUNALUR POST, ARANTHANGI TALUK, PUDUKKOTTAI DISTRICT - 614624"
+                  }),
+                  n.jsx("p", {
+                    style: { margin: 0, fontSize: 9.5, color: "#444" },
+                    children: "Email: srikolinchiandco@gmail.com | Account: 510909010201712 (City Union Bank)"
+                  }),
+                  n.jsxs("div", {
+                    style: { marginTop: 8, paddingTop: 6, borderTop: "1px dashed #666", display: "flex", justifyContent: "space-between", fontSize: 10 },
+                    children: [
+                      n.jsxs("span", { children: [n.jsx("b", { children: "அறிக்கை: " }), "[", m?.id, "] ", f === "ta" ? m?.ta : m?.en] }),
+                      n.jsxs("span", { children: [n.jsx("b", { children: "தேதி: " }), new Date().toLocaleDateString("en-IN")] }),
+                      n.jsxs("span", { children: [n.jsx("b", { children: "பயனர்: " }), c.name, " (", c.role, ")"] }),
+                      n.jsxs("span", { children: ["A4 ", orientation === "landscape" ? "Landscape (கிடைமட்டம்)" : "Portrait (செங்குத்து)"] })
+                    ]
+                  })
+                ]
+              }),
+              v === "R14" ? n.jsx("div", {
+                children: n.jsxs("table", {
+                  style: { width: "100%", borderCollapse: "collapse", fontSize: orientation === "landscape" ? 7.5 : 6.5 },
+                  children: [
+                    n.jsx("thead", {
+                      children: n.jsxs("tr", {
+                        style: { background: "#e2e8f0" },
+                        children: [
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "வ.எண்" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "ரசீது தேதி" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 3px" }, children: "பணி பெயர் (Work Name)" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "இடம்" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "பார்ட்டி" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right" }, children: "வரிக்குரியது" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right" }, children: "GST 18%" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right" }, children: "இன்வாய்ஸ்" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right" }, children: "IT TDS" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right" }, children: "ரசீது தொகை" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "FY" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", background: "#dbeafe" }, children: "வங்கி உறுதி" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px", textAlign: "right", background: "#dbeafe" }, children: "வங்கி வரவு" }),
+                          n.jsx("th", { style: { border: "1px solid #000", padding: "4px 2px" }, children: "BRS நிலை" })
+                        ]
+                      })
+                    }),
+                    n.jsxs("tbody", {
+                      children: [
+                        filteredR14.map((row, i) =>
+                          n.jsxs("tr", {
+                            style: { background: i % 2 === 1 ? "#f8fafc" : "#fff" },
+                            children: [
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "center" }, children: row.contract.sNo || i + 1 }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", fontWeight: row.bank ? 700 : 400, color: row.bank ? "#0284c7" : "inherit" }, children: Pe(row.contract.receiptDate) }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 4px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.contract.workName || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px" }, children: row.contract.workPlace || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px" }, children: row.contract.party || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.taxableValue ? Q(row.contract.taxableValue) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.gst ? Q(row.contract.gst) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.invoiceValue ? Q(row.contract.invoiceValue) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.tds ? Q(row.contract.tds) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right", fontWeight: 700 }, children: Q(row.contract.receiptAmount) }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "center" }, children: row.contract.fy }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", background: row.bank ? "#e0f2fe" : "transparent" }, children: row.bank ? Pe(row.bank.date) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right", fontWeight: 700, background: row.bank ? "#e0f2fe" : "transparent" }, children: row.bank ? Q(row.bank.credit) : "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "center", fontWeight: 600 }, children: row.matchType === "exact" ? "Reconciled" : row.matchType === "unmatched" ? "Pending" : row.matchType })
+                            ]
+                          }, i)
+                        ),
+                        totalsR14 && n.jsxs("tr", {
+                          style: { background: "#e2e8f0", fontWeight: 800, borderTop: "2px solid #000", borderBottom: "2px solid #000" },
+                          children: [
+                            n.jsxs("td", { colSpan: 5, style: { border: "1px solid #000", padding: "4px 6px", textAlign: "right" }, children: ["மொத்தம் (TOTAL — ", totalsR14.count, "):"] }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right" }, children: Q(totalsR14.taxableValue) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right" }, children: Q(totalsR14.gst) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right" }, children: Q(totalsR14.invoiceValue) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right" }, children: Q(totalsR14.tds) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right", background: "#bfdbfe" }, children: Q(totalsR14.receiptAmount) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px" } }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px" } }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px", textAlign: "right", background: "#bfdbfe" }, children: Q(statsR14?.totalBank || 0) }),
+                            n.jsx("td", { style: { border: "1px solid #000", padding: "4px 3px" } })
+                          ]
+                        })
+                      ]
+                    })
+                  ]
+                })
+              }) : n.jsx("div", {
+                children: n.jsxs("table", {
+                  style: { width: "100%", borderCollapse: "collapse", fontSize: orientation === "landscape" ? 8.5 : 9.5 },
+                  children: [
+                    n.jsx("thead", {
+                      children: n.jsx("tr", {
+                        style: { background: "#e2e8f0" },
+                        children: r1to13Data.columns.map(col =>
+                          n.jsx("th", {
+                            style: { border: "1px solid #000", padding: "4px 6px", textAlign: r1to13Data.totals[col] !== undefined ? "right" : "left" },
+                            children: col
+                          }, col)
+                        )
+                      })
+                    }),
+                    n.jsxs("tbody", {
+                      children: [
+                        r1to13Data.rows.map((row, i) =>
+                          n.jsx("tr", {
+                            style: { background: i % 2 === 1 ? "#f8fafc" : "#fff" },
+                            children: r1to13Data.columns.map((col, j) => {
+                              const val = row[col];
+                              const isNum = typeof val === "number";
+                              return n.jsx("td", {
+                                style: { border: "1px solid #ccc", padding: "3px 6px", textAlign: isNum ? "right" : "left" },
+                                children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : val == null ? "—" : String(val)
+                              }, j);
+                            })
+                          }, i)
+                        ),
+                        Object.keys(r1to13Data.totals).length > 0 && n.jsx("tr", {
+                          style: { background: "#e2e8f0", fontWeight: 800, borderTop: "2px solid #000", borderBottom: "2px solid #000" },
+                          children: r1to13Data.columns.map((col, idx) => {
+                            if (idx === 0) {
+                              return n.jsxs("td", {
+                                style: { border: "1px solid #000", padding: "4px 6px", textAlign: "left" },
+                                children: ["மொத்தம் (TOTAL — ", r1to13Data.rows.length, ")"]
+                              }, col);
+                            }
+                            const tot = r1to13Data.totals[col];
+                            return n.jsx("td", {
+                              style: { border: "1px solid #000", padding: "4px 6px", textAlign: "right" },
+                              children: tot !== undefined ? Q(tot) : ""
+                            }, col);
+                          })
+                        })
+                      ]
+                    })
+                  ]
+                })
+              }),
+              n.jsxs("div", {
+                style: { marginTop: 32, paddingTop: 16, borderTop: "1.5px solid #000", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24, fontSize: 10, textAlign: "center" },
+                children: [
+                  n.jsxs("div", {
+                    style: { border: "1px solid #aaa", padding: "12px 8px", borderRadius: 4 },
+                    children: [
+                      n.jsx("div", { style: { fontWeight: 700, marginBottom: 28 }, children: "தயாரித்தவர் / PREPARED BY" }),
+                      n.jsxs("div", {
+                        style: { borderTop: "1px dashed #666", paddingTop: 4 },
+                        children: [
+                          "பெயர்: ", c.name, n.jsx("br", {}),
+                          "பதவி: ", c.role, n.jsx("br", {}),
+                          "தேதி: ", new Date().toLocaleDateString("en-IN")
+                        ]
+                      })
+                    ]
+                  }),
+                  n.jsxs("div", {
+                    style: { border: "1px solid #aaa", padding: "12px 8px", borderRadius: 4 },
+                    children: [
+                      n.jsx("div", { style: { fontWeight: 700, marginBottom: 28 }, children: "சரிபார்த்தவர் / CHECKED & VERIFIED BY" }),
+                      n.jsxs("div", {
+                        style: { borderTop: "1px dashed #666", paddingTop: 4 },
+                        children: [
+                          "மாவட்ட நிர்வாகி / கணக்காளர்", n.jsx("br", {}),
+                          "(District Admin / Accountant)", n.jsx("br", {}),
+                          "கையொப்பம்: _________________"
+                        ]
+                      })
+                    ]
+                  }),
+                  n.jsxs("div", {
+                    style: { border: "1px solid #aaa", padding: "12px 8px", borderRadius: 4 },
+                    children: [
+                      n.jsx("div", { style: { fontWeight: 700, marginBottom: 28 }, children: "அங்கீகரித்தவர் & ஆடிட்டர் / AUTHORIZED" }),
+                      n.jsxs("div", {
+                        style: { borderTop: "1px dashed #666", paddingTop: 4 },
+                        children: [
+                          "ஸ்ரீ பொலிஞ்சி & கோ முத்திரை", n.jsx("br", {}),
+                          "(Sri Polinchi & Co Seal & Auditor)", n.jsx("br", {}),
+                          "கையொப்பம்: _________________"
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      }),
+      n.jsx("style", {
+        children: `
+          .row-ok td { background: rgba(16, 185, 129, 0.05); }
+          .row-warn td { background: rgba(239, 68, 68, 0.05); }
+          @media print {
+            @page {
+              size: A4 ${orientation};
+              margin: 8mm 6mm;
+            }
+            html, body {
+              background: #fff !important;
+              color: #000 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .app-sidebar, .app-topbar, .settings-nav, .ui-btn, .ai-fab, .no-print, header.app-head {
+              display: none !important;
+            }
+            .reports-centre {
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .a4-print-document {
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+            }
+            .a4-page {
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            table {
+              page-break-inside: auto !important;
+            }
+            tr {
+              page-break-inside: avoid !important;
+              page-break-after: auto !important;
+            }
+            thead {
+              display: table-header-group !important;
+            }
+            tfoot {
+              display: table-footer-group !important;
+            }
+          }
+        `
+      })
+    ]
+  });
+}
+function ky(c){return pe("users.resetPassword",{userId:c})}function qy(c){return pe("sessions.revoke",{sessionId:c})}function Hy(c,u){return pe("settings.update",{key:c,value:u})}function Gy(){return pe("backups.create",{})}function Yy(c){return pe("backups.restorePreview",{backupId:c})}function Vy(c){return pe("backups.restore",{backupId:c,confirm:"RESTORE"})}function Ly(){return pe("migration.importV3",{dryRun:!0})}function Qy(){return pe("migration.importV3",{dryRun:!1,confirm:"MIGRATE"})}const bv=[{id:"super_admin",label:"Super Admin"},{id:"district_admin",label:"District Admin"},{id:"agent",label:"Agent"},{id:"auditor",label:"Auditor"},{id:"vendor",label:"Vendor"}];function Xy({user:c}){const{t:u}=xe(),[f,r]=E.useState("users");return n.jsxs("div",{children:[n.jsx(st,{title:u("users.title"),sub:u("users.sub")}),n.jsx(sv,{tabs:[{id:"users",label:u("users.title")},{id:"sessions",label:u("users.activeSessions")},{id:"agents",label:u("agents.title")},{id:"slabs",label:u("agents.commissionSlab")}],active:f,onChange:r}),f==="users"&&n.jsx(Zy,{}),f==="sessions"&&n.jsx(Jy,{}),f==="agents"&&n.jsx(Iy,{}),f==="slabs"&&n.jsx(Py,{})]})}function Zy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(!1),[v,p]=E.useState(null),[j,g]=E.useState(""),[N,b]=E.useState(null),h=ge("users.list",{},[]),{busy:m,run:S}=ft();if(h.loading&&!h.data)return n.jsx(Ze,{label:c("common.loading")});const w=h.data?.rows||[];return n.jsxs(oe,{title:c("users.title"),right:n.jsx(L,{onClick:()=>r(!0),children:c("users.newUser")}),children:[n.jsx(Xe,{head:[c("users.username"),c("users.role"),c("users.district"),c("auth.mobile"),c("common.status"),"Last login",c("common.actions")],empty:w.length===0,children:w.map(y=>n.jsxs("tr",{children:[n.jsxs("td",{children:[n.jsx("b",{children:y.username}),y.mustChangePassword?n.jsxs("div",{className:"text-3",children:["⚠ ",c("users.mustChange")]}):null]}),n.jsx("td",{children:n.jsx(me,{tone:y.role==="super_admin"?"err":"info",children:y.role})}),n.jsx("td",{children:y.district||"—"}),n.jsx("td",{children:y.mobile||"—"}),n.jsx("td",{children:n.jsx(me,{tone:y.status==="active"?"ok":"err",children:y.status})}),n.jsx("td",{children:Pe(y.lastLoginAt)}),n.jsxs("td",{className:"row-actions",children:[n.jsxs(L,{small:!0,kind:"ghost",onClick:()=>{const D=window.prompt("Role ("+bv.map(H=>H.id).join(", ")+"):",y.role)||y.role;S("users.update",{userId:y.id,role:D},(H,Y)=>u(H,H?c("users.userUpdated"):Y))},children:["⇅ ",c("users.role")]}),n.jsx(L,{small:!0,kind:y.status==="active"?"danger":"soft",onClick:()=>{S("users.suspend",{userId:y.id,status:y.status==="active"?"suspended":"active"},(D,H)=>u(D,D?c("common.saved"):H))},children:y.status==="active"?c("common.archive"):c("common.restore")}),n.jsx(L,{small:!0,kind:"ghost",onClick:()=>{p(y),g("")},children:"🔑"})]})]},y.id))}),f&&n.jsx(Ky,{onClose:()=>r(!1),onCreated:y=>{r(!1),b(y),h.reload()},run:S,busy:m,toast:u,t:c}),v&&n.jsxs($e,{open:!0,onClose:()=>p(null),title:c("auth.changePassword")+" — "+v.username,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>p(null),children:c("common.cancel")}),n.jsx(L,{busy:m,onClick:async()=>{try{const y=await ky(v.id);b(y.tempPassword),p(null),u(!0,c("users.userUpdated"))}catch(y){u(!1,y.message)}},children:c("common.submit")})]}),children:[n.jsx("p",{children:c("users.tempPwShown")}),n.jsx(K,{label:"New temporary password (min 10, letter + number)",children:n.jsx(J,{value:j,onChange:y=>g(y.target.value),placeholder:"AR-"})}),n.jsx("p",{className:"text-3 mt-8",children:"The user must change it at first login. (Blank = server generates.)"})]}),N&&n.jsxs($e,{open:!0,onClose:()=>b(null),title:c("users.tempPwShown"),footer:n.jsx(L,{onClick:()=>b(null),children:c("common.close")}),children:[n.jsxs("p",{children:[c("users.tempPassword"),":"]}),n.jsx("div",{className:"mono",style:{fontSize:18,padding:12,background:"var(--bg-3)",borderRadius:10,userSelect:"all"},children:N}),n.jsx("p",{className:"text-3 mt-8",children:c("auth.changePasswordRequired")})]})]})}function Ky({onClose:c,onCreated:u,run:f,busy:r,toast:v,t:p}){const[j,g]=E.useState({username:"",role:"district_admin",district:"",mobile:"",email:"",pin:""}),N=(b,h)=>g(m=>({...m,[b]:h}));return n.jsx($e,{open:!0,onClose:c,title:p("users.newUser"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:c,children:p("common.cancel")}),n.jsx(L,{busy:r,onClick:async()=>{const b=await f("users.create",{username:j.username,role:j.role,district:j.district||void 0,mobile:j.mobile||void 0,email:j.email||void 0,pin:j.pin||void 0},(h,m)=>v(h,h?p("users.userCreated"):m));b&&b.tempPassword&&u(b.tempPassword)},children:p("common.create")})]}),children:n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:p("users.username"),req:!0,hint:"a-z, 0-9, _ · 3-30",children:n.jsx(J,{value:j.username,onChange:b=>N("username",b.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))})}),n.jsx(K,{label:p("users.role"),req:!0,children:n.jsx(be,{value:j.role,onChange:b=>N("role",b.target.value),children:bv.map(b=>n.jsx("option",{value:b.id,children:b.label},b.id))})}),n.jsx(K,{label:p("users.district"),children:n.jsx(J,{value:j.district,onChange:b=>N("district",b.target.value),placeholder:"Chennai"})}),n.jsx(K,{label:p("auth.mobile"),children:n.jsx(J,{value:j.mobile,onChange:b=>N("mobile",b.target.value.replace(/\D/g,"").slice(0,10)),inputMode:"numeric"})}),n.jsx(K,{label:p("auth.email"),children:n.jsx(J,{value:j.email,onChange:b=>N("email",b.target.value)})}),n.jsx(K,{label:p("users.vendorPin"),hint:"6 digits (vendor role only)",children:n.jsx(J,{value:j.pin,onChange:b=>N("pin",b.target.value.replace(/\D/g,"").slice(0,6)),inputMode:"numeric"})})]})})}function Jy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(""),v=ge("users.list",{},[]),p=ge("sessions.list",{userId:f||void 0},[f]);if(p.loading&&!p.data)return n.jsx(Ze,{label:c("common.loading")});const j=p.data?.sessions||[];return n.jsx(oe,{title:c("users.activeSessions"),right:n.jsxs(be,{value:f,onChange:g=>r(g.target.value),style:{width:220},children:[n.jsx("option",{value:"",children:c("common.all")}),(v.data?.rows||[]).map(g=>n.jsx("option",{value:g.id,children:g.username},g.id))]}),children:n.jsx(Xe,{head:[c("users.username"),"Device",c("common.date"),"Last activity",c("common.actions")],empty:j.length===0,children:j.map(g=>n.jsxs("tr",{children:[n.jsx("td",{children:n.jsx("b",{children:g.username||g.userId})}),n.jsx("td",{className:"wrap",children:g.device||"—"}),n.jsx("td",{children:Pe(g.issuedAt)}),n.jsx("td",{children:Pe(g.lastActivityAt)}),n.jsx("td",{className:"row-actions",children:n.jsx(L,{small:!0,kind:"danger",onClick:async()=>{window.confirm(c("users.revokeConfirm"))&&(await qy(g.sessionId),u(!0,c("users.sessionRevoked")),p.reload())},children:c("users.revoke")})})]},g.sessionId))})})}function Iy(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(!1),[v,p]=E.useState(null),j=ge("agents.list",{},[]),{busy:g,run:N}=ft();if(j.loading&&!j.data)return n.jsx(Ze,{label:c("common.loading")});const b=j.data?.rows||[];return n.jsxs(oe,{title:c("agents.title"),right:n.jsx(L,{onClick:()=>r(!0),children:c("agents.newAgent")}),children:[n.jsx(Xe,{head:[c("agents.code"),c("common.name"),c("auth.mobile"),c("agents.title"),c("agents.commissionSlab"),c("wallet.balance"),c("common.status"),c("common.actions")],empty:b.length===0,children:b.map(h=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:h.agentId}),n.jsxs("td",{children:[n.jsx("b",{children:h.fullName}),n.jsxs("div",{className:"text-3",children:[h.managerName||""," · ",h.managerDistrict||""]})]}),n.jsx("td",{children:h.mobile}),n.jsx("td",{children:h.bankName?h.bankName+" ····"+String(h.accountNumber||"").slice(-4):"—"}),n.jsx("td",{children:h.commissionType==="custom"?Ds(h.customCommissionPercent):c("common.all")+" slabs"}),n.jsx("td",{className:"num",children:h.commissionBalance?"₹"+Number(h.commissionBalance).toLocaleString("en-IN"):"—"}),n.jsx("td",{children:n.jsx(me,{tone:h.status==="approved"?"ok":"warn",children:h.status})}),n.jsx("td",{className:"row-actions",children:n.jsx(L,{small:!0,kind:"ghost",onClick:()=>p(h.agentId),children:c("agents.assignVendors")})})]},h.agentId))}),f&&n.jsx(Fy,{onClose:()=>r(!1),onCreated:h=>{r(!1),u(!0,h?c("users.tempPwShown")+": "+h:c("agents.agentCreated")),j.reload()},run:N,busy:g,toast:u,t:c}),v&&n.jsx(Wy,{agentId:v,onClose:()=>p(null),onDone:()=>{p(null),j.reload()},t:c})]})}function Fy({onClose:c,onCreated:u,run:f,busy:r,toast:v,t:p}){const[j,g]=E.useState({fullName:"",mobile:"",managerName:"",managerDistrict:"",commissionType:"auto",customCommissionPercent:"1"}),N=(b,h)=>g(m=>({...m,[b]:h}));return n.jsxs($e,{open:!0,onClose:c,title:p("agents.newAgent"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:c,children:p("common.cancel")}),n.jsx(L,{busy:r,onClick:async()=>{const b=await f("agents.create",{fullName:j.fullName,mobile:j.mobile,managerName:j.managerName||void 0,managerDistrict:j.managerDistrict||void 0,commissionType:j.commissionType,customCommissionPercent:Number(j.customCommissionPercent)||0},(h,m)=>v(h,h?p("agents.agentCreated"):m));b&&u(b.tempPassword||"")},children:p("common.create")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:p("common.name"),req:!0,children:n.jsx(J,{value:j.fullName,onChange:b=>N("fullName",b.target.value)})}),n.jsx(K,{label:p("auth.mobile"),req:!0,children:n.jsx(J,{value:j.mobile,onChange:b=>N("mobile",b.target.value.replace(/\D/g,"").slice(0,10)),inputMode:"numeric"})}),n.jsx(K,{label:p("agents.managerName"),children:n.jsx(J,{value:j.managerName,onChange:b=>N("managerName",b.target.value)})}),n.jsx(K,{label:p("agents.managerDistrict"),children:n.jsx(J,{value:j.managerDistrict,onChange:b=>N("managerDistrict",b.target.value)})}),n.jsx(K,{label:p("agents.commissionSlab"),children:n.jsxs(be,{value:j.commissionType,onChange:b=>N("commissionType",b.target.value),children:[n.jsx("option",{value:"auto",children:"Auto (slabs)"}),n.jsx("option",{value:"custom",children:"Custom %"})]})}),j.commissionType==="custom"&&n.jsx(K,{label:p("agents.overridePct"),children:n.jsx(J,{type:"number",value:j.customCommissionPercent,onChange:b=>N("customCommissionPercent",b.target.value)})})]}),n.jsx("p",{className:"text-3 mt-8",children:"A login (Agents userId) + temporary password are created automatically."})]})}function Wy({agentId:c,onClose:u,onDone:f,t:r}){const v=Ue(),p=ge("vendors.list",{statusFilter:"active"},[]),j=ge("agents.get",{agentId:c},[c]),[g,N]=E.useState(new Set);Vl.useEffect(()=>{const h=j.data;h&&h.assignedVendorIds&&N(new Set(h.assignedVendorIds))},[j.data]);const b=p.data?.rows||[];return n.jsxs($e,{open:!0,onClose:u,wide:!0,title:r("agents.assignVendors")+" — "+c,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:u,children:r("common.cancel")}),n.jsx(L,{busy:!1,onClick:async()=>{try{await Fx(c,[...g]),v(!0,r("common.saved")),f()}catch(h){v(!1,h.message)}},children:r("common.save")})]}),children:[b.length===0&&n.jsx("div",{className:"ui-empty",children:r("common.noData")}),b.map(h=>n.jsxs("div",{className:"kv",style:{cursor:"pointer"},onClick:()=>{N(m=>{const S=new Set(m);return S.has(h.vendorId)?S.delete(h.vendorId):S.add(h.vendorId),S})},children:[n.jsxs("span",{className:"k",children:[g.has(h.vendorId)?"☑":"☐"," ",h.vendorName," ",n.jsx("span",{className:"mono",children:h.vendorCode})]}),n.jsx("span",{className:"v",children:h.district})]},h.vendorId))]})}function Py(){const{t:c}=xe(),u=ge("agents.slabs",{},[]);if(u.loading&&!u.data)return n.jsx(Ze,{label:c("common.loading")});const f=u.data?.rows||[];return n.jsxs(oe,{title:c("agents.commissionSlab"),sub:c("agents.sub"),children:[n.jsx(Xe,{head:[c("agents.slab"),c("agents.commissionPct"),c("common.date")],empty:f.length===0,children:f.map(r=>n.jsxs("tr",{children:[n.jsx("td",{children:Ds(r.gstPercent)}),n.jsxs("td",{children:[n.jsx("b",{children:Ds(r.agentCommission)}),Number(r.agentCommission)===0&&n.jsxs("span",{className:"text-3",children:[" → ",c("common.none")]})]}),n.jsx("td",{children:Pe(r.effectiveFrom)})]},r.slabId))}),n.jsx("p",{className:"text-3 mt-8",children:"V3 default slabs (unchanged). Changes require a new effectiveFrom date; past transactions keep their slab."})]})}function dc(c){return c?.settings||{}}function $y({user:c}){const{t:u}=xe(),[f,r]=E.useState("org"),v=c.role==="auditor";return n.jsxs("div",{children:[n.jsx(st,{title:u("settings.title"),sub:u("settings.sub")}),n.jsxs("div",{className:"settings-grid",children:[n.jsxs("div",{className:"settings-nav",children:[n.jsx("button",{className:f==="org"?"on":"",onClick:()=>r("org"),children:u("settings.org")}),!v&&n.jsx("button",{className:f==="masters"?"on":"",onClick:()=>r("masters"),children:u("settings.masters")}),!v&&n.jsx("button",{className:f==="workflows"?"on":"",onClick:()=>r("workflows"),children:u("settings.workflows")}),n.jsx("button",{className:f==="ai"?"on":"",onClick:()=>r("ai"),children:u("settings.aiAccess")}),n.jsx("button",{className:f==="health"?"on":"",onClick:()=>r("health"),children:u("settings.sheetsHealth")}),!v&&n.jsx("button",{className:f==="data"?"on":"",onClick:()=>r("data"),children:u("settings.data")}),n.jsx("button",{className:f==="audit"?"on":"",onClick:()=>r("audit"),children:u("settings.auditLogs")})]}),n.jsxs("div",{children:[f==="org"&&n.jsx(e0,{canWrite:!v}),f==="masters"&&n.jsx(t0,{}),f==="workflows"&&n.jsx(l0,{}),f==="ai"&&n.jsx(a0,{}),f==="health"&&n.jsx(n0,{}),f==="data"&&n.jsx(s0,{}),f==="audit"&&n.jsx(c0,{})]})]})]})}function e0({canWrite:c}){const{t:u}=xe(),f=Ue(),r=ge("settings.get",{},[]),v=dc(r.data),p=v["org.profile"]||{},j=v["org.financialYear"]||{},[g,N]=E.useState({name:"",nameTa:"",gstin:"",address:"",phone:"",email:""}),[b,h]=E.useState("2025-26"),m=Vl.useRef(!1);E.useEffect(()=>{!r.data||m.current||(m.current=!0,N({name:p.name||"",nameTa:p.nameTa||"",gstin:p.gstin||"",address:p.address||"",phone:p.phone||"",email:p.email||""}),j.active&&h(j.active))},[r.data]);const{busy:S,run:w}=ft(),y=j.list||["2024-25","2025-26","2026-27","2027-28"];return r.loading&&!r.data?n.jsx(Ze,{label:u("common.loading")}):n.jsxs("div",{children:[n.jsxs(oe,{title:u("settings.orgProfile"),children:[c?n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:u("common.name"),children:n.jsx(J,{value:g.name,onChange:D=>N({...g,name:D.target.value})})}),n.jsx(K,{label:u("common.name")+" (தமிழ்)",children:n.jsx(J,{value:g.nameTa,onChange:D=>N({...g,nameTa:D.target.value})})}),n.jsx(K,{label:u("vendors.gstin"),children:n.jsx(J,{value:g.gstin,onChange:D=>N({...g,gstin:D.target.value.toUpperCase().slice(0,15)})})}),n.jsx(K,{label:"Phone",children:n.jsx(J,{value:g.phone,onChange:D=>N({...g,phone:D.target.value})})}),n.jsx(K,{label:u("auth.email"),children:n.jsx(J,{value:g.email,onChange:D=>N({...g,email:D.target.value})})}),n.jsx(K,{label:u("vendors.address"),children:n.jsx(J,{value:g.address,onChange:D=>N({...g,address:D.target.value})})})]}):n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:u("common.name")}),n.jsx("span",{className:"v",children:g.name||"—"}),n.jsx("span",{className:"k",children:u("vendors.gstin")}),n.jsx("span",{className:"v mono",children:g.gstin||"—"})]}),c&&n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:S,onClick:async()=>{await w("settings.update",{key:"org.profile",value:g},(H,Y)=>f(H,H?u("settings.orgSaved"):Y))&&r.reload()},children:u("common.save")})})]}),n.jsx(oe,{title:u("settings.financialYear"),children:c?n.jsxs("div",{className:"flex",children:[n.jsx(be,{value:b,onChange:D=>h(D.target.value),style:{width:160},children:y.map(D=>n.jsx("option",{value:D,children:D},D))}),n.jsx(L,{busy:S,onClick:async()=>{await Hy("org.financialYear",{active:b,list:y}),f(!0,u("settings.orgSaved")),r.reload()},children:u("common.save")})]}):n.jsxs(me,{tone:"info",children:["FY ",b]})})]})}function t0(){const{t:c,lang:u}=xe(),f=Ue(),r=ge("settings.get",{},[]),v=dc(r.data),[p,j]=E.useState([1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(String)),g=Vl.useRef(!1),{busy:N,run:b}=ft();if(E.useEffect(()=>{!r.data||g.current||(g.current=!0,j((v["calc.gstRates"]||[1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6]).map(String)))},[r.data]),r.loading&&!r.data)return n.jsx(Ze,{label:c("common.loading")});const h=v["calc.constants"]||{},m=v["gstr2b.clients"]||[];return n.jsxs("div",{children:[n.jsxs(oe,{title:c("vendors.gstin")+" rates (%)",sub:c("settings.masters"),children:[n.jsx("div",{className:"chip-row",children:p.map(S=>n.jsxs(me,{tone:"info",children:[S,"%"]},S))}),n.jsx("div",{className:"flex mt-16",children:n.jsx(L,{busy:N,onClick:async()=>{await b("settings.update",{key:"calc.gstRates",value:p.map(Number)},(w,y)=>f(w,w?c("settings.orgSaved"):y))&&r.reload()},children:c("common.save")})})]}),n.jsxs(oe,{title:"Calculation constants",sub:"V3 parity (managed read-only)",children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Profit rate"}),n.jsxs("span",{className:"v",children:[Math.round((h.profitRate||.08)*100),"%"]})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Bill total rate"}),n.jsxs("span",{className:"v",children:["× ",h.billTotalRate||1.18]})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Advance cap"}),n.jsxs("span",{className:"v",children:[Math.round((h.advanceCap||.2)*100),"%"]})]})]}),n.jsxs(oe,{title:c("gst.twoB")+" clients",sub:c("settings.masters"),children:[n.jsx(Xe,{head:["Client",c("vendors.gstin"),"Feature start"],empty:m.length===0,children:m.map((S,w)=>n.jsxs("tr",{children:[n.jsx("td",{children:S.name}),n.jsx("td",{className:"mono",children:S.gstin||n.jsx("span",{className:"text-3",children:"set GSTIN"})}),n.jsx("td",{children:Pe(S.featureStart)})]},w))}),n.jsx("p",{className:"text-3 mt-8",children:u==="ta"?"ஜிஎஸ்டி-2B பணியின் தொடக்க தேதிகள். ஒவ்வொரு கிளையண்டின் GSTIN-ஐ இங்கே அமைக்கவும்.":"Feature-start dates for the GSTR-2B module. Set each client GSTIN here before 2B matching goes live."})]})]})}function l0(){const{t:c}=xe(),u=Ue(),f=ge("settings.get",{},[]),r=dc(f.data),v=r["approval.workflow"]||{},[p,j]=E.useState({billAttachThreshold:"25000",overBillBuffer:"0"}),[g,N]=E.useState("0.8"),b=Vl.useRef(!1),{busy:h,run:m}=ft();if(E.useEffect(()=>{if(!f.data||b.current)return;b.current=!0,j({billAttachThreshold:String(v.billAttachThreshold??25e3),overBillBuffer:String(v.overBillBuffer??0)});const w=r["dash.layout"]||{};N(String(w.targetCollectionRate??.8))},[f.data]),f.loading&&!f.data)return n.jsx(Ze,{label:c("common.loading")});const S=r["dash.layout"]||{};return n.jsxs("div",{children:[n.jsxs(oe,{title:c("settings.workflows"),sub:c("settings.workflowsSub"),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:c("bills.uploadReceipt")+" threshold (₹)",children:n.jsx(J,{type:"number",value:p.billAttachThreshold,onChange:w=>j({...p,billAttachThreshold:w.target.value})})}),n.jsx(K,{label:c("transactions.remaining")+" buffer (₹)",hint:c("common.optional"),children:n.jsx(J,{type:"number",value:p.overBillBuffer,onChange:w=>j({...p,overBillBuffer:w.target.value})})})]}),n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:h,onClick:async()=>{await m("settings.update",{key:"approval.workflow",value:{...r["approval.workflow"]||{},billAttachThreshold:Number(p.billAttachThreshold)||0,overBillBuffer:Number(p.overBillBuffer)||0}},(y,D)=>u(y,y?c("settings.orgSaved"):D))&&f.reload()},children:c("common.save")})})]}),n.jsx(oe,{title:c("settings.dashboardLayout"),children:n.jsxs("div",{className:"flex",children:[n.jsx(K,{label:"Collection target (0–1)",children:n.jsx(J,{type:"number",step:"0.05",min:"0",max:"1",value:g,onChange:w=>N(w.target.value),style:{width:120}})}),n.jsx(L,{busy:h,onClick:async()=>{await m("settings.update",{key:"dash.layout",value:{...S,targetCollectionRate:Number(g)}},(w,y)=>u(w,w?c("settings.orgSaved"):y))},children:c("common.save")})]})})]})}function a0(){const{t:c}=xe(),u=Ue(),f=ge("settings.get",{},[]),r=ge("ai.getUsage",{},[]),p=dc(f.data)["ai.scope"]||{},[j,g]=E.useState(!0),[N,b]=E.useState("claude-sonnet-4-20250514"),[h,m]=E.useState("50"),S=Vl.useRef(!1),{busy:w,run:y}=ft();if(E.useEffect(()=>{!f.data||S.current||(S.current=!0,g(p.enabled!==!1),b(String(p.model||"claude-sonnet-4-20250514")),m(String(p.dailyLimitPerUser??50)))},[f.data]),f.loading&&!f.data)return n.jsx(Ze,{label:c("common.loading")});const D=r.data;return n.jsxs("div",{children:[n.jsxs(oe,{title:c("settings.aiScope"),sub:c("ai.sub"),children:[n.jsxs(Ct,{cols:3,children:[n.jsx(K,{label:c("common.status"),children:n.jsxs(be,{value:j?"1":"0",onChange:H=>g(H.target.value==="1"),children:[n.jsx("option",{value:"1",children:c("common.enabled")}),n.jsx("option",{value:"0",children:c("common.disabled")})]})}),n.jsx(K,{label:c("settings.aiModel"),children:n.jsx(J,{value:N,onChange:H=>b(H.target.value)})}),n.jsx(K,{label:c("settings.aiDailyCap"),children:n.jsx(J,{type:"number",value:h,onChange:H=>m(H.target.value)})})]}),n.jsx("div",{className:"row-actions mt-16",children:n.jsx(L,{busy:w,onClick:async()=>{await y("settings.update",{key:"ai.scope",value:{enabled:j,model:N,dailyLimitPerUser:Number(h)||50,bankMatch:!0,dedupe:!0,extractBills:!1}},(Y,V)=>u(Y,Y?c("settings.orgSaved"):V))&&f.reload()},children:c("common.save")})}),n.jsxs("p",{className:"text-3 mt-8",children:[c("ai.advisoryNote")," · ANTHROPIC_API_KEY lives in Vercel env only — never in this repo."]})]}),n.jsx(oe,{title:c("settings.aiUsage"),children:D?n.jsxs("div",{className:"ui-stats",children:[n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:c("ai.calls")}),n.jsx("div",{className:"ui-stat-value",children:D.total})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsxs("div",{className:"ui-stat-label",children:[c("ai.tokens")," (in)"]}),n.jsx("div",{className:"ui-stat-value",children:D.inputTokens??0})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsxs("div",{className:"ui-stat-label",children:[c("ai.tokens")," (out)"]}),n.jsx("div",{className:"ui-stat-value",children:D.outputTokens??0})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:c("settings.aiDailyCap")}),n.jsx("div",{className:"ui-stat-value",children:D.limit})]})]}):n.jsx(Ze,{label:c("common.loading")})})]})}function n0(){const{t:c}=xe(),u=ge("health.ping",{},[]),r=ge("health.connections",{},[],!1).data||{};return n.jsxs(oe,{title:c("settings.sheetsHealth"),children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Gateway → Apps Script"}),n.jsx("span",{className:"v",children:u.data?n.jsx(me,{tone:"ok",children:c("settings.apiOk")}):n.jsx(Ze,{label:""})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"WORKBOOK_ID"}),n.jsx("span",{className:"v",children:r.workbookId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"DRIVE_ROOT_ID"}),n.jsx("span",{className:"v",children:r.driveRootId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"GATEWAY_SECRET"}),n.jsx("span",{className:"v",children:r.gatewaySecret?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"err",children:"✗"})})]}),n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"V3_WORKBOOK_ID (migration)"}),n.jsx("span",{className:"v",children:r.v3WorkbookId?n.jsx(me,{tone:"ok",children:"✓"}):n.jsx(me,{tone:"muted",children:"optional"})})]}),u.data&&n.jsxs("p",{className:"text-3 mt-8",children:["ping ",String(u.data.ts||"")]})]})}function s0(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(null),[v,p]=E.useState(null),[j,g]=E.useState(""),[N,b]=E.useState(!1),[h,m]=E.useState(!1),[S,w]=E.useState("vendors"),[y,D]=E.useState(null),H=ge("backups.list",{},[]),Y=H.data?.backups||[];async function V(){b(!0);try{const k=await Ly();D(k)}catch(k){u(!1,k.message)}finally{b(!1)}}return n.jsxs("div",{children:[n.jsxs(oe,{title:c("common.import"),sub:c("imports.sub"),children:[n.jsxs("div",{className:"flex",children:[n.jsxs(be,{value:S,onChange:k=>w(k.target.value),style:{width:160},children:[n.jsx("option",{value:"vendors",children:"vendors.csv"}),n.jsx("option",{value:"worklog",children:"worklog.csv"})]}),n.jsxs(L,{onClick:()=>m(!0),children:[c("common.import"),"…"]})]}),h&&n.jsx(i0,{table:S,onDone:()=>{m(!1),u(!0,c("common.saved"))},t:c})]}),n.jsx(oe,{title:c("common.export"),sub:c("exports.sub"),children:n.jsxs("p",{className:"text-3",children:["Exports are requested from the ",n.jsx("b",{children:"Reports"})," page — each creates one ImportExports row + a single-use 15-minute download link."]})}),n.jsx(oe,{title:c("settings.lastBackup")+" / "+c("settings.restore"),right:n.jsx(L,{kind:"soft",busy:N,onClick:async()=>{b(!0);try{const k=await Gy();u(!0,c("settings.backupCreated",{name:k.backupId})),H.reload()}catch(k){u(!1,k.message)}finally{b(!1)}},children:c("settings.runBackup")}),children:n.jsx(Xe,{head:["Backup",c("common.date"),c("common.status"),c("common.actions")],empty:Y.length===0,children:Y.map(k=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k.backupId}),n.jsx("td",{children:cv(k.createdAt)}),n.jsx("td",{children:n.jsx(me,{tone:k.status==="completed"||k.status==="restore_tested"?"ok":"err",children:k.status})}),n.jsx("td",{className:"row-actions",children:n.jsxs(L,{small:!0,kind:"soft",onClick:async()=>{try{const O=await Yy(k.backupId);r(k.backupId),p(O.deltas),g("")}catch(O){u(!1,O.message)}},children:["⊕ ",c("settings.restore")]})})]},k.backupId))})}),f&&n.jsxs($e,{open:!0,onClose:()=>r(null),wide:!0,title:c("settings.restore")+" — "+f,footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>r(null),children:c("common.cancel")}),n.jsx(L,{kind:"danger",disabled:j!=="RESTORE",onClick:async()=>{try{const k=await Vy(f);u(!0,c("common.saved")+" — "+Object.keys(k.tabs).length+" tabs"),r(null)}catch(k){u(!1,k.message)}},children:c("common.confirm")})]}),children:[n.jsx("p",{className:"text-3 mb-8",children:c("settings.restoreConfirm")}),n.jsx(Xe,{head:["Tab","Backup","Live","Δ"],empty:!v,children:v&&Object.entries(v).map(([k,O])=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k}),n.jsx("td",{className:"num",children:O.backup}),n.jsx("td",{className:"num",children:O.live}),n.jsx("td",{className:"num",children:O.delta>0?"+"+O.delta:O.delta})]},k))}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:["Type ",n.jsx("b",{children:"RESTORE"})," to confirm"]}),n.jsx(J,{value:j,onChange:k=>g(k.target.value.trim())})]})]}),n.jsx(oe,{title:"V3 → V4 migration",sub:c("common.dryRun")+" → "+c("common.confirm")+" (flag: migration.v3.enabled)",right:n.jsxs("div",{className:"flex",children:[n.jsx(L,{kind:"soft",busy:N,onClick:V,children:c("common.dryRun")}),n.jsxs(L,{kind:"danger",busy:N,disabled:!y||y.dryRun!==!0,onClick:async()=>{if(window.confirm("MIGRATE all V3 data now? V4 must be empty. One super admin will be created (temporary password)."))try{const k=await Qy();u(!0,"Migrated: "+JSON.stringify(k.counts)),D(null)}catch(k){u(!1,k.message)}},children:[c("common.confirm")," (MIGRATE)"]})]}),children:y?n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"kv",children:[n.jsx("span",{className:"k",children:"Source"}),n.jsx("span",{className:"v",children:String(y.source||"")})]}),n.jsx(Xe,{head:["Collection","Rows"],empty:!1,children:Object.entries(y.counts||{}).map(([k,O])=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:k}),n.jsx("td",{className:"num",children:O})]},k))}),Array.isArray(y.flagged)&&y.flagged.length>0&&n.jsxs("div",{className:"toast-announce warn mt-8",children:["⚠ ",y.flagged.length," flagged rows — review the flagged list before cutover."]})]}):n.jsx("p",{className:"text-3",children:"Run the dry run first. Confirm requires an empty V4 workbook; the V3 admin user becomes the single super admin with a temporary password (must change at first login)."})})]})}function i0({table:c,onDone:u,t:f}){const r=Ue(),[v,p]=E.useState(null),[j,g]=E.useState(null),[N,b]=E.useState(!1);return n.jsxs("div",{className:"mt-16",children:[n.jsxs("div",{className:"file-drop",children:[n.jsxs("div",{children:[f("imports.chooseFile")," — ",c,".csv"]}),n.jsx("input",{type:"file",accept:".csv,text/csv",onChange:h=>{const m=h.target.files?.[0];m&&(p(m),g(null))}})]}),v&&!j&&n.jsx("div",{className:"row-actions mt-8",children:n.jsx(L,{busy:N,onClick:async()=>{b(!0);try{g(await dy(v,c))}catch(h){r(!1,h.message)}finally{b(!1)}},children:f("imports.preview")})}),j&&n.jsxs("div",{className:"mt-8",children:[n.jsxs("div",{className:"toast-announce warn",children:[f("imports.previewed",{valid:String(j.valid),invalid:String(j.invalid),dupes:String(j.dupes)}),j.capped&&" · "+f("imports.capped")]}),n.jsx("div",{className:"row-actions",children:n.jsx(L,{busy:N,onClick:async()=>{b(!0);try{const h=await fy(j.previewId);r(!0,f("imports.imported",{n:String(h.written)})),u()}catch(h){r(!1,h.message)}finally{b(!1)}},children:f("imports.confirmImport")})})]})]})}function c0(){const{t:c}=xe(),[u,f]=E.useState(1),[r,v]=E.useState(""),p=ge("audit.list",{page:u,size:100,action:r||void 0},[u,r]),j=p.data?.rows||[],g=p.data?.total||0;return n.jsxs(oe,{title:c("audit.title"),sub:c("audit.sub"),right:n.jsxs("div",{className:"flex",children:[n.jsx("input",{className:"ui-input",style:{width:200},placeholder:c("audit.action")+" (e.g. CREATE)",value:r,onChange:N=>{v(N.target.value.toUpperCase()),f(1)}}),n.jsx(L,{small:!0,kind:"ghost",disabled:u<=1,onClick:()=>f(N=>N-1),children:"←"}),n.jsx(me,{tone:"info",children:u}),n.jsx(L,{small:!0,kind:"ghost",disabled:j.length<100,onClick:()=>f(N=>N+1),children:"→"})]}),children:[n.jsx(Xe,{head:[c("audit.timestamp"),c("audit.user"),c("audit.action"),c("audit.entity"),c("audit.result"),c("audit.detail")],empty:j.length===0,children:j.map(N=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:cv(N.timestamp)}),n.jsxs("td",{children:[N.username,n.jsx("div",{className:"text-3",children:N.role||""})]}),n.jsx("td",{children:n.jsx(me,{tone:"info",children:N.action})}),n.jsx("td",{className:"mono",children:N.entityId?N.domain+":"+N.entityId:N.domain||"—"}),n.jsx("td",{children:N.result||"—"}),n.jsx("td",{className:"wrap text-3",children:N.detail||"—"})]},N.logId))}),n.jsxs("p",{className:"text-3 mt-8",children:[g," rows · ",c("audit.sub")]})]})}const u0=[{id:"bank-match",en:"Bank match",ta:"பேங்க் மேட்ச்",desc_en:"Explain a bank entry that auto-suggest failed on.",desc_ta:"ஆட்டோ-சஜெஸ்ட ஃபெயில் ஆன பேங்க் என்ட்ரி-ஐ விளக்கு."},{id:"gst-brief",en:"GST brief",ta:"ஜிஎஸ்டி பிரீப்",desc_en:"Summary of the current period: billed, 2B matches, ITC position, due dates.",desc_ta:"இந்த் பெரியாட்டின் சுருக்கம்: பில், 2B மேட்ச், ITC, தேதிகள்."},{id:"dedupe",en:"Dedupe check",ta:"டூப் செக்",desc_en:"Likely duplicate vendors / transactions in the current scope.",desc_ta:"முதல் டூப் வண்டர்ஸ் / டிரான்ஸாக்ஷன்ஸ்."},{id:"decision",en:"Decision brief",ta:"டிசீஷன் பிரீப்",desc_en:"Context for a pending close confirmation (per-district).",desc_ta:"டிஸ்டிரிக்ட் க்ளோஸ் கான்ஃபர்மஷனுக்கான குறிப்புகள்."}];function o0(){const{t:c,lang:u}=xe(),f=Ue(),r=ge("ai.getUsage",{},[]),[v,p]=E.useState("bank-match"),[j,g]=E.useState(""),[N,b]=E.useState(!1),[h,m]=E.useState([]),S=E.useRef(0),w=E.useRef(null);E.useEffect(()=>{w.current?.scrollIntoView({behavior:"smooth"})},[h]);const y=r.data,D=y?y.enabled===!1||(y.total||0)>=(y.limit||1/0):!1,H=y?Math.min(100,Math.round((y.total||0)/(y.limit||1)*100)):0;function Y(){const k=j.trim();if(!k||N)return;const O=++S.current;m(Z=>[...Z,{id:O,role:"user",text:k,at:new Date().toISOString()}]),g(""),b(!0),ov(v,{prompt:k,lang:u}).then(Z=>{m(I=>[...I,{id:++S.current,role:"ai",text:Z.output||JSON.stringify(Z.parsed),feature:v,aiId:Z.aiId,decision:"unreviewed",at:new Date().toISOString()}]),r.reload()}).catch(Z=>{f(!1,Z.message),m(I=>[...I,{id:++S.current,role:"ai",text:"(error) "+Z.message,feature:v,at:new Date().toISOString()}])}).finally(()=>b(!1))}function V(k,O){k.aiId&&Mx(k.aiId,O,k.text.slice(0,500)).then(()=>{m(Z=>Z.map(I=>I.id===k.id?{...I,decision:O}:I)),f(!0,c(O==="accepted"?"ai.accepted":"ai.rejected")),r.reload()}).catch(Z=>f(!1,Z.message))}return n.jsxs("div",{children:[n.jsx(st,{title:c("ai.title"),sub:c("ai.sub"),right:n.jsx(me,{tone:y?D?"warn":"ok":"muted",children:c("ai.advisory")})}),n.jsxs("div",{className:"ai-chat",children:[n.jsxs("div",{className:"ai-sidebar",children:[u0.map(k=>n.jsxs("button",{className:v===k.id?"on":"",onClick:()=>p(k.id),children:[n.jsx("b",{children:u==="ta"?k.ta:k.en}),n.jsx("span",{children:u==="ta"?k.desc_ta:k.desc_en})]},k.id)),n.jsxs("div",{className:"ai-usage",children:[n.jsx("div",{className:"ai-usage-bar",children:n.jsx("div",{style:{width:H+"%"}})}),n.jsx("div",{className:"ai-usage-num",children:y?`${y.total} / ${y.limit} ${c("ai.calls")}`:"…"}),y?.model&&n.jsx("div",{className:"ai-usage-num",children:y.model})]})]}),n.jsxs("div",{className:"ai-main",children:[n.jsxs("div",{className:"ai-announce",children:["⚠ ",c("ai.advisoryNote")]}),n.jsxs("div",{className:"ai-thread",children:[h.length===0&&n.jsx("div",{className:"ai-empty",children:n.jsx("p",{children:u==="ta"?"இடதுபுறம் ஒரு ஃபீச்சர் தேர்வு செய்யுங்க, கேள்வி எழுதுங்க.":"Pick a feature on the left and ask. Everything the AI returns must be verified before acting."})}),h.map(k=>n.jsxs("div",{className:"ai-bubble "+(k.role==="user"?"me":"them"),children:[n.jsxs("div",{className:"ai-bubble-meta",children:[k.role==="ai"&&n.jsxs("span",{className:"ai-badge",children:["AI — ",c("ai.verify")]}),k.feature&&k.role==="ai"&&n.jsx("span",{className:"mono",children:k.feature}),n.jsx("span",{children:Pe(k.at)}),k.aiId&&n.jsxs("span",{className:"mono text-3",children:["#",k.aiId]})]}),n.jsx("div",{className:"ai-bubble-text",children:k.text}),k.role==="ai"&&k.aiId&&n.jsxs("div",{className:"ai-bubble-actions",children:[n.jsxs(L,{small:!0,kind:"soft",disabled:k.decision!=="unreviewed",onClick:()=>V(k,"accepted"),children:["✓ ",c("ai.accept")]}),n.jsxs(L,{small:!0,kind:"ghost",disabled:k.decision!=="unreviewed",onClick:()=>V(k,"rejected"),children:["✗ ",c("ai.reject")]}),k.decision==="accepted"&&n.jsx(me,{tone:"ok",children:c("ai.accepted")}),k.decision==="rejected"&&n.jsx(me,{tone:"err",children:c("ai.rejected")})]})]},k.id)),N&&n.jsx(Ze,{label:c("common.loading")}),n.jsx("div",{ref:w})]}),n.jsxs("div",{className:"ai-input",children:[n.jsx(nv,{rows:3,placeholder:u==="ta"?"உங்கள் கேள்வி… (24KB வரை)":"Your question… (24KB prompt cap)",value:j,onChange:k=>g(k.target.value),onKeyDown:k=>{k.key==="Enter"&&(k.ctrlKey||k.metaKey)&&Y()}}),n.jsxs("div",{className:"row-actions mt-8",children:[n.jsxs("span",{className:"text-3",children:[j.length," / 24576"]}),n.jsx(L,{busy:N,disabled:D||!j.trim(),onClick:Y,children:c("ai.ask")})]}),D&&n.jsx("p",{className:"text-3 warn-text mt-8",children:c("errors.aiDisabled")})]})]})]})]})}const r0={vendors:["super_admin","district_admin","agent","vendor","auditor"],transactions:["super_admin","district_admin","agent","vendor","auditor"],bills:["super_admin","district_admin","agent","vendor"],payments:["super_admin","district_admin","vendor","auditor"],gst:["super_admin","auditor"],bank:["super_admin","auditor"],wallet:["agent","super_admin","district_admin"],projects:["super_admin","district_admin","auditor"],worklog:["super_admin","district_admin","agent"],reports:["super_admin","district_admin","agent","auditor"],ai:["super_admin","district_admin","agent","auditor"],users:["super_admin"],settings:["super_admin","auditor"],profile:["super_admin","district_admin","agent","vendor"]};function d0(){const[c,u]=E.useState(!0),[f,r]=E.useState(null),v=or(),{t:p}=xe(),j=E.useCallback(h=>{r(h),h&&ur(uc(),h)},[]);if(E.useEffect(()=>{if(!uc()){u(!1);return}fv().then(m=>j(m.user)).catch(()=>{oc(),j(null)}).finally(()=>u(!1))},[j]),E.useEffect(()=>{Ex(()=>{oc(),r(null),nt("/"),window.location.reload()})},[]),E.useEffect(()=>{if(!f||f.role==="vendor")return;const h=v.parts[0]||"",m=r0[h];h&&m&&!m.includes(f.role)&&nt("/")},[v.raw,f]),c)return n.jsx("div",{className:"login-wrap",children:n.jsxs("div",{className:"login-card",style:{textAlign:"center"},children:[n.jsxs("div",{className:"login-brand",children:[n.jsx("div",{className:"app-brand-logo",children:"AR"}),n.jsx("h1",{children:p("app.name")})]}),n.jsxs("div",{className:"ui-spinner-wrap",children:[n.jsx("span",{className:"ui-spinner"}),n.jsx("span",{className:"ui-spinner-label",children:p("common.loading")})]})]})});if(!f||!uc())return n.jsx(er,{children:n.jsx(Ix,{onLoggedIn:j})});if(f.mustChangePassword&&v.path!=="/profile")return n.jsx(er,{children:n.jsx(vv,{user:f,onDone:()=>{window.location.reload()},onLogout:async()=>{await ar()}})});let g;const N=v.parts[0]||"",b=v.parts[1]||"";switch(N){case"":g=n.jsx(Ph,{user:f});break;case"vendors":g=b?n.jsx(cy,{user:f,vendorId:b}):n.jsx(sy,{user:f});break;case"transactions":g=n.jsx(uy,{user:f});break;case"bills":g=n.jsx(hy,{user:f});break;case"payments":g=n.jsx(xy,{user:f});break;case"gst":g=n.jsx(Ny,{user:f});break;case"bank":g=n.jsx(_y,{user:f});break;case"wallet":g=n.jsx(Ry,{user:f});break;case"projects":g=n.jsx(Dy,{user:f});break;case"worklog":g=n.jsx(zy,{user:f});break;case"reports":g=n.jsx(By,{user:f});break;case"users":g=n.jsx(Xy,{user:f});break;case"settings":g=n.jsx($y,{user:f});break;case"ai":g=n.jsx(o0,{});break;case"profile":g=n.jsx(Px,{user:f,query:v.query,onLogout:async()=>{await ar()}});break;default:g=n.jsx(Ph,{user:f})}return n.jsx(er,{children:n.jsx(Gx,{user:f,children:g})})}Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{children:n.jsx(Rx,{children:n.jsx(d0,{})})}));

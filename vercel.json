@@ -2,6 +2,13 @@
   "buildCommand": "cd v4 && npm install && npm run build",
   "outputDirectory": "v4/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "https://polinchi-zgki.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

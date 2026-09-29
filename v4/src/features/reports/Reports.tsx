@@ -62,8 +62,9 @@ interface LiveData {
 export function Reports({ user }: { user: User }) {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const defaultMonth = new Date().toISOString().slice(0, 7) || "2026-09";
   const [selected, setSelected] = useState<string>("R14");
-  const [month, setMonth] = useState<string>("");
+  const [month, setMonth] = useState<string>(defaultMonth);
   const [district, setDistrict] = useState<string>("all");
   const [vendorId, setVendorId] = useState<string>("");
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("landscape");
@@ -87,7 +88,8 @@ export function Reports({ user }: { user: User }) {
     {
       reportId: selected || "R1",
       params: {
-        ...(month ? { month } : {}),
+        month: month || defaultMonth,
+        period: month || defaultMonth,
         ...(district !== "all" ? { district } : {}),
         ...(vendorId ? { vendorId } : {}),
         ...(user.role === "district_admin" ? { district: user.district } : {}),
@@ -95,7 +97,7 @@ export function Reports({ user }: { user: User }) {
       }
     },
     [selected, month, district, vendorId],
-    !!def && selected !== "R14"
+    !!def && selected !== "R14" && (selected !== "R2" || !!vendorId)
   );
 
   // Bank Live 200 data for R14

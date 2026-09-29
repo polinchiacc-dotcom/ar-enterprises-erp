@@ -35,8 +35,9 @@ Error generating stack: `+a.message+`
       `})]})}function Ry({user:c}){const{t:u,lang:f}=xe(),[r,v]=E.useState(""),p=c.role==="agent",j=ge("agents.list",{},[],!p),g=ge("agents.wallet",p?{}:{agentId:r},[r,p],p||!!r);if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const N=g.data,b=j.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("wallet.title"),sub:u("wallet.sub")}),!p&&n.jsx("div",{className:"flex mb-16",children:n.jsxs(be,{value:r,onChange:h=>v(h.target.value),style:{width:300},children:[n.jsx("option",{value:"",children:u("common.select")}),b.map(h=>n.jsxs("option",{value:h.agentId,children:[h.fullName," — ",h.agentId," (",h.managerDistrict||"",")"]},h.agentId))]})}),N&&n.jsxs(n.Fragment,{children:[n.jsxs("div",{className:"ui-stats",children:[n.jsx(dt,{label:u("wallet.balance"),value:Q(N.balance),tone:"ok"}),n.jsx(dt,{label:u("agents.commissionSlab")+" — "+Sl(new Date().toISOString().slice(0,7),f),value:Q(N.monthCommission)}),n.jsx(dt,{label:u("wallet.walletHistory"),value:String(N.entries.length)})]}),n.jsxs(oe,{title:u("wallet.walletHistory"),children:[n.jsx(Xe,{head:[u("common.date"),u("common.notes"),u("wallet.txnRef"),u("wallet.type"),u("wallet.credit"),u("wallet.balance")],empty:N.entries.length===0,children:N.entries.map((h,m)=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(String(h.date||""))}),n.jsx("td",{className:"wrap",children:String(h.description||"")}),n.jsx("td",{className:"mono",children:String(h.txnId||"")}),n.jsx("td",{children:n.jsxs(me,{tone:"violet",children:[String(h.commissionType||h.type||"")," ",Number(h.commissionPercent)>0?"· "+h.commissionPercent+"%":""]})}),n.jsx("td",{className:"num text-ok",children:Q(Number(h.commissionAmount)||0)}),n.jsx("td",{className:"num",children:n.jsx("b",{children:Q(Number(h.balance)||0)})})]},m))}),N.entries.length===0&&n.jsx(Yl,{children:u("common.noData")})]})]}),!p&&!r&&n.jsx(Yl,{children:u("common.select")})]})}function Dy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(""),[p,j]=E.useState(null),g=ge("projects.list",{q:r||void 0},[r]),N=c.role==="super_admin";if(g.loading&&!g.data)return n.jsx(Ze,{label:u("common.loading")});const b=g.data?.rows||[],h=b.reduce((S,w)=>S+Number(w.contractAmount||0),0),m=b.reduce((S,w)=>S+Number(w.pending||0),0);return n.jsxs("div",{children:[n.jsx(st,{title:u("projects.title"),sub:u("projects.sub"),right:n.jsxs("div",{className:"flex",children:[n.jsx(rc,{value:r,onChange:v}),N&&n.jsx(L,{onClick:()=>j("new"),children:u("projects.newProject")})]})}),n.jsxs("div",{className:"ui-stats",children:[n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.title")}),n.jsx("div",{className:"ui-stat-value",children:b.length})]}),n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.contractAmount")}),n.jsx("div",{className:"ui-stat-value",children:Q(h)})]}),n.jsxs("div",{className:"ui-stat ui-stat-warn",children:[n.jsx("div",{className:"ui-stat-label",children:u("projects.pending")}),n.jsx("div",{className:"ui-stat-value",children:Q(m)})]})]}),n.jsx(oe,{children:n.jsx(Xe,{head:[u("projects.name"),u("projects.district"),u("projects.contractAmount"),u("projects.received"),u("projects.pending"),u("projects.tds"),u("projects.progress"),u("common.status"),u("common.actions")],empty:b.length===0,children:b.map(S=>{const w=Number(S.contractAmount)>0?Math.min(100,Math.round(Number(S.received)/Number(S.contractAmount)*100)):0;return n.jsxs("tr",{children:[n.jsxs("td",{className:"wrap",children:[n.jsx("b",{children:S.name}),n.jsx("div",{className:"text-3",children:S.location||""})]}),n.jsx("td",{children:S.location?"":"—"}),n.jsx("td",{className:"num",children:Q(S.contractAmount)}),n.jsx("td",{className:"num text-ok",children:Q(S.received)}),n.jsx("td",{className:"num",children:Q(S.pending)}),n.jsx("td",{className:"num",children:Q(S.expectedTds)}),n.jsxs("td",{style:{minWidth:110},children:[n.jsx("div",{className:"progress",children:n.jsx("div",{style:{width:w+"%"}})}),n.jsxs("div",{className:"text-3",children:[w,"%"]})]}),n.jsx("td",{children:n.jsx(me,{tone:St(S.status),children:S.status})}),n.jsx("td",{className:"row-actions",children:N&&n.jsxs(n.Fragment,{children:[n.jsx(L,{small:!0,kind:"ghost",onClick:()=>j(S),children:u("common.edit")}),n.jsx(L,{small:!0,kind:"danger",onClick:async()=>{window.confirm(S.name+" — "+u("common.archive")+"?")&&(await Wx(S.projectId),f(!0,u("common.saved")),g.reload())},children:u("common.archive")})]})})]},S.projectId)})})}),p&&n.jsx(Oy,{project:p==="new"?null:p,onClose:()=>j(null),onSaved:()=>{j(null),g.reload()}})]})}function Oy({project:c,onClose:u,onSaved:f}){const{t:r}=xe(),v=Ue(),{busy:p,run:j}=ft(),[g,N]=E.useState({name:c?.name||"",location:c?.location||"",contractAmount:String(c?.contractAmount??""),expectedGst:String(c?.expectedGst??"0"),expectedTds:String(c?.expectedTds??"0"),labourCost:String(c?.labourCost??"0"),emdAmount:String(c?.emdAmount??"0"),keywords:c?.keywords||"",notes:c?.notes||""}),b=(h,m)=>N(S=>({...S,[h]:m}));return n.jsxs($e,{open:!0,onClose:u,wide:!0,title:c?r("common.edit")+" — "+c.name:r("projects.newProject"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:u,children:r("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const h={name:g.name,location:g.location,contractAmount:Number(g.contractAmount)||0,expectedGst:Number(g.expectedGst)||0,expectedTds:Number(g.expectedTds)||0,labourCost:Number(g.labourCost)||0,emdAmount:Number(g.emdAmount)||0,keywords:g.keywords,notes:g.notes||void 0};(c?await j("projects.update",{...h,projectId:c.projectId},(S,w)=>v(S,S?r("projects.saved"):w)):await j("projects.create",h,(S,w)=>v(S,S?r("projects.saved"):w)))&&f()},children:r("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:r("projects.name"),req:!0,children:n.jsx(J,{value:g.name,onChange:h=>b("name",h.target.value)})}),n.jsx(K,{label:r("projects.district"),children:n.jsx(J,{value:g.location,onChange:h=>b("location",h.target.value)})}),n.jsx(K,{label:r("projects.contractAmount"),children:n.jsx(J,{type:"number",value:g.contractAmount,onChange:h=>b("contractAmount",h.target.value)})}),n.jsx(K,{label:r("gst.title")+" (₹)",children:n.jsx(J,{type:"number",value:g.expectedGst,onChange:h=>b("expectedGst",h.target.value)})}),n.jsx(K,{label:r("projects.tds"),hint:Ds(0).slice(0,0)+"V3: amount only (no 26Q)",children:n.jsx(J,{type:"number",value:g.expectedTds,onChange:h=>b("expectedTds",h.target.value)})}),n.jsx(K,{label:r("projects.received")+" (₹)",children:n.jsx(J,{type:"number",value:String(c?.received??0),readOnly:!0})}),n.jsx(K,{label:"Labour (₹)",children:n.jsx(J,{type:"number",value:g.labourCost,onChange:h=>b("labourCost",h.target.value)})}),n.jsx(K,{label:"EMD (₹)",children:n.jsx(J,{type:"number",value:g.emdAmount,onChange:h=>b("emdAmount",h.target.value)})}),n.jsx(K,{label:r("bank.ref")+" / "+r("projects.name")+" ("+r("common.optional")+")",hint:"Comma-separated keywords for bank auto-match",children:n.jsx(J,{value:g.keywords,onChange:h=>b("keywords",h.target.value)})}),n.jsx(K,{label:r("common.notes"),children:n.jsx(J,{value:g.notes,onChange:h=>b("notes",h.target.value)})})]}),c&&n.jsxs("div",{className:"kv mt-8",children:[n.jsxs("span",{className:"k",children:[r("projects.pending")," (auto)"]}),n.jsx("span",{className:"v",children:Q(Math.max(0,(Number(c.contractAmount)||0)-(Number(c.received)||0)))})]})]})}const sr={site_visit:"Site visit",vendor_call:"Vendor call",bill_followup:"Bill follow-up",payment_followup:"Payment follow-up",office:"Office",training:"Training",other:"Other"};function zy({user:c}){const{t:u}=xe(),f=Ue(),[r,v]=E.useState(new Date().toISOString().slice(0,10)),[p,j]=E.useState(""),[g,N]=E.useState(c.role==="agent"),[b,h]=E.useState(null),[m,S]=E.useState(!1),w={date:r||void 0,category:p||void 0,mine:g||void 0,...c.role==="district_admin"?{district:c.district}:{}},y=ge("worklog.list",w,[r,p,g]),{busy:D,run:H}=ft();if(y.loading&&!y.data)return n.jsx(Ze,{label:u("common.loading")});const Y=y.data?.rows||[];return n.jsxs("div",{children:[n.jsx(st,{title:u("worklog.title"),sub:u("worklog.sub"),right:n.jsx(L,{onClick:()=>S(!0),children:u("worklog.newEntry")})}),n.jsx(oe,{right:n.jsxs("div",{className:"flex",children:[n.jsx(J,{type:"date",value:r,onChange:V=>v(V.target.value),style:{width:150}}),n.jsxs(be,{value:p,onChange:V=>j(V.target.value),style:{width:160},children:[n.jsxs("option",{value:"",children:[u("worklog.category"),": ",u("common.all")]}),xv.map(V=>n.jsx("option",{value:V,children:sr[V]||V},V))]}),(c.role==="super_admin"||c.role==="district_admin")&&n.jsxs(be,{value:g?"1":"0",onChange:V=>N(V.target.value==="1"),style:{width:130},children:[n.jsx("option",{value:"0",children:u("worklog.teamEntries")}),n.jsx("option",{value:"1",children:u("worklog.myEntries")})]})]}),children:n.jsx(Xe,{head:[u("common.date"),u("worklog.category"),u("worklog.description"),u("common.amount"),u("common.status"),u("common.actions")],empty:Y.length===0,children:Y.map(V=>n.jsxs("tr",{children:[n.jsx("td",{children:Pe(V.date)}),n.jsx("td",{children:n.jsx(me,{tone:"info",children:sr[V.category]||V.category})}),n.jsx("td",{className:"wrap",children:V.description}),n.jsx("td",{className:"num",children:V.amount?Q(V.amount):"—"}),n.jsx("td",{children:n.jsx(me,{tone:St(V.status),children:V.status})}),n.jsx("td",{className:"row-actions",children:V.createdBy&&(c.role==="super_admin"||c.role==="district_admin"||c.role==="agent")&&n.jsx(L,{small:!0,kind:"ghost",onClick:()=>h(V),children:u("common.edit")})})]},V.workId))})}),(m||b)&&n.jsx(My,{entry:b,defaultDate:r,onClose:()=>{S(!1),h(null)},onSaved:async()=>{S(!1),h(null),y.reload()},run:H,busy:D,toast:f,t:u})]})}function My({entry:c,defaultDate:u,onClose:f,onSaved:r,run:v,busy:p,toast:j,t:g}){const[N,b]=E.useState({date:c?.date||u,category:c?.category||"site_visit",description:c?.description||"",amount:String(c?.amount??"")}),h=(m,S)=>b(w=>({...w,[m]:S}));return n.jsxs($e,{open:!0,onClose:f,title:g(c?"common.edit":"worklog.newEntry"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:f,children:g("common.cancel")}),n.jsx(L,{busy:p,onClick:async()=>{const m={date:N.date,category:N.category,description:N.description,amount:N.amount?Number(N.amount):void 0};(c?await v("worklog.update",{...m,workId:c.workId},(w,y)=>j(w,w?g("common.saved"):y)):await v("worklog.create",m,(w,y)=>j(w,w?g("common.saved"):y)))&&r()},children:g("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:g("common.date"),req:!0,children:n.jsx(J,{type:"date",value:N.date,onChange:m=>h("date",m.target.value)})}),n.jsx(K,{label:g("worklog.category"),req:!0,children:n.jsx(be,{value:N.category,onChange:m=>h("category",m.target.value),children:xv.map(m=>n.jsx("option",{value:m,children:sr[m]||m},m))})})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("worklog.description")," (",g("common.required"),")"]}),n.jsx(nv,{value:N.description,onChange:m=>h("description",m.target.value),rows:3})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsxs("span",{className:"ui-field-label",children:[g("common.amount")," (",g("common.optional"),")"]}),n.jsx(J,{type:"number",value:N.amount,onChange:m=>h("amount",m.target.value)})]})]})}const Uy=[{id:"R1",en:"District performance",ta:"மாவட்ட செயல்திறன்",roles:["super_admin","district_admin"],params:["district"]},{id:"R2",en:"Vendor ledger",ta:"வெண்டர் லெடார்",roles:["super_admin","district_admin","auditor"],params:["vendorId"]},{id:"R3",en:"Transaction aging",ta:"பரிவர்த்தனை வயது",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R4",en:"Collections",ta:"வசூல்",roles:["super_admin","district_admin","auditor"],params:["district"]},{id:"R5",en:"Wallet statement",ta:"வாலெட் கணக்கு",roles:["super_admin"],params:[]},{id:"R6",en:"Agent commission statement",ta:"அஜெண்ட் கமிஷன்",roles:["super_admin","district_admin","agent","auditor"],params:["agentId"]},{id:"R7",en:"GST summary",ta:"ஜிஎஸ்டி சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R8",en:"TDS summary",ta:"டிடிஎஸ் சுருக்கம்",roles:["super_admin","auditor"],params:[]},{id:"R9",en:"GSTR-2B reconciliation",ta:"ஜிஎஸ்டி-2B சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R10",en:"Bank reconciliation",ta:"வங்கி சரிபார்ப்பு",roles:["super_admin","auditor"],params:[]},{id:"R11",en:"Audit extract",ta:"ஆடிட் பதிவேடு",roles:["super_admin","auditor"],params:[]},{id:"R12",en:"Users & roles",ta:"பயனர்கள் & பங்குகள்",roles:["super_admin"],params:[]},{id:"R13",en:"AI usage",ta:"AI பயன்பாடு",roles:["super_admin"],params:[]},{id:"R14",en:"Bank Live BRS 200 — All Columns Print Ready",ta:"வங்கி லைவ் BRS 200 — அனைத்து காலமும் அச்சு தயார்",roles:["super_admin","district_admin","agent","auditor"],params:[]}];function By({user:c}){
   const {t:u, lang:f} = xe(),
     r = Ue(),
+    defaultMonth = new Date().toISOString().slice(0, 7) || "2026-09",
     [v, p] = E.useState("R14"),
-    [j, g] = E.useState(""),
+    [j, g] = E.useState(defaultMonth),
     [district, setDistrict] = E.useState("all"),
     [vendorId, setVendorId] = E.useState(""),
     [orientation, setOrientation] = E.useState("landscape"),
@@ -55,13 +56,14 @@ Error generating stack: `+a.message+`
   const S = ge("reports.run", {
     reportId: v || "R1",
     params: {
-      ...j ? { month: j } : {},
+      month: j || defaultMonth,
+      period: j || defaultMonth,
       ...district !== "all" ? { district } : {},
       ...vendorId ? { vendorId } : {},
       ...c.role === "district_admin" ? { district: c.district } : {},
       ...c.role === "agent" ? { self: !0 } : {}
     }
-  }, [v, j, district, vendorId], !!m && v !== "R14");
+  }, [v, j, district, vendorId], !!m && v !== "R14" && (v !== "R2" || !!vendorId));
 
   const bankQuery = ge("bank.liveRecon", {
     filterStatus: "all",
@@ -97,8 +99,8 @@ Error generating stack: `+a.message+`
 
   const r1to13Data = E.useMemo(() => {
     const rawData = S.data;
-    if (!rawData || !rawData.rows || !rawData.rows.length) {
-      return { columns: [], rows: [], totals: {} };
+    if (!rawData || rawData.reportId !== v || !rawData.rows || !rawData.rows.length) {
+      return { columns: [], rows: [], totals: {}, rowCount: 0 };
     }
     const rawRows = rawData.rows;
     let cols = [];
@@ -121,8 +123,8 @@ Error generating stack: `+a.message+`
         totals[col] = formattedRows.reduce((acc, row) => acc + (typeof row[col] === "number" ? row[col] : 0), 0);
       }
     });
-    return { columns: cols, rows: formattedRows, totals };
-  }, [S.data]);
+    return { columns: cols, rows: formattedRows, totals, rowCount: formattedRows.length };
+  }, [S.data, v]);
 
   const tnDistricts = [
     "Ariyalur","Chengalpattu","Chennai","Coimbatore","Cuddalore","Dharmapuri","Dindigul","Erode",
@@ -193,6 +195,7 @@ Error generating stack: `+a.message+`
         headers.map(hKey => {
           const val = row[hKey];
           if (val === null || val === undefined) return "";
+          if (typeof val === "object") return '"' + JSON.stringify(val).replace(/"/g, '""') + '"';
           if (typeof val === "string") return '"' + val.replace(/"/g, '""') + '"';
           return val;
         })
@@ -202,7 +205,7 @@ Error generating stack: `+a.message+`
         return r1to13Data.totals[hKey] !== undefined ? r1to13Data.totals[hKey] : "";
       });
       const csv = [headers.join(","), ...rows.map(row => row.join(",")), totalRow.join(",")].join("\n");
-      downloadCsv(csv, (m?.id || "Report") + "_" + new Date().toISOString().slice(0, 10) + ".csv");
+      downloadCsv(csv, (m?.id || "Report") + "_" + (j || defaultMonth) + "_" + new Date().toISOString().slice(0, 10) + ".csv");
       r(!0, (m?.id || "Report") + " Excel CSV exported with totals");
     }
   }
@@ -213,6 +216,8 @@ Error generating stack: `+a.message+`
       window.print();
     }, 150);
   }
+
+  const showMonthFilter = v !== "R12" && v !== "R14";
 
   return n.jsxs("div", {
     className: "reports-centre",
@@ -263,9 +268,9 @@ Error generating stack: `+a.message+`
                         n.jsxs("div", {
                           style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 },
                           children: [
-                            m?.params?.includes("month") && n.jsxs("div", {
+                            showMonthFilter && n.jsxs("div", {
                               children: [
-                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: f === "ta" ? "மாதம்:" : "Month:" }),
+                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: f === "ta" ? "மாதம் / காலம்:" : "Period:" }),
                                 n.jsx("input", { type: "month", className: "ui-input", style: { width: 145 }, value: j, onChange: ev => g(ev.target.value) })
                               ]
                             }),
@@ -284,7 +289,7 @@ Error generating stack: `+a.message+`
                                 })
                               ]
                             }),
-                            m?.params?.includes("vendorId") && n.jsxs("div", {
+                            v === "R2" && n.jsxs("div", {
                               children: [
                                 n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: "வெண்டர் ID:" }),
                                 n.jsx("input", { className: "ui-input", style: { width: 130 }, placeholder: "Vendor ID…", value: vendorId, onChange: ev => setVendorId(ev.target.value) })
@@ -499,10 +504,11 @@ Error generating stack: `+a.message+`
                     ]
                   }) : n.jsx(oe, {
                     title: (m?.id || "") + " — " + (f === "ta" ? m?.ta : m?.en),
-                    sub: (orientation === "landscape" ? "A4 கிடைமட்டம் (Landscape)" : "A4 செங்குத்து (Portrait)") + " | " + r1to13Data.rows.length + " வரிசைகள்",
-                    children: S.loading ? n.jsx(Ze, { label: (m?.id || "") + " அறிக்கை தரவுகள் ஏற்றப்படுகின்றன…" }) :
+                    sub: (orientation === "landscape" ? "A4 கிடைமட்டம் (Landscape)" : "A4 செங்குத்து (Portrait)") + " | " + r1to13Data.rowCount + " வரிசைகள் (Rows)",
+                    children: v === "R2" && !vendorId ? n.jsx(Yl, { children: f === "ta" ? "வெண்டர் லெட்ஜர் காண மேலே உள்ள கட்டத்தில் Vendor ID உள்ளிடவும்." : "Please enter a Vendor ID above to view the vendor ledger." }) :
+                      S.loading ? n.jsx(Ze, { label: (m?.id || "") + " அறிக்கை தரவுகள் ஏற்றப்படுகின்றன…" }) :
                       S.error ? n.jsxs(Yl, { children: ["பிழை: ", String(S.error)] }) :
-                      !r1to13Data.rows.length ? n.jsx(Yl, { children: "இந்த அளவுகோல்களுக்கு தரவுகள் ஏதுமில்லை (No records found)" }) :
+                      !r1to13Data.rows.length ? n.jsx(Yl, { children: f === "ta" ? "இந்த காலத்திற்கு (" + (j || defaultMonth) + ") தரவுகள் ஏதுமில்லை (No records for this period)" : "No records found for " + (j || defaultMonth) }) :
                       n.jsx("div", {
                         style: { overflowX: "auto" },
                         children: n.jsxs("table", {
@@ -523,14 +529,14 @@ Error generating stack: `+a.message+`
                               children: [
                                 r1to13Data.rows.map((row, i) =>
                                   n.jsx("tr", {
-                                    children: r1to13Data.columns.map((col, j) => {
+                                    children: r1to13Data.columns.map((col, kIdx) => {
                                       const val = row[col];
                                       const isNum = typeof val === "number";
                                       return n.jsx("td", {
                                         className: isNum ? "num" : "",
                                         style: { textAlign: isNum ? "right" : "left" },
-                                        children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : val == null ? "—" : String(val)
-                                      }, j);
+                                        children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : typeof val === "object" && val !== null ? JSON.stringify(val) : val == null ? "—" : String(val)
+                                      }, kIdx);
                                     })
                                   }, i)
                                 ),
@@ -597,7 +603,7 @@ Error generating stack: `+a.message+`
                     style: { marginTop: 8, paddingTop: 6, borderTop: "1px dashed #666", display: "flex", justifyContent: "space-between", fontSize: 10 },
                     children: [
                       n.jsxs("span", { children: [n.jsx("b", { children: "அறிக்கை: " }), "[", m?.id, "] ", f === "ta" ? m?.ta : m?.en] }),
-                      n.jsxs("span", { children: [n.jsx("b", { children: "தேதி: " }), new Date().toLocaleDateString("en-IN")] }),
+                      n.jsxs("span", { children: [n.jsx("b", { children: "காலம் / தேதி: " }), j || defaultMonth, " (", new Date().toLocaleDateString("en-IN"), ")"] }),
                       n.jsxs("span", { children: [n.jsx("b", { children: "பயனர்: " }), c.name, " (", c.role, ")"] }),
                       n.jsxs("span", { children: ["A4 ", orientation === "landscape" ? "Landscape (கிடைமட்டம்)" : "Portrait (செங்குத்து)"] })
                     ]
@@ -688,16 +694,22 @@ Error generating stack: `+a.message+`
                     }),
                     n.jsxs("tbody", {
                       children: [
-                        r1to13Data.rows.map((row, i) =>
+                        r1to13Data.rows.length === 0 ? n.jsx("tr", {
+                          children: n.jsx("td", {
+                            colSpan: Math.max(1, r1to13Data.columns.length),
+                            style: { textAlign: "center", padding: 12, border: "1px solid #ccc" },
+                            children: "இந்த காலத்திற்கான (" + (j || defaultMonth) + ") பதிவுகள் ஏதுமில்லை (No records for this period)"
+                          })
+                        }) : r1to13Data.rows.map((row, i) =>
                           n.jsx("tr", {
                             style: { background: i % 2 === 1 ? "#f8fafc" : "#fff" },
-                            children: r1to13Data.columns.map((col, j) => {
+                            children: r1to13Data.columns.map((col, kIdx) => {
                               const val = row[col];
                               const isNum = typeof val === "number";
                               return n.jsx("td", {
                                 style: { border: "1px solid #ccc", padding: "3px 6px", textAlign: isNum ? "right" : "left" },
-                                children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : val == null ? "—" : String(val)
-                              }, j);
+                                children: isNum ? (Math.abs(val) >= 100 ? Q(val) : val.toLocaleString("en-IN")) : typeof val === "object" && val !== null ? JSON.stringify(val) : val == null ? "—" : String(val)
+                              }, kIdx);
                             })
                           }, i)
                         ),

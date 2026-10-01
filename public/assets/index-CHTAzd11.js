@@ -80,26 +80,35 @@ function gvizFetch(id,tab,cb){
   function clean(){try{delete window[fn]}catch(e2){window[fn]=void 0}var s2=document.getElementById(fn);if(s2&&s2.parentNode)s2.parentNode.removeChild(s2)}
   var sc=document.createElement("script");sc.id=fn;
   sc.onerror=function(){clean();cb("Sheet-ஐ படிக்க முடியவில்லை — Share → Anyone with link → Viewer ஆக மாற்றவும்")};
-  sc.src="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json;responseHandler:"+fn+"&sheet="+encodeURIComponent(tab||"Sheet1")+"&headers=1&cb="+Date.now();
+  sc.src="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json;responseHandler:"+fn+"&sheet="+encodeURIComponent(tab||"Sheet1")+"&headers=0&cb="+Date.now();
   document.head.appendChild(sc);
   setTimeout(function(){if(window[fn]){clean();cb("நேரம் முடிந்தது (timeout) — Sheet ID / tab பெயரை சரிபார்க்கவும்")}},15000);
 }
 function parseGvizTable(d2){
-  var tb=d2&&d2.table;if(!tb||!tb.cols||!tb.rows)return null;
-  var labels=tb.cols.map(function(col){return String(col.label||col.id||"").trim()});
-  var rows=[];
-  tb.rows.forEach(function(rr){if(!rr||!rr.c)return;var vals=rr.c.map(function(cell){if(!cell)return"";if(cell.f!==undefined&&cell.f!==null)return String(cell.f);if(cell.v===null||cell.v===undefined)return"";return String(cell.v)});if(vals.some(function(v2){return v2!==""}))rows.push(vals)});
-  return rows.length?{labels:labels,rows:rows}:null;
+  var tb=d2&&d2.table;if(!tb||!tb.rows)return null;
+  var types=(tb.cols||[]).map(function(col){return String(col.type||"")});
+  var all=[];
+  tb.rows.forEach(function(rr){if(!rr||!rr.c)return;var vals=rr.c.map(function(cell){if(!cell)return"";if(cell.f!==undefined&&cell.f!==null)return String(cell.f);if(cell.v===null||cell.v===undefined)return"";return String(cell.v)});if(vals.some(function(v2){return v2!==""}))all.push(vals)});
+  if(!all.length)return null;
+  var hIdx=-1;
+  for(var i2=0;i2<Math.min(all.length,6);i2++){var j2=all[i2].join("|").toUpperCase();if(j2.indexOf("GSTIN")>=0||(j2.indexOf("INVOICE")>=0&&j2.indexOf("DATE")>=0)||j2.indexOf("TAXABLE")>=0){hIdx=i2;break}}
+  if(hIdx<0)hIdx=0;
+  var labels=all[hIdx].map(function(v2){return String(v2).replace(/\s+/g," ").trim()});
+  var rows=all.slice(hIdx+1);
+  return rows.length?{labels:labels,rows:rows,types:types}:null;
 }
+
 function normAudDate(v){
-  var s=String(v||"").trim();if(!s)return"";
+  var s=String(v==null?"":v).trim();if(!s)return"";
   var m=s.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];
+  var MN={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,"ஜன":1,"பிப்":2,"மார்":3,"ஏப்":4,"மே":5,"ஜூன்":6,"ஜூலை":7,"ஆக":8,"செப்":9,"அக்":10,"நவ":11,"டிச":12};
+  m=s.match(/^(\d{1,2})[\/\-.]\s*([A-Za-z\u0b80-\u0bff]+)\.?\s*[\/\-.]\s*(\d{2,4})$/);
+  if(m){var mo=0,kk;for(kk in MN){if(m[2].toLowerCase().indexOf(kk)===0||m[2].indexOf(kk)===0){mo=MN[kk];break}}
+    var dd=+m[1],y=+m[3];if(y<100)y+=2000;if(mo)return y+"-"+(mo<10?"0":"")+mo+"-"+(dd<10?"0":"")+dd;return""}
   m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if(m){var dd=+m[1],mo=+m[2],y=+m[3];if(y<100)y+=2000;if(mo>12){var t=dd;dd=mo;mo=t}return y+"-"+(mo<10?"0":"")+mo+"-"+(dd<10?"0":"")+dd}
   return"";
-}
-function audNum(v){var n=parseFloat(String(v==null?"":v).replace(/[^0-9.\-]/g,""));return isNaN(n)?0:n}
-function audStatus(s){s=String(s||"").toLowerCase();if(/conf|உறுதி|done|yes/.test(s))return"confirmed";if(/next|அடுத்த/.test(s))return"next";return"pending"}
+}function audStatus(s){s=String(s||"").toLowerCase();if(/conf|உறுதி|done|yes/.test(s))return"confirmed";if(/next|அடுத்த/.test(s))return"next";return"pending"}
 function AudSheetPageFn({user:c,def:d}){
   const{t:u,lang:f}=xe(),r=Ue();
   const cfgKey="arAudSheet_"+d.id;
@@ -217,7 +226,7 @@ function AudSheetPageFn({user:c,def:d}){
         loading2?n.jsx(Ze,{label:"Google Sheet ஏற்றப்படுகிறது…"}):
         !tdata?n.jsxs(Yl,{children:["Google Sheet-ல் '",cfgTab,"' tab-ல் தரவுகளை போடவும். ",d.hint," — 1வது வரிசை தலைப்புகள், Share → Anyone with link → Viewer."]}):
         !visible.length?n.jsx(Yl,{children:"இந்த வடிகட்டலுக்கு வரிசைகள் இல்லை."}):
-        n.jsx("div",{style:{overflowX:"auto"},children:n.jsxs("table",{className:"ui-table",style:{fontSize:11,width:"100%"},children:[
+        n.jsx("div",{className:"aud-compact",style:{overflowX:"auto"},children:n.jsxs("table",{className:"ui-table",style:{fontSize:10.5,width:"100%"},children:[
           n.jsx("thead",{children:n.jsx("tr",{children:L2.map(function(h2,j2){return n.jsx("th",{style:{textAlign:totals[j2]!==undefined?"right":"left"},children:h2||("Col"+(j2+1))},j2)})})}),
           n.jsxs("tbody",{children:[
             visible.map(function(o2,i2){return n.jsx("tr",{children:L2.map(function(h2,j2){const v2=o2.vals[j2];const num=totals[j2]!==undefined;return n.jsx("td",{className:num?"num":"",style:{textAlign:num?"right":"left"},children:v2===""?"—":v2},j2)})},o2.i)}),
@@ -264,26 +273,20 @@ function AudSheetPageFn({user:c,def:d}){
         ]})
       ]})
     ]}),
-    n.jsx("style",{children:"\n@media print {\n@page { size: A4 "+orientation+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; margin: 0 !important; }\n.app-sidebar, .app-topbar, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}"})
+    n.jsx("style",{children:"\n.aud-compact .ui-table th,.aud-compact .ui-table td{padding:2px 6px!important;font-size:10.5px!important;line-height:1.3!important}\n.aud-compact .ui-table td{white-space:nowrap}\n@media print {\n@page { size: A4 "+orientation+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; margin: 0 !important; }\n.app-sidebar, .app-topbar, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}"})
   ]});
 }
 
 function AuditorGstr2bPageFn({user:c}){
   const{t:u,lang:f}=xe(),r=Ue();
-  const cfgKey="arAuditor2bCfg",ovKey="arAuditor2bOv";
+  const cfgKey="arAuditor2bCfg";
   const cfg0=(function(){try{return JSON.parse(localStorage.getItem(cfgKey)||"{}")}catch(e2){return{}}})();
   const[cfgId,cfgSetId]=E.useState(cfg0.sheetId||AUD_DEFAULT_SHEET),[cfgTab,cfgSetTab]=E.useState(cfg0.tab||"GSTR2B"),
     [showCfg,setShowCfg]=E.useState(!1),[loading2,setLoading2]=E.useState(!0),[err2,setErr2]=E.useState(""),
-    [tdata,setTdata]=E.useState(null),[stFilter,setStFilter]=E.useState("all"),[srch,setSrch]=E.useState(""),
-    [dFrom,setDFrom]=E.useState(""),[dTo,setDTo]=E.useState(""),
-    [isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("portrait");
-  const billsQ=ge("bills.list",{page:1,pageSize:200},[],!!tdata),
-    txnsQ=ge("transactions.list",{page:1,pageSize:200},[],!!tdata),
-    vendsQ=ge("vendors.list",{page:1,pageSize:200},[],!!tdata);
+    [tdata,setTdata]=E.useState(null),[srch,setSrch]=E.useState(""),[mSel,setMSel]=E.useState(""),
+    [remFilter,setRemFilter]=E.useState("all"),[dFrom,setDFrom]=E.useState(""),[dTo,setDTo]=E.useState(""),
+    [isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("landscape");
   function saveCfg(){try{localStorage.setItem(cfgKey,JSON.stringify({sheetId:cfgId,tab:cfgTab}))}catch(e2){}}
-  function getOv(){try{return JSON.parse(localStorage.getItem(ovKey)||"{}")}catch(e2){return{}}}
-  function setOv(k2,s2){const o2=getOv();o2[k2]=s2;try{localStorage.setItem(ovKey,JSON.stringify(o2))}catch(e2){}}
-  function findGstin(s2){const m2=String(s2||"").toUpperCase().match(/[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]/g);return m2?m2[0]:""}
   function load(){
     const id2=extractSheetId(cfgId);
     if(!id2){setErr2("Google Sheet URL / ID இல்லை");setLoading2(!1);return}
@@ -292,126 +295,153 @@ function AuditorGstr2bPageFn({user:c}){
       setLoading2(!1);
       if(e2){setErr2(e2);setTdata(null);return}
       const parsed=parseGvizTable(d2);
-      if(!parsed){setErr2("'"+cfgTab+"' tab-ல் தரவு இல்லை — GSTR-2B B2B விவரங்களை paste செய்யவும் (1வது வரிசை: GSTIN | Supplier Name | Invoice No | Invoice Date | Taxable Value | IGST | CGST | SGST | Cess | Invoice Value | Place of Supply | Status | Remarks)");setTdata(null);return}
+      if(!parsed){setErr2("'"+cfgTab+"' tab-ல் தரவு இல்லை");setTdata(null);return}
       setTdata(parsed);r(!0,"ஏற்றப்பட்டது — "+parsed.rows.length+" பில் வரிசைகள்");
     });
   }
   E.useEffect(function(){load()},[]);
   const L2=tdata?tdata.labels:[],R2=tdata?tdata.rows:[];
-  const idx=E.useMemo(function(){
+  const D=E.useMemo(function(){
+    const out={month:-1,gstin:-1,name:-1,invNo:-1,date:-1,invVal:-1,taxVal:-1,igst:-1,cgst:-1,sgst:-1,rem:-1};
+    if(!tdata)return out;
+    const types=tdata.types||[],R=R2,n=R.length||1;
     const find=function(re){for(let i2=0;i2<L2.length;i2++){if(re.test(L2[i2]))return i2}return -1};
-    return{gstin:find(/gstin|gst.?tin/i),supp:find(/supplier|trade|legal|name|பெயர்/i),inv:find(/invoice.?(no|number)|bill.?no|பில்.?எண்|inv.?no/i),date:find(/date|தேதி/i),tax:find(/taxable/i),igst:find(/igst|integrated/i),cgst:find(/cgst|central/i),sgst:find(/sgst|state/i),cess:find(/cess/i),total:find(/invoice.?value|total.?amount|total/i),pos:find(/place|pos/i),status:find(/status|நிலை/i),rem:find(/remark|note|குறிப்பு/i)};
-  },[tdata]);
-  function rowKey(vals,i2){const iv=idx.inv>=0?String(vals[idx.inv]||"").trim():"";return iv||"row"+i2}
-  function effStatus(vals,i2){const ov=getOv()[rowKey(vals,i2)];if(ov)return ov;const ss=idx.status>=0?vals[idx.status]:"";return audStatus(ss)}
-  const stCounts=E.useMemo(function(){const c2={confirmed:0,pending:0,next:0};R2.forEach(function(vals,i2){c2[effStatus(vals,i2)]++});return c2},[R2,idx]);
-  const amtTotals=E.useMemo(function(){
-    const t2={tax:0,itc:0,inv:0};
-    R2.forEach(function(vals){
-      if(idx.tax>=0)t2.tax+=audNum(vals[idx.tax]);
-      const ig=idx.igst>=0?audNum(vals[idx.igst]):0,cg=idx.cgst>=0?audNum(vals[idx.cgst]):0,sg=idx.sgst>=0?audNum(vals[idx.sgst]):0,ce=idx.cess>=0?audNum(vals[idx.cess]):0;
-      t2.itc+=ig+cg+sg+ce;
-      if(idx.total>=0)t2.inv+=audNum(vals[idx.total]);
-    });
-    return t2;
-  },[R2,idx]);
-  const companyIdx=E.useMemo(function(){
-    const map={};
-    function scan(listObj,src){
-      const arr=(listObj.data&&(listObj.data.rows||listObj.data.bills||listObj.data.transactions||listObj.data.vendors))||[];
-      arr.forEach(function(row){
-        const s2=JSON.stringify(row).toUpperCase();
-        const gs=s2.match(/[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]/g)||[];
-        gs.forEach(function(g2){if(!map[g2])map[g2]={src:src,ref:String(row.billNo||row.invoiceNo||row.txnId||row.vendorId||row.id||row.name||row.code||"").slice(0,40)}});
-      });
+    out.rem=find(/client remark|remark|status|நிலை/i);
+    out.gstin=find(/gstin/i);
+    out.name=find(/trade|legal/i);if(out.name<0)out.name=find(/supplier|party|name/i);
+    out.invNo=find(/invoice.?number|inv.?no|bill.?no/i);
+    const dateCols=[],numCols=[];
+    for(let i2=0;i2<L2.length;i2++){
+      let ne=0;R.forEach(function(v2){if(String(v2[i2]||"")!=="")ne++});
+      const fill=ne/n;
+      if(types[i2]==="date"&&fill>0.05)dateCols.push({i:i2,fill:fill});
+      if(types[i2]==="number"&&fill>0.3)numCols.push(i2);
     }
-    scan(billsQ,"Bill");scan(txnsQ,"Txn");scan(vendsQ,"Vendor");
-    return map;
-  },[billsQ.data,txnsQ.data,vendsQ.data]);
+    out.month=find(/month|மாத/i);
+    if(out.month<0){
+      for(let k2=0;k2<dateCols.length;k2++){
+        let hits=0;R.forEach(function(v2){if(/^\d{4}-\d{2}/.test(String(v2[dateCols[k2].i]||"")))hits++});
+        if(hits>n*0.3){out.month=dateCols[k2].i;break}
+      }
+    }
+    out.date=find(/invoice.?date|bill.?date|தேதி/i);
+    if(out.date===out.month)out.date=-1;
+    if(out.date<0){
+      const cand=dateCols.filter(function(d2){return d2.i!==out.month}).sort(function(a2,b2){return b2.fill-a2.fill});
+      if(cand.length)out.date=cand[0].i;
+    }
+    if(numCols.length>=5){out.invVal=numCols[0];out.taxVal=numCols[1];out.igst=numCols[2];out.cgst=numCols[3];out.sgst=numCols[4]}
+    const lblInv=find(/invoice.?value|inv.?value|total.?amount/i);if(lblInv>=0)out.invVal=lblInv;
+    const lblTax=find(/taxable/i);if(lblTax>=0)out.taxVal=lblTax;
+    const lblI=find(/igst|integrated/i);if(lblI>=0)out.igst=lblI;
+    const lblC=find(/cgst|central/i);if(lblC>=0)out.cgst=lblC;
+    const lblS=find(/sgst|state/i);if(lblS>=0)out.sgst=lblS;
+    return out;
+  },[tdata]);
+  const viewCols=E.useMemo(function(){
+    if(!tdata)return[];
+    const defs=[["month","மாதம்",D.month],["gstin","GSTIN of Supplier",D.gstin],["name","Trade/Legal Name",D.name],["invNo","Invoice Number",D.invNo],["date","Invoice Date",D.date],["invVal","Invoice Value (₹)",D.invVal],["taxVal","Taxable Value (₹)",D.taxVal],["igst","IGST",D.igst],["cgst","CGST",D.cgst],["sgst","SGST",D.sgst]];
+    const numK=["invVal","taxVal","igst","cgst","sgst"];
+    return defs.filter(function(d2){return d2[2]>=0}).map(function(d2){return{key:d2[0],label:L2[d2[2]]&&L2[d2[2]].length>0&&L2[d2[2]].length<=24?L2[d2[2]]:d2[1],idx:d2[2],num:numK.indexOf(d2[0])>=0}});
+  },[tdata,D,L2]);
+  const remOptions=E.useMemo(function(){
+    if(D.rem<0)return[];
+    const s2=[];R2.forEach(function(v2){const x2=String(v2[D.rem]||"").trim();if(x2&&s2.indexOf(x2)<0&&s2.length<15)s2.push(x2)});return s2;
+  },[R2,D]);
   const visible=E.useMemo(function(){
     const q2=srch.trim().toUpperCase(),df=dFrom?normAudDate(dFrom):"",dt=dTo?normAudDate(dTo):"",out=[];
     R2.forEach(function(vals,i2){
-      const st=effStatus(vals,i2);
-      if(stFilter!=="all"&&st!==stFilter)return;
+      if(mSel){
+        let inM=!1;
+        const mv=D.month>=0?String(vals[D.month]||"").trim():"";
+        if(mv===mSel||mv.slice(0,7)===mSel)inM=!0;
+        if(!inM&&D.date>=0){const dv=normAudDate(vals[D.date]);if(dv&&dv.slice(0,7)===mSel)inM=!0}
+        if(!inM)return;
+      }
+      if(remFilter!=="all"&&D.rem>=0&&String(vals[D.rem]||"").trim()!==remFilter)return;
       if(q2&&!vals.some(function(v2){return String(v2).toUpperCase().indexOf(q2)>=0}))return;
-      if((df||dt)&&idx.date>=0){const dv=normAudDate(vals[idx.date]);if(!dv)return;if(df&&dv<df)return;if(dt&&dv>dt)return}
-      out.push({i:i2,vals:vals,st:st});
+      if((df||dt)&&D.date>=0){const dv=normAudDate(vals[D.date]);if(!dv)return;if(df&&dv<df)return;if(dt&&dv>dt)return}
+      out.push({i:i2,vals:vals});
     });
     return out;
-  },[R2,stFilter,srch,dFrom,dTo,idx]);
-  const ftotals=E.useMemo(function(){
-    const t2={tax:0,itc:0,inv:0};
-    visible.forEach(function(o2){
-      const vals=o2.vals;
-      if(idx.tax>=0)t2.tax+=audNum(vals[idx.tax]);
-      const ig=idx.igst>=0?audNum(vals[idx.igst]):0,cg=idx.cgst>=0?audNum(vals[idx.cgst]):0,sg=idx.sgst>=0?audNum(vals[idx.sgst]):0,ce=idx.cess>=0?audNum(vals[idx.cess]):0;
-      t2.itc+=ig+cg+sg+ce;
-      if(idx.total>=0)t2.inv+=audNum(vals[idx.total]);
+  },[R2,srch,mSel,remFilter,dFrom,dTo,D]);
+  const fv=E.useMemo(function(){
+    const t2={invVal:0,taxVal:0,igst:0,cgst:0,sgst:0};
+    visible.forEach(function(o2){const v2=o2.vals;
+      t2.invVal+=audNum(D.invVal>=0?v2[D.invVal]:0);t2.taxVal+=audNum(D.taxVal>=0?v2[D.taxVal]:0);
+      t2.igst+=audNum(D.igst>=0?v2[D.igst]:0);t2.cgst+=audNum(D.cgst>=0?v2[D.cgst]:0);t2.sgst+=audNum(D.sgst>=0?v2[D.sgst]:0);
     });
     return t2;
-  },[visible,idx]);
-  function clearFilters(){setSrch("");setDFrom("");setDTo("");setStFilter("all")}
-  function logAction(vals,st){
-    if(c.role!=="super_admin")return;
-    const inv=idx.inv>=0?vals[idx.inv]:"?";
-    pe("worklog.create",{category:"AUDIT-2B",description:"GSTR-2B "+inv+" — "+st.toUpperCase(),date:new Date().toISOString().slice(0,10)}).then(function(){r(!0,"Work Tracker-ல் பதிவு ஆனது")}).catch(function(){});
-  }
-  function mark(vals,i2,st){
-    setOv(rowKey(vals,i2),st);
-    logAction(vals,st);
-    r(!0,"நிலை மாற்றப்பட்டது: "+(st==="confirmed"?"✓ உறுதி":st==="next"?"📅 அடுத்த மாதம்":"⏳ நிலுவை")+(c.role==="super_admin"?" (Work Tracker-லும் பதிவு)":""));
-    setTdata({labels:L2,rows:R2.slice()});
-  }
+  },[visible,D]);
+  const fvAll=E.useMemo(function(){
+    const t2={invVal:0,taxVal:0,igst:0,cgst:0,sgst:0};
+    R2.forEach(function(v2){
+      t2.invVal+=audNum(D.invVal>=0?v2[D.invVal]:0);t2.taxVal+=audNum(D.taxVal>=0?v2[D.taxVal]:0);
+      t2.igst+=audNum(D.igst>=0?v2[D.igst]:0);t2.cgst+=audNum(D.cgst>=0?v2[D.cgst]:0);t2.sgst+=audNum(D.sgst>=0?v2[D.sgst]:0);
+    });
+    return t2;
+  },[R2,D]);
+  function clearFilters(){setSrch("");setMSel("");setRemFilter("all");setDFrom("");setDTo("")}
   function dlCsv(){
     if(!visible.length){r(!1,"தரவு இல்லை");return}
     const esc=function(v2){return '"'+String(v2==null?"":v2).replace(/"/g,'""')+'"'};
-    const head=L2.map(esc).join(",");
-    const body=visible.map(function(o2){return o2.vals.map(esc).join(",")});
-    const tot=["TOTAL ("+visible.length+")"];
-    L2.forEach(function(h2,j2){
-      if(j2===idx.tax)tot.push(String(Math.round(ftotals.tax*100)/100));
-      else if(j2===idx.igst||j2===idx.cgst||j2===idx.sgst||j2===idx.cess)tot.push("");
-      else if(j2===idx.total)tot.push(String(Math.round(ftotals.inv*100)/100));
-      else tot.push("");
+    const head=["S.No"].concat(viewCols.map(function(vc){return vc.label}));
+    if(D.rem>=0)head.push("Remark");
+    const body=visible.map(function(o2,i2){
+      const row2=[i2+1].concat(viewCols.map(function(vc){return o2.vals[vc.idx]}));
+      if(D.rem>=0)row2.push(o2.vals[D.rem]);
+      return row2.map(esc).join(",");
     });
-    const csv=[head].concat(body).concat([tot.join(",")]).join("\n");
+    const tot=["TOTAL"];
+    viewCols.forEach(function(vc){tot.push(vc.num?String(Math.round(fv[vc.key]*100)/100):"")});
+    if(D.rem>=0)tot.push("");
+    const csv=[head.map(esc).join(",")].concat(body).concat([tot.join(",")]).join("\n");
     const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="Auditor_GSTR2B_ITC_"+new Date().toISOString().slice(0,10)+".csv";a2.click();
     setTimeout(function(){URL.revokeObjectURL(a2.href)},5000);
-    r(!0,"Excel CSV ஏற்றுமதி ஆனது ("+visible.length+")");
+    r(!0,"Excel CSV ஏற்றுமதி ("+visible.length+" வரிசைகள்)");
   }
   function doPrint(){setIsPrint(!0);setTimeout(function(){window.print()},150)}
-  const stBadge=function(st){return n.jsx(me,{tone:st==="confirmed"?"ok":st==="next"?"info":"warn",children:st==="confirmed"?"✓ உறுதி":st==="next"?"📅 அடுத்த மாதம்":"⏳ நிலுவை"})};
-  const printCols=E.useMemo(function(){
-    if(!tdata)return[];
-    const picks=[idx.gstin,idx.supp,idx.inv,idx.date,idx.tax,idx.igst,idx.cgst,idx.sgst,idx.total,idx.status].filter(function(i2){return i2>=0});
-    return picks.length>=4?picks:L2.map(function(_,i2){return i2}).slice(0,9);
-  },[tdata,idx,L2]);
+  const printCols=viewCols.filter(function(vc){return["month","gstin","name","invNo","date","invVal"].indexOf(vc.key)>=0});
   return n.jsxs("div",{className:"reports-centre",children:[
     n.jsxs("div",{className:"no-print",children:[
-      n.jsx(st,{title:f==="ta"?"ஆடிட்டர் — GSTR-2B (ITC) சரிபார்ப்பு":"Auditor — GSTR-2B (ITC) Verification",sub:f==="ta"?"ஆடிட்டர் Google Sheet-ல் பதிவேற்றும் மாத GSTR-2B ITC பில்கள் தானாக ஏற்றப்படும் — நிறுவன பில்களுடன் சரிபார்த்து நிலைப்படி பிரித்துக் காட்டலாம்":"Monthly GSTR-2B ITC bills auto-loaded from the auditor's Google Sheet — verify against company records & split by status"}),
+      n.jsx(st,{title:f==="ta"?"ஆடிட்டர் — GSTR-2B (ITC) சரிபார்ப்பு":"Auditor — GSTR-2B (ITC) Verification",sub:f==="ta"?"GSTR-2B ITC பில்கள் தானாக ஏற்றம் — மாத காலண்டர், வடிகட்டி, மொத்தம், A4 அச்சு":"GSTR-2B ITC bills auto-loaded — month calendar, filters, totals & A4 print"}),
       n.jsxs("div",{className:"ui-stats",style:{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",marginBottom:12},children:[
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"மொத்த பில்கள்"}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsx("div",{className:"ui-stat-sub",children:"வடிகட்டியது: "+visible.length})]}),
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"Taxable மொத்தம்"}),n.jsx("div",{className:"ui-stat-value",children:Q(amtTotals.tax)}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",Q(ftotals.tax)]})]}),
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"மொத்த ITC"}),n.jsx("div",{className:"ui-stat-value",style:{color:"#059669"},children:Q(amtTotals.itc)}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",Q(ftotals.itc)]})]}),
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"✓ உறுதி"}),n.jsx("div",{className:"ui-stat-value",style:{color:"green"},children:stCounts.confirmed}),n.jsx("div",{className:"ui-stat-sub",children:"Confirmed"})]}),
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"⏳ நிலுவை"}),n.jsx("div",{className:"ui-stat-value",style:{color:"#d97706"},children:stCounts.pending}),n.jsx("div",{className:"ui-stat-sub",children:"Pending"})]}),
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"📅 அடுத்த மாதம்"}),n.jsx("div",{className:"ui-stat-value",style:{color:"#2563eb"},children:stCounts.next}),n.jsx("div",{className:"ui-stat-sub",children:"Next month"})]})
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"மொத்த பில்கள்"}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",visible.length]})]}),
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"Invoice Value"}),n.jsx("div",{className:"ui-stat-value",children:Q(fvAll.invVal)}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",Q(fv.invVal)]})]}),
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"Taxable Value"}),n.jsx("div",{className:"ui-stat-value",children:Q(fvAll.taxVal)}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",Q(fv.taxVal)]})]}),
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"மொத்த ITC"}),n.jsx("div",{className:"ui-stat-value",style:{color:"#059669"},children:Q(fvAll.igst+fvAll.cgst+fvAll.sgst)}),n.jsxs("div",{className:"ui-stat-sub",children:["வடிகட்டியது: ",Q(fv.igst+fv.cgst+fv.sgst)]})]}),
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:"IGST / CGST / SGST"}),n.jsx("div",{className:"ui-stat-value",style:{fontSize:16},children:Q(fvAll.igst)+" / "+Q(fvAll.cgst)+" / "+Q(fvAll.sgst)}),n.jsx("div",{className:"ui-stat-sub",children:"மொத்தம் (அனைத்து மாதம்)"})]})
+      ]}),
+      mSel&&n.jsxs("div",{style:{background:"#eef2ff",border:"1px solid #c7d2fe",borderRadius:8,padding:"8px 14px",marginBottom:12,fontWeight:700,fontSize:13.5,display:"flex",flexWrap:"wrap",gap:14},children:[
+        n.jsxs("span",{children:["📅 ",mSel]}),
+        n.jsxs("span",{children:["பில்கள்: ",visible.length]}),
+        n.jsxs("span",{children:["Invoice: ",Q(fv.invVal)]}),
+        n.jsxs("span",{children:["Taxable: ",Q(fv.taxVal)]}),
+        n.jsxs("span",{children:["IGST: ",Q(fv.igst)]}),
+        n.jsxs("span",{children:["CGST: ",Q(fv.cgst)]}),
+        n.jsxs("span",{children:["SGST: ",Q(fv.sgst)]}),
+        n.jsxs("span",{style:{color:"#059669"},children:["மொத்த ITC: ",Q(fv.igst+fv.cgst+fv.sgst)]})
       ]}),
       n.jsxs("div",{style:{display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:12},children:[
-        n.jsxs("div",{style:{display:"flex",flexWrap:"wrap",gap:8},children:[
-          n.jsx(L,{kind:stFilter==="all"?"primary":"ghost",onClick:function(){setStFilter("all")},children:"அனைத்தும் ("+R2.length+")"}),
-          n.jsx(L,{kind:stFilter==="pending"?"primary":"ghost",onClick:function(){setStFilter("pending")},children:"⏳ நிலுவை ("+stCounts.pending+")"}),
-          n.jsx(L,{kind:stFilter==="confirmed"?"primary":"ghost",onClick:function(){setStFilter("confirmed")},children:"✓ உறுதி ("+stCounts.confirmed+")"}),
-          n.jsx(L,{kind:stFilter==="next"?"primary":"ghost",onClick:function(){setStFilter("next")},children:"📅 அடுத்த மாதம் ("+stCounts.next+")"}),
+        n.jsxs("div",{style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"},children:[
+          n.jsxs("div",{style:{display:"flex",alignItems:"center",gap:4,background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 8px"},children:[
+            n.jsx("span",{style:{fontSize:14},children:"📅"}),
+            n.jsx("input",{type:"month",className:"ui-input",style:{width:150,border:"none",background:"transparent",padding:"4px 2px"},value:mSel,onChange:function(e2){setMSel(e2.target.value)}}),
+            mSel?n.jsx("button",{type:"button",style:{background:"none",border:"none",cursor:"pointer",fontSize:12},onClick:function(){setMSel("")},children:"✕"}):null
+          ]}),
+          remOptions.length>0?n.jsxs("select",{className:"ui-input",style:{width:150},value:remFilter,onChange:function(e2){setRemFilter(e2.target.value)},children:[
+            n.jsx("option",{value:"all",children:"அனைத்து ரிமார்க்"}),
+            remOptions.map(function(s2){return n.jsx("option",{value:s2,children:s2},s2)})
+          ]}):null,
+          n.jsx("input",{className:"ui-input",style:{width:170},placeholder:"தேடு (GSTIN/பெயர்/எண்)…",value:srch,onChange:function(e2){setSrch(e2.target.value)}}),
+          n.jsx("input",{type:"date",className:"ui-input",style:{width:135},value:dFrom,onChange:function(e2){setDFrom(e2.target.value)}}),
+          n.jsx("span",{children:"—"}),
+          n.jsx("input",{type:"date",className:"ui-input",style:{width:135},value:dTo,onChange:function(e2){setDTo(e2.target.value)}}),
           n.jsx(L,{kind:"ghost",small:!0,onClick:clearFilters,children:"✕ அழி"}),
-          n.jsx(L,{kind:"ghost",small:!0,onClick:load,children:"🔄"})
+          n.jsx(L,{kind:"ghost",small:!0,onClick:load,children:"🔄 புதுப்பி"})
         ]}),
         n.jsxs("div",{style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"},children:[
-          n.jsx("input",{className:"ui-input",style:{width:150},placeholder:"தேடு (GSTIN/பில்)…",value:srch,onChange:function(e2){setSrch(e2.target.value)}}),
-          n.jsx("input",{type:"date",className:"ui-input",style:{width:135},value:dFrom,onChange:function(e2){setDFrom(e2.target.value)}}),
-          n.jsx("span",{style:{margin:"0 2px"},children:"—"}),
-          n.jsx("input",{type:"date",className:"ui-input",style:{width:135},value:dTo,onChange:function(e2){setDTo(e2.target.value)}}),
           n.jsxs("div",{style:{display:"inline-flex",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:6,padding:2},children:[
             n.jsx("button",{className:"ui-btn "+(orientation==="portrait"?"ui-btn-primary":"ui-btn-ghost"),style:{padding:"4px 10px",fontSize:12,height:32},onClick:function(){setOrientation("portrait")},children:"📄 Portrait"}),
             n.jsx("button",{className:"ui-btn "+(orientation==="landscape"?"ui-btn-primary":"ui-btn-ghost"),style:{padding:"4px 10px",fontSize:12,height:32},onClick:function(){setOrientation("landscape")},children:"📃 Landscape"})
@@ -431,43 +461,26 @@ function AuditorGstr2bPageFn({user:c}){
         err2&&n.jsx("div",{style:{color:"#dc2626",fontWeight:600,fontSize:13,marginTop:8},children:"⚠ "+err2})
       ]}),
       !showCfg&&err2&&n.jsx("div",{style:{color:"#dc2626",fontWeight:600,fontSize:13,marginBottom:10},children:"⚠ "+err2+"  (⚙️ அழுத்தி Sheet இணைப்பை மாற்றலாம்)"}),
-      n.jsx(oe,{title:"GSTR-2B (ITC) பில் சரிபார்ப்பு அட்டவணை",sub:visible.length+" / "+R2.length+" வரிசைகள் | ✓ = நிறுவன பதிவுடன் பொருந்தியது",children:
+      n.jsx(oe,{title:"GSTR-2B (ITC) பில்கள்",sub:visible.length+" / "+R2.length+" வரிசைகள் | கீழே வடிகட்டிய மொத்தம்",children:
         loading2?n.jsx(Ze,{label:"Google Sheet ஏற்றப்படுகிறது…"}):
         !tdata?n.jsx(Yl,{children:"தரவு இல்லை — ⚙️ அழுத்தி Sheet இணைப்பை சரிபார்க்கவும்."}):
         !visible.length?n.jsx(Yl,{children:"இந்த வடிகட்டலுக்கு வரிசைகள் இல்லை."}):
-        n.jsx("div",{style:{overflowX:"auto"},children:n.jsxs("table",{className:"ui-table",style:{fontSize:11,width:"100%"},children:[
+        n.jsx("div",{className:"aud-compact",style:{overflowX:"auto"},children:n.jsxs("table",{className:"ui-table",style:{fontSize:10.5,width:"100%"},children:[
           n.jsx("thead",{children:n.jsxs("tr",{children:[
             n.jsx("th",{children:"#"}),
-            L2.map(function(h2,j2){return n.jsx("th",{style:{textAlign:(idx.tax===j2||idx.igst===j2||idx.cgst===j2||idx.sgst===j2||idx.cess===j2||idx.total===j2)?"right":"left"},children:h2||("Col"+(j2+1))},j2)}),
-            n.jsx("th",{children:"நிலை"}),n.jsx("th",{children:"நிறுவன சரிபார்ப்பு"}),n.jsx("th",{children:"செயல்"})
+            viewCols.map(function(vc){return n.jsx("th",{style:{textAlign:vc.num?"right":"left"},children:vc.label},vc.key)}),
+            D.rem>=0?n.jsx("th",{children:"ரிமார்க்"},"remcol"):null
           ]})}),
           n.jsxs("tbody",{children:[
-            visible.map(function(o2){
-              const g2=idx.gstin>=0?findGstin(o2.vals[idx.gstin]):"";
-              const inv=idx.inv>=0?String(o2.vals[idx.inv]||""):"";
-              const hit=(g2&&companyIdx[g2])||(inv&&companyIdx[inv.toUpperCase()]);
-              return n.jsxs("tr",{children:[
-                n.jsx("td",{className:"mono",children:o2.i+1}),
-                L2.map(function(h2,j2){const v2=o2.vals[j2];const num=(idx.tax===j2||idx.igst===j2||idx.cgst===j2||idx.sgst===j2||idx.cess===j2||idx.total===j2);return n.jsx("td",{className:num?"num":"",style:{textAlign:num?"right":"left",background:j2===idx.status?"#fefce8":"transparent"},children:v2===""?"—":v2},j2)}),
-                n.jsx("td",{children:stBadge(o2.st)}),
-                n.jsx("td",{children:hit?n.jsx(me,{tone:"ok",children:"✓ "+hit.src+(hit.ref?" · "+hit.ref:"")}):n.jsx("span",{className:"text-3",children:g2||inv?"கிடைக்கவில்லை":"—"})}),
-                n.jsx("td",{className:"row-actions",children:n.jsxs(n.Fragment,{children:[
-                  n.jsx(L,{small:!0,kind:"soft",onClick:function(){mark(o2.vals,o2.i,"confirmed")},children:"✓"}),
-                  n.jsx(L,{small:!0,kind:"ghost",onClick:function(){mark(o2.vals,o2.i,"next")},children:"📅"}),
-                  n.jsx(L,{small:!0,kind:"ghost",onClick:function(){mark(o2.vals,o2.i,"pending")},children:"⏳"})
-                ]})})
-              ]},rowKey(o2.vals,o2.i));
-            }),
+            visible.map(function(o2,i2){return n.jsxs("tr",{children:[
+              n.jsx("td",{className:"mono",children:i2+1},"sn"+o2.i),
+              viewCols.map(function(vc){const v2=o2.vals[vc.idx];return n.jsx("td",{className:vc.num?"num":"",style:{textAlign:vc.num?"right":"left"},children:v2===""?"—":v2},vc.key)}),
+              D.rem>=0?n.jsx("td",{children:String(o2.vals[D.rem]||"")===""?"—":o2.vals[D.rem]},"remcell"):null
+            ]},"r"+o2.i)}),
             (function(){
-              const tds=[n.jsxs("td",{children:["மொத்தம் (",visible.length,")"]},"t0")];
-              L2.forEach(function(h2,j2){
-                let val="";
-                if(j2===idx.tax)val=Q(ftotals.tax);
-                else if(j2===idx.total)val=Q(ftotals.inv);
-                else if(j2===idx.igst||j2===idx.cgst||j2===idx.sgst||j2===idx.cess)val="";
-                tds.push(n.jsx("td",{className:"num",style:{textAlign:"right",fontWeight:val?700:400,background:val?"#dbeafe":"transparent"},children:val},("c"+j2)));
-              });
-              tds.push(n.jsx("td",{},"t1"),n.jsx("td",{},"t2"),n.jsx("td",{},"t3"));
+              const tds=[n.jsx("td",{children:"மொத்தம் ("+visible.length+")"},"t0")];
+              viewCols.forEach(function(vc){tds.push(n.jsx("td",{className:vc.num?"num":"",style:{textAlign:vc.num?"right":"left",fontWeight:700,background:vc.num?"#dbeafe":"transparent"},children:vc.num?Q(fv[vc.key]||0):""},("t"+vc.key)))});
+              if(D.rem>=0)tds.push(n.jsx("td",{},"tr"));
               return n.jsx("tr",{style:{background:"#f1f5f9",fontWeight:700,borderTop:"2px solid #000"},children:tds},"totals");
             })()
           ]})
@@ -485,23 +498,25 @@ function AuditorGstr2bPageFn({user:c}){
           n.jsx("p",{style:{margin:"0 0 4px 0",fontSize:9.5},children:"DOOR NO 2/150 CHITTANGADU, THIRUNALUR POST, ARANTHANGI TALUK, PUDUKKOTTAI DISTRICT - 614624"}),
           n.jsxs("div",{style:{marginTop:6,paddingTop:5,borderTop:"1px dashed #666",display:"flex",justifyContent:"space-between",fontSize:9.5},children:[
             n.jsx("b",{children:"GSTR-2B (ITC) சரிபார்ப்பு அறிக்கை"}),
+            mSel?n.jsxs("span",{children:["மாதம்: ",mSel]}):n.jsx("span",{children:"அனைத்து மாதம்"}),
             n.jsxs("span",{children:["தேதி: ",new Date().toLocaleDateString("en-IN")]}),
             n.jsxs("span",{children:["பயனர்: ",c.name," (",c.role,")"]}),
             n.jsx("span",{children:orientation==="landscape"?"A4 Landscape":"A4 Portrait"})
           ]})
         ]}),
-        n.jsxs("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:orientation==="landscape"?7.5:8.5},children:[
-          n.jsx("thead",{children:n.jsx("tr",{style:{background:"#e2e8f0"},children:printCols.map(function(j2){return n.jsx("th",{style:{border:"1px solid #000",padding:"3px 4px",textAlign:(idx.tax===j2||idx.total===j2||idx.igst===j2||idx.cgst===j2||idx.sgst===j2)?"right":"left"},children:L2[j2]},j2)})})}),
+        n.jsxs("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:orientation==="landscape"?8:9},children:[
+          n.jsx("thead",{children:n.jsxs("tr",{style:{background:"#e2e8f0"},children:[
+            n.jsx("th",{style:{border:"1px solid #000",padding:"3px 4px"},children:"#"}),
+            printCols.map(function(vc){return n.jsx("th",{style:{border:"1px solid #000",padding:"3px 4px",textAlign:vc.num?"right":"left"},children:vc.label},vc.key)})
+          ]})}),
           n.jsxs("tbody",{children:[
-            visible.map(function(o2,i2){return n.jsx("tr",{style:{background:i2%2?"#f8fafc":"#fff"},children:printCols.map(function(j2){const v2=o2.vals[j2];const num=(idx.tax===j2||idx.total===j2||idx.igst===j2||idx.cgst===j2||idx.sgst===j2);return n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:num?"right":"left"},children:v2===""?"—":v2},j2)})},o2.i)}),
+            visible.map(function(o2,i2){return n.jsxs("tr",{style:{background:i2%2?"#f8fafc":"#fff"},children:[
+              n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:"center"},children:i2+1},"p"+o2.i),
+              printCols.map(function(vc){const v2=o2.vals[vc.idx];return n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:vc.num?"right":"left"},children:v2===""?"—":v2},("p"+vc.key))})
+            ]},"pr"+o2.i)}),
             (function(){
-              const tds=[];
-              printCols.forEach(function(j2,k2){
-                let val="";
-                if(j2===idx.tax)val=Q(ftotals.tax);else if(j2===idx.total)val=Q(ftotals.inv);
-                tds.push(n.jsx("td",{style:{border:"1px solid #000",padding:"3px 4px",textAlign:(idx.tax===j2||idx.total===j2||idx.igst===j2||idx.cgst===j2||idx.sgst===j2)?"right":"left",fontWeight:800,background:val?"#bfdbfe":"#e2e8f0"},children:k2===0?"TOTAL ("+visible.length+")":val},("p"+j2)));
-              });
-              tds.push(n.jsx("td",{style:{border:"1px solid #000",padding:"3px 4px"}},"pst"));
+              const tds=[n.jsx("td",{style:{border:"1px solid #000",padding:"3px 4px",fontWeight:800},children:"TOTAL ("+visible.length+")"},"pt0")];
+              printCols.forEach(function(vc){tds.push(n.jsx("td",{style:{border:"1px solid #000",padding:"3px 4px",textAlign:vc.num?"right":"left",fontWeight:800,background:vc.num?"#bfdbfe":"#e2e8f0"},children:vc.num?Q(fv[vc.key]||0):""},("pt"+vc.key)))});
               return n.jsx("tr",{style:{background:"#e2e8f0"},children:tds},"ptotals");
             })()
           ]})
@@ -513,7 +528,7 @@ function AuditorGstr2bPageFn({user:c}){
         ]})
       ]})
     ]}),
-    n.jsx("style",{children:"\n@media print {\n@page { size: A4 "+orientation+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; margin: 0 !important; }\n.app-sidebar, .app-topbar, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}"})
+    n.jsx("style",{children:"\n/*aud2b*/\n.aud-compact .ui-table th,.aud-compact .ui-table td{padding:2px 6px!important;font-size:10.5px!important;line-height:1.3!important}\n.aud-compact .ui-table td{white-space:nowrap}\n@media print {\n@page { size: A4 "+orientation+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; margin: 0 !important; }\n.app-sidebar, .app-topbar, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}"})
   ]});
 }
 

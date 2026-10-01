@@ -126,7 +126,7 @@ n.jsx("div",{className:"aud-sechead",children:"சப்ளையர் வா�
 n.jsx("div",{className:"aud-compact",style:{overflowX:"auto",marginBottom:12},children:n.jsxs("table",{className:"ui-table",children:[
 n.jsx("thead",{children:n.jsxs("tr",{children:[n.jsx("th",{children:"#"}),n.jsx("th",{children:"Supplier Name / சப்ளையர் பெயர்"}),n.jsx("th",{children:"GSTIN"}),n.jsx("th",{style:{textAlign:"right"},children:"பில்கள்"}),n.jsx("th",{style:{textAlign:"right"},children:"Invoice Value"}),n.jsx("th",{style:{textAlign:"right"},children:"Taxable Value"}),n.jsx("th",{style:{textAlign:"right"},children:"Total GST (ITC)"})]})}),
 n.jsxs("tbody",{children:[
-agg.map(function(x,si){return n.jsxs("tr",{children:[n.jsx("td",{className:"num",style:{textAlign:"right"},children:si+1}),n.jsx("td",{className:"wrap",children:x.name}),n.jsx("td",{children:x.gstin}),n.jsx("td",{className:"num",children:x.n}),n.jsx("td",{className:"num",children:Q(x.invVal)}),n.jsx("td",{className:"num",children:Q(x.taxVal)}),n.jsx("td",{className:"num",children:Q(x.igst+x.cgst+x.sgst)})]},"s"+si)}),
+agg.map(function(x,si){return n.jsxs("tr",{className:x.n>1?"aud-regrow":"",title:x.n>1?"ரெகுலர் சப்ளையர் — "+x.n+" பில்கள்":"",children:[n.jsx("td",{className:"num",style:{textAlign:"right"},children:si+1}),n.jsx("td",{className:"wrap",children:x.n>1?"🔁 "+x.name:x.name}),n.jsx("td",{children:x.gstin}),n.jsx("td",{className:"num",children:x.n}),n.jsx("td",{className:"num",children:Q(x.invVal)}),n.jsx("td",{className:"num",children:Q(x.taxVal)}),n.jsx("td",{className:"num",children:Q(x.igst+x.cgst+x.sgst)})]},"s"+si)}),
 n.jsxs("tr",{className:"aud-totrow",children:[n.jsx("td",{}),n.jsx("td",{children:"மொத்தம் / Grand Total ("+agg.length+" சப்ளையர்)"}),n.jsx("td",{}),n.jsx("td",{className:"num",children:T.n}),n.jsx("td",{className:"num",children:Q(T.invVal)}),n.jsx("td",{className:"num",children:Q(T.taxVal)}),n.jsx("td",{className:"num",children:Q(T.igst+T.cgst+T.sgst)})]},"stot")]})]})})]})}
 function aud2bPrintSummary(rows,D){var ma,sa;try{ma=audAggMonth(rows,D);sa=audAggSupp(rows,D)}catch(e2){return null}var src=(ma&&ma.length)?ma:sa,T=audSumAgg(src);var navy={background:"#1f3864",color:"#fff",fontWeight:700,border:"1px solid #4560a0",padding:"3px 5px"};var bd={border:"1px solid #999",padding:"2px 5px"};function R(v){return Object.assign({},bd,{textAlign:"right"})}var out=[];
 if(ma&&ma.length){out.push(n.jsx("div",{className:"aud-sechead",children:"மாதவாரியான பிரிவு / Month-wise Breakdown"},"phm"));out.push(n.jsxs("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:7.5,marginBottom:10},children:[n.jsx("thead",{children:n.jsxs("tr",{children:[n.jsx("th",{style:navy,children:"மாதம் / Month"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"பில்கள்"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Invoice Value"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Taxable Value"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"IGST"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"CGST"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"SGST"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Total GST"})]})}),n.jsxs("tbody",{children:[ma.map(function(x){return n.jsxs("tr",{children:[n.jsx("td",{style:bd,children:audMonthLabel(x.m)}),n.jsx("td",{style:R(),children:x.n}),n.jsx("td",{style:R(),children:Q(x.invVal)}),n.jsx("td",{style:R(),children:Q(x.taxVal)}),n.jsx("td",{style:R(),children:Q(x.igst)}),n.jsx("td",{style:R(),children:Q(x.cgst)}),n.jsx("td",{style:R(),children:Q(x.sgst)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:600}),children:Q(x.igst+x.cgst+x.sgst)})]},"pm"+x.m)}),n.jsxs("tr",{className:"aud-totrow",children:[n.jsx("td",{style:bd,children:"மொத்தம் / Grand Total"}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:T.n}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.invVal)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.taxVal)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.igst)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.cgst)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.sgst)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.igst+T.cgst+T.sgst)})]},"pmtot")]})]},"ptabm"))}
@@ -373,9 +373,15 @@ function AuditorGstr2bPageFn({user:c}){
     if(D.rem<0)return[];
     const s2=[];R2.forEach(function(v2){const x2=String(v2[D.rem]||"").trim();if(x2&&s2.indexOf(x2)<0&&s2.length<15)s2.push(x2)});return s2;
   },[R2,D]);
+  const REG=E.useMemo(function(){const m2={};R2.forEach(function(v2){const g=D.gstin>=0?String(v2[D.gstin]||"").trim().toUpperCase():"";const nm=D.name>=0?String(v2[D.name]||"").trim().toUpperCase():"";const k2=g||nm;if(!k2)return;m2[k2]=(m2[k2]||0)+1});return m2},[R2,D]);
+  const regSuppN=E.useMemo(function(){let c2=0;for(var k2 in REG)if(REG[k2]>1)c2++;return c2},[REG]);
+  const[regOnly,setRegOnly]=E.useState("");
+  function regCount(vals){const g=D.gstin>=0?String(vals[D.gstin]||"").trim().toUpperCase():"";const nm=D.name>=0?String(vals[D.name]||"").trim().toUpperCase():"";return REG[g||nm]||0}
   const visible=E.useMemo(function(){
     const q2=srch.trim().toUpperCase(),df=dFrom?normAudDate(dFrom):"",dt=dTo?normAudDate(dTo):"",out=[];
     R2.forEach(function(vals,i2){
+      if(regOnly==="reg"&&regCount(vals)<2)return;
+      if(regOnly==="once"&&regCount(vals)>=2)return;
       if(mSel){
         let inM=!1;
         const mv=D.month>=0?String(vals[D.month]||"").trim():"";
@@ -389,7 +395,7 @@ function AuditorGstr2bPageFn({user:c}){
       out.push({i:i2,vals:vals});
     });
     return out;
-  },[R2,srch,mSel,remFilter,dFrom,dTo,D]);
+  },[R2,srch,mSel,remFilter,dFrom,dTo,D,regOnly]);
   const fv=E.useMemo(function(){
     const t2={invVal:0,taxVal:0,igst:0,cgst:0,sgst:0};
     visible.forEach(function(o2){const v2=o2.vals;
@@ -406,7 +412,7 @@ function AuditorGstr2bPageFn({user:c}){
     });
     return t2;
   },[R2,D]);
-  function clearFilters(){setSrch("");setMSel("");setRemFilter("all");setDFrom("");setDTo("")}
+  function clearFilters(){setSrch("");setMSel("");setRemFilter("all");setRegOnly("");setDFrom("");setDTo("")}
   function dlCsv(){
     if(!visible.length){r(!1,"தரவு இல்லை");return}
     const esc=function(v2){return '"'+String(v2==null?"":v2).replace(/"/g,'""')+'"'};
@@ -427,7 +433,7 @@ function AuditorGstr2bPageFn({user:c}){
     r(!0,"Excel CSV ஏற்றுமதி ("+visible.length+" வரிசைகள்)");
   }
   function doPrint(){setIsPrint(!0);setTimeout(function(){window.print()},150)}
-  E.useEffect(function(){window.__arShareLines=[mSel?"GSTR-2B (ITC) — மாதம்: "+mSel:"GSTR-2B (ITC) சரிபார்ப்பு","பில்கள்: "+visible.length+" / "+R2.length,"Invoice Value: "+Q(fv.invVal),"Taxable: "+Q(fv.taxVal),"மொத்த ITC: "+Q(fv.igst+fv.cgst+fv.sgst)]},[mSel,visible.length,R2.length,fv]);
+  E.useEffect(function(){window.__arShareLines=[mSel?"GSTR-2B (ITC) — மாதம்: "+mSel:"GSTR-2B (ITC) சரிபார்ப்பு","பில்கள்: "+visible.length+" / "+R2.length,"Invoice Value: "+Q(fv.invVal),"Taxable: "+Q(fv.taxVal),"மொத்த ITC: "+Q(fv.igst+fv.cgst+fv.sgst),"ரெகுலர் சப்ளையர்கள்: "+regSuppN]},[mSel,visible.length,R2.length,fv,regSuppN]);
   const printCols=viewCols.filter(function(vc){return["month","gstin","name","invNo","date","invVal"].indexOf(vc.key)>=0});
   return n.jsxs("div",{className:"reports-centre",children:[
     n.jsxs("div",{className:"no-print",children:[
@@ -455,6 +461,11 @@ function AuditorGstr2bPageFn({user:c}){
             n.jsx("span",{style:{fontSize:14},children:"📅"}),
             n.jsx("input",{type:"month",className:"ui-input",style:{width:150,border:"none",background:"transparent",padding:"4px 2px"},value:mSel,onChange:function(e2){setMSel(e2.target.value)}}),
             mSel?n.jsx("button",{type:"button",style:{background:"none",border:"none",cursor:"pointer",fontSize:12},onClick:function(){setMSel("")},children:"✕"}):null
+          ]}),
+          n.jsxs("select",{className:"ui-input",style:{width:170},title:"ரெகுலர் பில் — அதே GSTIN ஒன்றுக்கு மேற்பட்ட முறை",value:regOnly,onChange:function(e2){setRegOnly(e2.target.value)},children:[
+            n.jsx("option",{value:"",children:"அனைத்து பில்கள்"}),
+            n.jsx("option",{value:"reg",children:"🔁 ரெகுலர் மட்டும்"}),
+            n.jsx("option",{value:"once",children:"ஒரே முறை மட்டும் (புதிய)"})
           ]}),
           remOptions.length>0?n.jsxs("select",{className:"ui-input",style:{width:150},value:remFilter,onChange:function(e2){setRemFilter(e2.target.value)},children:[
             n.jsx("option",{value:"all",children:"அனைத்து ரிமார்க்"}),
@@ -487,7 +498,7 @@ function AuditorGstr2bPageFn({user:c}){
         err2&&n.jsx("div",{style:{color:"#dc2626",fontWeight:600,fontSize:13,marginTop:8},children:"⚠ "+err2})
       ]}),
       !showCfg&&err2&&n.jsx("div",{style:{color:"#dc2626",fontWeight:600,fontSize:13,marginBottom:10},children:"⚠ "+err2+"  (⚙️ அழுத்தி Sheet இணைப்பை மாற்றலாம்)"}),
-      aud2bMonthSection(visible,D,setMSel),aud2bSuppSection(visible,D),n.jsx(oe,{title:"GSTR-2B (ITC) பில்கள்",sub:visible.length+" / "+R2.length+" வரிசைகள் | கீழே வடிகட்டிய மொத்தம்",children:
+      aud2bMonthSection(visible,D,setMSel),aud2bSuppSection(visible,D),n.jsx(oe,{title:"GSTR-2B (ITC) பில்கள்",sub:visible.length+" / "+R2.length+" வரிசைகள் | வடிகட்டிய மொத்தம் கீழே | 🔁 = ரெகுலர் பில் (அதே GSTIN மீண்டும்)",children:
         loading2?n.jsx(Ze,{label:"Google Sheet ஏற்றப்படுகிறது…"}):
         !tdata?n.jsx(Yl,{children:"தரவு இல்லை — ⚙️ அழுத்தி Sheet இணைப்பை சரிபார்க்கவும்."}):
         !visible.length?n.jsx(Yl,{children:"இந்த வடிகட்டலுக்கு வரிசைகள் இல்லை."}):
@@ -498,9 +509,9 @@ function AuditorGstr2bPageFn({user:c}){
             D.rem>=0?n.jsx("th",{children:"ரிமார்க்"},"remcol"):null
           ]})}),
           n.jsxs("tbody",{children:[
-            visible.map(function(o2,i2){return n.jsxs("tr",{children:[
+            visible.map(function(o2,i2){const rc=regCount(o2.vals),isReg=rc>1;return n.jsxs("tr",{className:isReg?"aud-regrow":"",children:[
               n.jsx("td",{className:"mono",children:i2+1},"sn"+o2.i),
-              viewCols.map(function(vc){const v2=o2.vals[vc.idx];return n.jsx("td",{className:vc.num?"num":"",style:{textAlign:vc.num?"right":"left"},children:v2===""?"—":v2},vc.key)}),
+              viewCols.map(function(vc){const v2=o2.vals[vc.idx];const badge=(vc.key==="name"&&isReg)?n.jsx("span",{className:"aud-regbadge",title:"ரெகுலர் சப்ளையர் — இதே GSTIN-க்கு மொத்தம் "+rc+" பில்",children:"🔁 "+rc}):null;return n.jsxs("td",{className:vc.num?"num":"",style:{textAlign:vc.num?"right":"left"},children:[v2===""?"—":v2,badge?" ":"",badge]},vc.key)}),
               D.rem>=0?n.jsx("td",{children:String(o2.vals[D.rem]||"")===""?"—":o2.vals[D.rem]},"remcell"):null
             ]},"r"+o2.i)}),
             (function(){
@@ -536,9 +547,9 @@ function AuditorGstr2bPageFn({user:c}){
             printCols.map(function(vc){return n.jsx("th",{style:{border:"1px solid #000",padding:"3px 4px",textAlign:vc.num?"right":"left"},children:vc.label},vc.key)})
           ]})}),
           n.jsxs("tbody",{children:[
-            visible.map(function(o2,i2){return n.jsxs("tr",{style:{background:i2%2?"#f8fafc":"#fff"},children:[
+            visible.map(function(o2,i2){const rc=regCount(o2.vals),isReg=rc>1;return n.jsxs("tr",{className:isReg?"aud-regrow":"",style:{background:isReg?"#fff4d6":(i2%2?"#f8fafc":"#fff")},children:[
               n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:"center"},children:i2+1},"p"+o2.i),
-              printCols.map(function(vc){const v2=o2.vals[vc.idx];return n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:vc.num?"right":"left"},children:v2===""?"—":v2},("p"+vc.key))})
+              printCols.map(function(vc){const v2=o2.vals[vc.idx];const rc2=vc.key==="name"?regCount(o2.vals):0;const base=v2===""?"—":v2;return n.jsx("td",{style:{border:"1px solid #ccc",padding:"2px 4px",textAlign:vc.num?"right":"left"},children:rc2>1?base+" 🔁"+rc2:base},("p"+vc.key))})
             ]},"pr"+o2.i)}),
             (function(){
               const tds=[n.jsx("td",{style:{border:"1px solid #000",padding:"3px 4px",fontWeight:800},children:"TOTAL ("+visible.length+")"},"pt0")];

@@ -22,3 +22,8 @@
 .a4-print-document thead th{border-color:#4560a0!important}
 .a4-print-document tr.aud-totrow td{background:#c6efce!important;font-weight:800}
 .a4-print-document .aud-sechead{border-left:5px solid #1f3864;background:#e9eff9;padding:5px 10px;margin:10px 0 5px;font-size:12px;font-weight:800;color:#1f3864}
+/* REGULAR BILL — repeat-supplier (same GSTIN more than once) amber highlight */
+.reports-centre .ui-table tr.aud-regrow>td{background:#fff4d6!important}
+.reports-centre .ui-table tr.aud-regrow>td:nth-child(2){border-left:3px solid #f59e0b}
+.aud-regbadge{display:inline-block;background:#f59e0b;color:#fff;font-weight:700;font-size:9px;line-height:1.2;padding:2px 6px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle}
+.a4-print-document tr.aud-regrow>td{background:#fff4d6!important}

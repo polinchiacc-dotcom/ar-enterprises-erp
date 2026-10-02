@@ -134,46 +134,32 @@ if(ma&&ma.length){out.push(n.jsx("div",{className:"aud-sechead",children:AT(f,AT
 if(sa&&sa.length){var cap=150,trunc=sa.length>cap?sa.slice(0,cap):sa;out.push(n.jsx("div",{className:"aud-sechead",children:AT(f,AT(f,"சப்ளையர் வாரியான சுருக்கம் / Supplier-wise Summary","Supplier-wise Summary"),"Supplier-wise Summary")},"phs"));out.push(n.jsxs("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:7.5,marginBottom:10},children:[n.jsx("thead",{children:n.jsxs("tr",{children:[n.jsx("th",{style:navy,children:"#"}),n.jsx("th",{style:navy,children:AT(f,AT(f,"Supplier Name / சப்ளையர் பெயர்","Supplier Name"),"Supplier Name")}),n.jsx("th",{style:navy,children:"GSTIN"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:AT(f,AT(f,AT(f,AT(f,"பில்கள்","Bills"),"Bills"),"Bills"),"Bills")}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Invoice Value"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Taxable Value"}),n.jsx("th",{style:Object.assign({},navy,{textAlign:"right"}),children:"Total GST (ITC)"})]})}),n.jsxs("tbody",{children:[trunc.map(function(x,si){return n.jsxs("tr",{children:[n.jsx("td",{style:R(),children:si+1}),n.jsx("td",{style:bd,children:x.name}),n.jsx("td",{style:bd,children:x.gstin}),n.jsx("td",{style:R(),children:x.n}),n.jsx("td",{style:R(),children:Q(x.invVal)}),n.jsx("td",{style:R(),children:Q(x.taxVal)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:600}),children:Q(x.igst+x.cgst+x.sgst)})]},"ps"+si)}),trunc.length<sa.length?n.jsxs("tr",{children:[n.jsx("td",{style:bd,children:""}),n.jsx("td",{style:bd,colSpan:6,children:AT(f,"… மேலும் ","… plus ")+(sa.length-trunc.length)+AT(f," சப்ளையர்கள் (மொத்தம் "," more suppliers (total ")+sa.length+")"})]},"ptr"):null,n.jsxs("tr",{className:"aud-totrow",children:[n.jsx("td",{style:bd,children:""}),n.jsx("td",{style:bd,children:AT(f,AT(f,"மொத்தம் / Grand Total (","Grand Total"),"Grand Total")+sa.length+AT(f,AT(f," சப்ளையர்)"," suppliers)")," suppliers)")}),n.jsx("td",{style:bd,children:""}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:T.n}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.invVal)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.taxVal)}),n.jsx("td",{style:Object.assign({},bd,{textAlign:"right",fontWeight:700}),children:Q(T.igst+T.cgst+T.sgst)})]},"pstot")]})]},"ptabs"))}
 return out.length?n.jsx("div",{children:out},"psum"):null}
 function audStatus(s){s=String(s||"").toLowerCase();if(/conf|உறுதி|done|yes/.test(s))return"confirmed";if(/next|அடுத்த/.test(s))return"next";return"pending"}
-var AR_GMAIL_SCRIPT="/********************************************************************\n * AR ENTERPRISES ERP — Gmail → Google Sheet Auto-Sync (Apps Script)\n * நிறுவன Gmail மெயில்களை தானாக படித்து \"MailInbox\" tab-ல் எழுதும்.\n *\n * SETUP (ஒரே ஒரு முறை, ~10 நிமிடம்):\n *  1) script.google.com → New project\n *  2) கீழே உள்ள முழு code-ஐயும் paste செய்து Save\n *  3) Function: \"arMailSetup\" தேர்ந்தெடுத்து Run → Authorize (Allow)\n *  4) முடிந்தது! ஒவ்வொரு 10 நிமிடத்திலும் புதிய மெயில்கள் தானே Sheet-ல்.\n *     (~1 நிமிடத்தில் website-ன் Mail page-ல் தெரியும்)\n ********************************************************************/\n\n// ---- CONFIG ----\nvar WORKBOOK_ID = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw'; // நம்ம workbook\nvar TAB_NAME = 'MailInbox';     // மெயில்கள் எழுதப்படும் tab\nvar INITIAL_DAYS = 7;           // முதல் run-ல் எத்தனை நாள் மெயில் வரை எடுக்க\nvar MAX_PER_RUN = 50;           // ஒரு run-ல் அதிகபட்ச மெயில்கள்\nvar SAVE_ATTACHMENTS = true;    // attachment-களை Drive-ல் save செய்யவா?\n\nfunction arMailSync() {\n  var ss = SpreadsheetApp.openById(WORKBOOK_ID);\n  var sh = ss.getSheetByName(TAB_NAME);\n  if (!sh) {\n    sh = ss.insertSheet(TAB_NAME);\n    sh.appendRow(['Date', 'From', 'Subject', 'Category', 'Invoice No', 'Amount', 'Attachment', 'Gmail Link', 'MsgID']);\n    sh.getRange(1, 1, 1, 9).setFontWeight('bold');\n    sh.setFrozenRows(1);\n  }\n  var props = PropertiesService.getScriptProperties();\n  var lastEpoch = Number(props.getProperty('arMailLast') || 0);\n  if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;\n\n  // ஏற்கனவே எழுதிய MsgID-கள் (duplicate தவிர்க்க)\n  var seen = {};\n  var data = sh.getDataRange().getValues();\n  for (var r = 1; r < data.length; r++) seen[String(data[r][8])] = true;\n\n  var threads = GmailApp.search('after:' + Math.floor(lastEpoch), 0, 40);\n  var rows = [], newest = lastEpoch;\n\n  for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {\n    var msgs = threads[t].getMessages();\n    for (var m = 0; m < msgs.length && rows.length < MAX_PER_RUN; m++) {\n      var msg = msgs[m];\n      var id = msg.getId();\n      if (seen[id]) continue;\n      var dt = msg.getDate();\n      var epoch = Math.floor(dt.getTime() / 1000);\n      if (epoch <= lastEpoch) continue;\n      if (epoch > newest) newest = epoch;\n\n      var from = msg.getFrom();\n      var subj = msg.getSubject() || '(no subject)';\n      var body = '';\n      try { body = msg.getPlainBody().slice(0, 4000); } catch (e) { body = ''; }\n\n      var cat = arMailClassify(from, subj, body);\n      var inv = '', amt = '';\n      var mInv = body.match(/(?:invoice|inv|bill)\\s*(?:no\\.?|number|#)?\\s*[:#-]?\\s*([A-Za-z0-9\\/\\-\\.]{4,20})/i);\n      if (mInv) inv = mInv[1];\n      var mAmt = body.match(/(?:rs\\.?|inr|₹)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)/i);\n      if (mAmt) amt = Number(mAmt[1].replace(/,/g, ''));\n\n      var attNames = '', attLinks = '';\n      try {\n        var atts = msg.getAttachments();\n        attNames = atts.map(function (a) { return a.getName(); }).join(', ');\n        if (SAVE_ATTACHMENTS) {\n          atts.forEach(function (a) {\n            try {\n              var fl = DriveApp.createFile(a.copyBlob());\n              fl.setName(arMailToday() + '_' + a.getName());\n              attLinks += (attLinks ? ' | ' : '') + fl.getUrl();\n            } catch (e2) {}\n          });\n        }\n      } catch (e3) {}\n\n      rows.push([dt, from, subj, cat, inv, amt, attLinks || attNames, threads[t].getPermalink(), id]);\n    }\n  }\n\n  if (rows.length) {\n    sh.getRange(sh.getLastRow() + 1, 1, rows.length, 9).setValues(rows);\n    props.setProperty('arMailLast', String(newest));\n  } else {\n    props.setProperty('arMailLast', String(Math.floor(Date.now() / 1000)));\n  }\n  return rows.length + ' mail(s) synced';\n}\n\n// ---- Content-ஐ பொறுத்து வகைப்படுத்துதல் ----\nfunction arMailClassify(from, subj, body) {\n  var s = (subj + ' ' + from + ' ' + body.slice(0, 600));\n  if (/income\\s?tax|incometax|\\bpan\\b|\\btds\\b|26as|traces|efiling|\\bitr[\\s\\-]?\\d|form\\s?16/i.test(s)) return 'Income Tax';\n  if (/gst|gstr|goods\\s?and\\s?services|gstn|e-?way\\s?bill|e-?invoice/i.test(s)) return 'GST';\n  if (/\\bbank\\b|neft|rtgs|\\bimps\\b|\\bupi\\b|credited|debited|\\bemi\\b|loan statement/i.test(s)) return 'Bank';\n  if (/invoice|purchase\\s?order|quotation|delivery\\s?challan|payment\\s?due|proforma/i.test(s)) return 'Vendor';\n  if (/municipality|panchayat|twad|jelc|electricity|\\btneb\\b|property\\s?tax|\\b Court\\b|taluk|registrar/i.test(s)) return 'Government';\n  return 'Other';\n}\n\nfunction arMailToday() {\n  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');\n}\n\n// ---- ஒரே முறை இதை Run செய்யவும் (trigger அமைக்கும்) ----\nfunction arMailSetup() {\n  ScriptApp.getProjectTriggers().forEach(function (t) {\n    if (t.getHandlerFunction() === 'arMailSync') ScriptApp.deleteTrigger(t);\n  });\n  ScriptApp.newTrigger('arMailSync').timeBased().everyMinutes(10).create();\n  var n = arMailSync();\n  Logger.log('Setup OK — trigger ஒவ்வொரு 10 நிமிடத்திலும் run ஆகும். முதல் sync: ' + n);\n}\n";
 function mailParse(d2){var tb=d2&&d2.table;if(!tb||!tb.rows)return null;var types=(tb.cols||[]).map(function(col){return String(col.type||"")});var all=[];tb.rows.forEach(function(rr){if(!rr||!rr.c)return;var vals=rr.c.map(function(cell){if(!cell)return"";if(cell.f!==undefined&&cell.f!==null)return String(cell.f);if(cell.v===null||cell.v===undefined)return"";return String(cell.v)});if(vals.some(function(v2){return v2!==""}))all.push(vals)});if(!all.length)return null;var hIdx=0,best=-1;for(var i2=0;i2<Math.min(all.length,3);i2++){var ne=0;all[i2].forEach(function(v2){if(v2!=="")ne++});if(ne>best){best=ne;hIdx=i2}}var labels=all[hIdx].map(function(v2){return String(v2).replace(/\s+/g," ").trim()});var rows=all.slice(hIdx+1);return rows.length?{labels:labels,rows:rows,types:types}:null}
 function AuditorMailPageFn({user:c}){
   const{t:u,lang:f}=xe(),r=Ue();
   const cfgKey="arAuditorMailCfg";
   const cfg0=(function(){try{return JSON.parse(localStorage.getItem(cfgKey)||"{}")}catch(e2){return{}}})();
   const[cfgId,cfgSetId]=E.useState(cfg0.sheetId||AUD_DEFAULT_SHEET),[showCfg,setShowCfg]=E.useState(!1);
-  const[view,setView]=E.useState("inbox"),[loading2,setLoading2]=E.useState(!0),[err2,setErr2]=E.useState(""),[tdata,setTdata]=E.useState(null);
+  const[loading2,setLoading2]=E.useState(!0),[err2,setErr2]=E.useState(""),[tdata,setTdata]=E.useState(null);
   const[srch,setSrch]=E.useState(""),[catF,setCatF]=E.useState("all"),[stF,setStF]=E.useState("all"),[dFrom,setDFrom]=E.useState(""),[dTo,setDTo]=E.useState("");
-  const[isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("landscape"),[showGuide,setShowGuide]=E.useState(!1);
-  function load(vw){
-    const t2=vw==="inbox"?"MailInbox":"Mail";
+  const[isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("landscape");
+  function load(){
     const id2=extractSheetId(cfgId);
     if(!id2){setErr2(AT(f,"Google Sheet URL / ID இல்லை","Google Sheet URL / ID missing"));setLoading2(!1);return}
     setLoading2(!0);setErr2("");
-    gvizFetch(id2,t2,function(e2,d2){
+    gvizFetch(id2,"MailInbox",function(e2,d2){
       setLoading2(!1);
       const parsed=e2?null:mailParse(d2);
-      if(!parsed){
-        if(t2==="MailInbox"){
-          setShowGuide(!0);
-          gvizFetch(id2,"Mail",function(e3,d3){
-            const p3=e3?null:mailParse(d3);
-            if(!p3){setErr2(AT(f,"Mail tab-லும் தரவு இல்லை — Google Sheet இணைப்பை சரிபார்க்கவும்","Mail tab has no data either — check the Google Sheet link"));setTdata(null);return}
-            setTdata(p3);r(!0,AT(f,"பதிவேடு ஏற்றப்பட்டது","Register loaded")+" — "+p3.rows.length);
-          });
-          return;
-        }
-        setErr2(e2?String(e2):("'"+t2+"' "+AT(f,"tab-ல் தரவு இல்லை","tab has no data")));setTdata(null);return;
-      }
+      if(!parsed){setErr2(e2?String(e2):("MailInbox "+AT(f,"tab-ல் தரவு இல்லை — சற்று நேரம் கழித்து 🔄 அழுத்தவும்","tab has no data yet — press 🔄 in a little while")));setTdata(null);return}
       setTdata(parsed);
-      if(t2==="MailInbox")setShowGuide(!1);
-      r(!0,AT(f,"ஏற்றப்பட்டது — ","Loaded — ")+parsed.rows.length+AT(f," வரிசைகள்"," rows"));
+      r(!0,AT(f,"ஏற்றப்பட்டது — ","Loaded — ")+parsed.rows.length+AT(f," மெயில்கள்"," mails"));
     });
   }
-  E.useEffect(function(){load("inbox")},[]);
+  E.useEffect(function(){load()},[]);
   const L2=tdata?tdata.labels:[],R2=tdata?tdata.rows:[],TY=tdata?(tdata.types||[]):[];
   E.useEffect(function(){
-    window.__arShareLines=[AT(f,"மெயில் மேசை / Mail Desk","Mail Desk"),(view==="inbox"?AT(f,"Gmail Inbox (தானியங்கி)","Gmail Inbox (auto)"):AT(f,"பதிவேடு (Manual)","Register (Manual)"))+" | "+AT(f,"வரிசைகள்: ","Rows: ")+R2.length];
-  },[tdata,f,view,R2.length]);
+    window.__arShareLines=[AT(f,"மெயில் மேசை / Mail Desk — Gmail Inbox","Mail Desk — Gmail Inbox"),AT(f,"மெயில்கள்: ","Mails: ")+R2.length+(D.cat>=0?" | "+topCats.slice(0,3).map(function(k2){return k2+": "+catCounts[k2]}).join(", "):"")];
+  },[tdata,f,R2.length]);
   const D=E.useMemo(function(){
     const out={date:-1,from:-1,subj:-1,cat:-1,stat:-1,link:-1};
     if(!tdata)return out;
@@ -225,31 +211,19 @@ function AuditorMailPageFn({user:c}){
     const csv="\uFEFF"+[head.map(esc).join(",")].concat(body).concat([tot.map(esc).join(",")]).join("\r\n");
     const a2=document.createElement("a");
     a2.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-    a2.download="AR-Mail-"+tabName+"-"+new Date().toISOString().slice(0,10)+".csv";a2.click();
+    a2.download="AR-Gmail-Inbox-"+new Date().toISOString().slice(0,10)+".csv";a2.click();
     r(!0,AT(f,"Excel CSV ஏற்றுமதி (","Excel CSV Export (")+visible.length+AT(f," வரிசைகள்)"," rows)"));
   }
-  const tabName=view==="inbox"?"MailInbox":"Mail";
   const printCols=viewCols.slice(0,7);
+  const printCss="@media print {\n@page { size: A4 "+(orientation==="landscape"?"landscape":"portrait")+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }\n.app-sidebar, .app-topbar, .app-bell, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}";
   return n.jsxs("div",{className:"reports-centre",children:[
     n.jsxs("div",{className:"no-print",children:[
       n.jsx(st,{title:AT(f,"ஆடிட்டர் — மெயில் மேசை","Auditor — Mail Desk"),sub:AT(f,"Gmail மெயில்கள் தானாக ஏற்றம் — வகைப்பாடு, வடிகட்டி, மொத்தம், A4 அச்சு","Gmail mails auto-loaded — categories, filters, totals & A4 print")}),
-      n.jsxs("div",{style:{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"},children:[
-        n.jsx(L,{kind:view==="inbox"?"primary":"ghost",onClick:function(){setView("inbox");load("inbox")},children:"📥 "+AT(f,"Gmail Inbox (தானியங்கி)","Gmail Inbox (auto)")}),
-        n.jsx(L,{kind:view==="register"?"primary":"ghost",onClick:function(){setView("register");load("register")},children:"📝 "+AT(f,"பதிவேடு (Manual)","Register (Manual)")}),
-        n.jsx(L,{kind:"soft",onClick:function(){setShowGuide(!showGuide)},children:"📧 Gmail Setup"})
-      ]}),
       n.jsxs("div",{className:"ui-stats",style:{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",marginBottom:12},children:[
-        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"மொத்த மெயில்கள்","Total mails")}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsx("div",{className:"ui-stat-sub",children:tabName})]}),
+        n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"மொத்த மெயில்கள்","Total mails")}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsx("div",{className:"ui-stat-sub",children:"Gmail Inbox"})]}),
         n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"வடிகட்டியவை","Filtered")}),n.jsx("div",{className:"ui-stat-value",children:visible.length}),n.jsx("div",{className:"ui-stat-sub",children:R2.length+" total"})]}),
         topCats.map(function(k2,ki){return n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:k2}),n.jsx("div",{className:"ui-stat-value",style:{color:"#1f3864"},children:catCounts[k2]}),n.jsx("div",{className:"ui-stat-sub",children:AT(f,"வகை","category")})]},"cat"+ki)})
       ]}),
-      showGuide&&n.jsx(oe,{title:"📧 "+AT(f,"Gmail தானியங்கி இணைப்பு — ஒரே முறை Setup","Gmail auto-sync — one-time setup"),sub:AT(f,"கீழே உள்ள script-ஐ உங்கள் நிறுவன Gmail-ல் ஒரு முறை இணைத்தால் புதிய மெயில்கள் தானாக இங்கே வரும்","Connect the script below once in your company Gmail — new mails will arrive here automatically"),style:{marginBottom:12},children:n.jsxs("div",{children:[n.jsxs("ol",{style:{margin:"6px 0 10px 18px",fontSize:13,lineHeight:1.7},children:[
-          n.jsx("li",{children:AT(f,"script.google.com → புதிய project (New project)","script.google.com → New project")}),
-          n.jsx("li",{children:AT(f,"கீழே உள்ள script-ஐ முழுவதும் நகலெடுத்து paste செய்து Save அழுத்தவும்","Copy the whole script below, paste it and press Save")}),
-          n.jsxs("li",{children:[AT(f,"மேலே உள்ள function list-ல் ","In the function list, select "),n.jsx("b",{children:"arMailSetup"}),AT(f," தேர்ந்தெடுத்து Run → Authorize/Allow அழுத்தவும்"," and press Run → Authorize/Allow")]}),
-          n.jsx("li",{children:AT(f,"முடிந்தது! 10 நிமிடத்திற்கு ஒரு முறை புதிய மெயில்கள் MailInbox tab-ல் தானே வரும் — இந்த page-ல் 🔄 அழுத்திப் பாருங்கள்","Done! Every 10 minutes new mails land in the MailInbox tab — press 🔄 here to refresh")}),
-          n.jsx("li",{children:n.jsx(L,{kind:"primary",onClick:function(){try{navigator.clipboard.writeText(AR_GMAIL_SCRIPT).then(function(){r(!0,AT(f,"Apps Script நகலெடுக்கப்பட்டது — script.google.com-ல் paste செய்யவும்","Apps Script copied — paste it on script.google.com"))},function(){r(!1,AT(f,"நகலெடுக்க முடியவில்லை — கீழே உள்ள box-லிருந்து கையேடாக நகலெடுக்கவும்","Copy failed — copy manually from the box below"))})}catch(e2){r(!1,"copy error")}},children:"📋 "+AT(f,"Script நகலெடு","Copy Script")})})
-        ]}),n.jsx("textarea",{readOnly:!0,value:AR_GMAIL_SCRIPT,style:{width:"100%",minHeight:180,fontFamily:"monospace",fontSize:11,borderRadius:8,border:"1px solid #ccc",padding:8},onFocus:function(e2){e2.target.select()}})]})}),
       n.jsxs(oe,{style:{marginBottom:12},children:[
         n.jsxs("div",{style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"},children:[
           n.jsx("input",{className:"ui-input",style:{width:190},placeholder:AT(f,"தேடு (அனுப்புநர்/தலைப்பு)…","Search (sender/subject)…"),value:srch,onChange:function(e2){setSrch(e2.target.value)}}),
@@ -267,13 +241,13 @@ function AuditorMailPageFn({user:c}){
             n.jsx("input",{type:"date",className:"ui-input",style:{width:140},value:dTo,onChange:function(e2){setDTo(e2.target.value)}})
           ]}),
           n.jsx(L,{kind:"ghost",small:!0,onClick:clearFilters,children:"✕ "+AT(f,"அழி","Clear")}),
-          n.jsx(L,{kind:"soft",small:!0,onClick:function(){load(view)},children:"🔄 "+AT(f,"புதுப்பி","Refresh")}),
+          n.jsx(L,{kind:"soft",small:!0,onClick:function(){load()},children:"🔄 "+AT(f,"புதுப்பி","Refresh")}),
           n.jsx(L,{kind:"soft",small:!0,onClick:dlCsv,children:"Excel CSV"}),
           n.jsx(L,{kind:orientation==="landscape"?"primary":"soft",small:!0,onClick:function(){setOrientation(orientation==="landscape"?"portrait":"landscape")},children:orientation==="landscape"?AT(f,"A4 கிடைமட்டம்","A4 Landscape"):AT(f,"A4 செங்குத்து","A4 Portrait")}),
           n.jsx(L,{kind:"primary",small:!0,onClick:function(){setIsPrint(!0)},children:"🖨️ "+AT(f,"A4 அச்சு","A4 Print")})
         ]})
       ]}),
-      n.jsx(oe,{title:view==="inbox"?AT(f,"Gmail Inbox (தானியங்கி வரவு)","Gmail Inbox (auto)"):AT(f,"மெயில் பதிவேடு (Manual)","Mail Register (Manual)"),sub:visible.length+" / "+R2.length+AT(f," வரிசைகள்"," rows"),children:
+      n.jsx(oe,{title:"📥 "+AT(f,"Gmail Inbox (தானியங்கி வரவு)","Gmail Inbox (auto)"),sub:visible.length+" / "+R2.length+AT(f," மெயில்கள்"," mails"),children:
         loading2?n.jsx(Ze,{label:AT(f,"Google Sheet ஏற்றப்படுகிறது…","Loading Google Sheet…")}):
         !tdata?n.jsx(Yl,{children:err2||AT(f,"தரவு இல்லை","No data")}):
         !visible.length?n.jsx(Yl,{children:AT(f,"இந்த வடிகட்டலுக்கு வரிசைகள் இல்லை.","No rows for this filter.")}):
@@ -311,7 +285,7 @@ function AuditorMailPageFn({user:c}){
           n.jsx("p",{style:{margin:"0 0 4px 0",fontSize:9.5},children:"DOOR NO 2/150 CHITTANGADU, THIRUNALUR POST, ARANTHANGI TALUK, PUDUKKOTTAI DISTRICT - 614624"}),
           n.jsxs("div",{style:{marginTop:6,paddingTop:5,borderTop:"1px dashed #666",display:"flex",justifyContent:"space-between",fontSize:9.5},children:[
             n.jsx("b",{children:AT(f,"மெயில் அறிக்கை / Mail Desk Report","Mail Desk Report")}),
-            n.jsx("span",{children:tabName}),
+            n.jsx("span",{children:"Gmail Inbox"}),
             n.jsx("span",{children:AT(f,"தேதி: ","Date: ")+new Date().toLocaleDateString("en-IN")}),
             n.jsx("span",{children:AT(f,"பயனர்: ","User: ")+c.name+" ("+c.role+")"}),
             n.jsx("span",{children:orientation==="landscape"?"A4 Landscape":"A4 Portrait"})
@@ -334,7 +308,8 @@ function AuditorMailPageFn({user:c}){
           ]})
         ]})
       ]})
-    ]})
+    ]}),
+    n.jsx("style",{children:printCss})
   ]});
 }
 

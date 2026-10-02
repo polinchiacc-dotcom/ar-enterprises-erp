@@ -1,6 +1,12 @@
 /********************************************************************
  * AR ENTERPRISES ERP — Gmail → Sheet Sync + Bank Statement v3
  *
+ * v4 புதியவை:
+ *   • arStmtParseMails() — CUB statement PDF mails → PDF→Doc convert →
+ *     transaction lines parse → "Polinchi BS 1712" tab-ல் append
+ *     (duplicate தவிர்ப்பு; StmtLog/StmtRaw tab-ல் அறிக்கை)
+ *   • arStmtRenumber() — S.No மீட்டமைப்பு
+ *   முன்நிபந்தனை: Editor → Services (+) → Drive API → Add
  * v3 புதியவை:
  *  1) City Union Bank mails சரியாக "Bank" வகைப்படும் (classifier fix)
  *  2) arMailReclassify() — ஏற்கனவே உள்ள எல்லா mails-ஐயும் மீண்டும்
@@ -234,4 +240,123 @@ function arMailSetup() {
   });
   ScriptApp.newTrigger('arMailSync').timeBased().everyMinutes(10).create();
   Logger.log('Setup OK — trigger 10 நிமிடம் ஒன்றுக்கு run ஆகும்.');
+}
+
+// ==================================================================
+// v4 — பேங்க் ஸ்டேட்மெண்ட் PDF mails-ஐ தானாக parse செய்து BS tab-ல் சேர்த்தல்
+// முன்நிபந்தனை: Editor → Services (+) → Drive API (v2) → Add
+// ==================================================================
+function arStmtParseMails() {
+  var props = PropertiesService.getScriptProperties();
+  var processed = {};
+  var pr = props.getProperty('arStmtProcessed') || '';
+  if (pr) pr.split(',').forEach(function (x) { processed[x] = 1; });
+
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = ss.getSheetByName(STMT_TAB);
+  if (!sh) return 'Tab missing: ' + STMT_TAB;
+  var log = ss.getSheetByName('StmtLog');
+  if (!log) { log = ss.insertSheet('StmtLog'); log.appendRow(['Time', 'MailID', 'Status', 'Detail']); }
+  var raw = ss.getSheetByName('StmtRaw');
+  if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
+
+  var threads = GmailApp.search('from:cityunionbank.in (statement OR statementofaccount OR "statement of account")', 0, 50);
+  var added = 0, skipped = 0, failed = 0;
+
+  for (var t = 0; t < threads.length; t++) {
+    var msgs = threads[t].getMessages();
+    for (var m = 0; m < msgs.length; m++) {
+      var msg = msgs[m], mid = msg.getId();
+      if (processed[mid]) { skipped++; continue; }
+      var pdf = null, pdfName = '';
+      try {
+        var atts = msg.getAttachments();
+        for (var a = 0; a < atts.length; a++) {
+          if (/\.pdf$/i.test(atts[a].getName())) { pdf = atts[a]; pdfName = atts[a].getName(); break; }
+        }
+      } catch (e) {}
+      if (!pdf) {
+        processed[mid] = 1;
+        log.appendRow([new Date(), mid, 'SKIP', 'no pdf: ' + msg.getSubject()]);
+        continue;
+      }
+      try {
+        var blob = pdf.copyBlob();
+        var docFile = Drive.Files.insert({
+          title: 'STMT_' + mid,
+          mimeType: 'application/vnd.google-apps.document'
+        }, blob, { convert: true });
+        var text = DocumentApp.openById(docFile.id).getBody().getText();
+        var res = arStmtParseText_(text);
+        if (res.rows.length) {
+          sh.getRange(sh.getLastRow() + 1, 1, res.rows.length, res.rows[0].length).setValues(res.rows);
+          added += res.rows.length;
+          log.appendRow([new Date(), mid, 'OK', res.rows.length + ' rows | ' + pdfName + ' | unparsed:' + res.unparsed]);
+        } else {
+          failed++;
+          log.appendRow([new Date(), mid, 'NOPARSE', '0 rows | ' + pdfName + ' — StmtRaw-ல் text பார்க்கவும்']);
+          raw.appendRow([mid, pdfName, text.slice(0, 5000)]);
+        }
+        processed[mid] = 1;
+        try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      } catch (err) {
+        failed++;
+        log.appendRow([new Date(), mid, 'ERROR', String(err).slice(0, 200)]);
+        if (/Drive is not defined|Cannot read|Files/.test(String(err))) {
+          log.appendRow([new Date(), mid, 'HINT', 'Editor → Services (+) → Drive API v2 Add செய்யவும்']);
+        }
+      }
+    }
+  }
+  props.setProperty('arStmtProcessed', Object.keys(processed).join(','));
+  var msg2 = added + ' rows added, ' + skipped + ' skipped, ' + failed + ' failed — விவரம் StmtLog tab';
+  Logger.log(msg2);
+  return msg2;
+}
+
+// PDF text → transaction rows (BS 1712 layout: A SNo | B Date | C Desc | F Amount | H Balance)
+function arStmtParseText_(text) {
+  var rows = [], unparsed = 0;
+  var lines = String(text || '').split(/[\r\n]+/);
+  for (var i = 0; i < lines.length; i++) {
+    var L = lines[i].replace(/\s+/g, ' ').trim();
+    var m = L.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s+(.+)$/);
+    if (!m) continue;
+    var dd = m[1], mo = m[2], yy = m[3];
+    if (String(yy).length === 2) yy = '20' + yy;
+    var rest = m[4];
+    var nums = [], re2 = /((?:\d{1,3}(?:,\d{2,3})*|\d+)(?:\.\d{1,2})?)(?:\s*(?:Cr|Dr|CR|DR))?/g, mm;
+    while ((mm = re2.exec(rest)) !== null) {
+      if (mm[1].length <= 2 && nums.length === 0) continue;
+      nums.push({ v: mm[1], idx: mm.index });
+    }
+    if (!nums.length) continue;
+    var desc = rest.slice(0, nums[0].idx).replace(/[\|\-·]+\s*$/, '').trim();
+    if (!desc || desc.length < 2) { desc = rest.replace(/[\d,.\s CrDr]+$/, '').trim(); }
+    var amtRaw = nums[nums.length - 1].v.replace(/,/g, '');
+    var balRaw = nums.length >= 2 ? nums[nums.length - 2].v.replace(/,/g, '') : '';
+    var amt = parseFloat(amtRaw), bal = balRaw !== '' ? parseFloat(balRaw) : '';
+    if (isNaN(amt)) { unparsed++; continue; }
+    var dt = new Date(Number(yy), Number(mo) - 1, Number(dd));
+    rows.push([null, dt, desc, '', '', amt, '', bal === '' ? '' : String(bal)]);
+  }
+  return { rows: rows, unparsed: unparsed };
+}
+
+// ஒரே முறை: S.No ஐ மீட்டமை (A column empty rows-க்கு எண் இடும்)
+function arStmtRenumber() {
+  var sh = SpreadsheetApp.openById(WORKBOOK_ID).getSheetByName(STMT_TAB);
+  if (!sh) return 'Tab missing';
+  var data = sh.getDataRange().getValues();
+  var lastHeader = 0;
+  for (var r = 0; r < Math.min(data.length, 10); r++) {
+    if (String(data[r][2]).indexOf('Description') >= 0) lastHeader = r;
+  }
+  var n = 0;
+  for (var r2 = lastHeader + 1; r2 < data.length; r2++) {
+    n++;
+    if (data[r2][0] === '' || data[r2][0] === null) sh.getRange(r2 + 1, 1).setValue(n);
+  }
+  Logger.log('Renumbered ' + n + ' rows');
+  return n + ' rows numbered';
 }

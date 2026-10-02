@@ -80,7 +80,7 @@ function gvizFetch(id,tab,cb){
   function clean(){try{delete window[fn]}catch(e2){window[fn]=void 0}var s2=document.getElementById(fn);if(s2&&s2.parentNode)s2.parentNode.removeChild(s2)}
   var sc=document.createElement("script");sc.id=fn;
   sc.onerror=function(){clean();cb("Sheet-ஐ படிக்க முடியவில்லை — Share → Anyone with link → Viewer ஆக மாற்றவும்")};
-  sc.src="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json;responseHandler:"+fn+"&sheet="+encodeURIComponent(tab||"Sheet1")+"&headers=0&cb="+Date.now();
+  var _src="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json;responseHandler:"+fn;_src+=/^gid:/.test(tab||"")?"&gid="+String(tab).slice(4):"&sheet="+encodeURIComponent(tab||"Sheet1");sc.src=_src+"&headers=0&cb="+Date.now();
   document.head.appendChild(sc);
   setTimeout(function(){if(window[fn]){clean();cb("நேரம் முடிந்தது (timeout) — Sheet ID / tab பெயரை சரிபார்க்கவும்")}},15000);
 }
@@ -333,7 +333,8 @@ function AuditorStmtPageFn({user:c}){
   const{t:u,lang:f}=xe(),r=Ue();
   const cfgKey="arAuditorStmtCfg";
   const cfg0=(function(){try{return JSON.parse(localStorage.getItem(cfgKey)||"{}")}catch(e2){return{}}})();
-  const[cfgId,cfgSetId]=E.useState(cfg0.sheetId||AUD_DEFAULT_SHEET),[cfgTab,cfgSetTab]=E.useState(cfg0.tab||"Polinchi BS 1712");
+  const[cfgId,cfgSetId]=E.useState(cfg0.sheetId||AUD_DEFAULT_SHEET),[cfgTab,cfgSetTab]=E.useState(cfg0.tab||"gid:2024650928");
+  const tabName=cfgTab.indexOf("gid:")===0?(cfg0.tabName||"Polinchi BS 1712"):cfgTab;
   const[loading2,setLoading2]=E.useState(!0),[err2,setErr2]=E.useState(""),[tdata,setTdata]=E.useState(null);
   const[srch,setSrch]=E.useState(""),[dFrom,setDFrom]=E.useState(""),[dTo,setDTo]=E.useState(""),[txF,setTxF]=E.useState("all");
   const[isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("landscape");
@@ -349,6 +350,7 @@ function AuditorStmtPageFn({user:c}){
       const parsed=e2?null:stmtParse(d2);
       if(!parsed){setErr2(e2?String(e2):("'"+cfgTab+"' "+AT(f,"tab-ல் தரவு இல்லை","tab has no data")));setTdata(null);return}
       setTdata(parsed);
+      const _lb=parsed.labels.join("|").toUpperCase();if(_lb.indexOf("BALANCE")<0&&_lb.indexOf("DESCRIPTION")<0)r(!1,AT(f,"⚠️ தவறான tab fallback ஆகியிருக்கலாம் — gid முறையில் திறக்கவும்","⚠️ Wrong-tab fallback may have occurred — open via gid"));
       r(!0,AT(f,"ஏற்றப்பட்டது — ","Loaded — ")+parsed.rows.length+AT(f," பரிவர்த்தனைகள்"," transactions"));
     });
   }
@@ -414,7 +416,7 @@ function AuditorStmtPageFn({user:c}){
     return t2;
   },[visible,R2,D]);
   E.useEffect(function(){
-    window.__arShareLines=[AT(f,"பேங்க் ஸ்டேட்மெண்ட்","Bank Statement")+" — "+cfgTab,AT(f,"பரிவர்த்தனைகள்: ","Transactions: ")+R2.length+(D.credit>=0?" | "+AT(f,"வரவு: ","Credits: ")+Q(totals.credit):"")+(D.debit>=0?" | "+AT(f,"செலவு: ","Debits: ")+Q(totals.debit):"")];
+    window.__arShareLines=[AT(f,"பேங்க் ஸ்டேட்மெண்ட்","Bank Statement")+" — "+tabName,AT(f,"பரிவர்த்தனைகள்: ","Transactions: ")+R2.length+(D.credit>=0?" | "+AT(f,"வரவு: ","Credits: ")+Q(totals.credit):"")+(D.debit>=0?" | "+AT(f,"செலவு: ","Debits: ")+Q(totals.debit):"")];
   },[tdata,f,R2.length,totals,cfgTab]);
   function clearFilters(){setSrch("");setDFrom("");setDTo("");setTxF("all")}
   function dlCsv(){
@@ -436,7 +438,7 @@ function AuditorStmtPageFn({user:c}){
     if(!wsUrl||!wsTk){setShowConn(!0);r(!1,AT(f,"முதலில் 🔗 Connect-ல் Web App URL + Token சேர்க்கவும்","First add Web App URL + Token in 🔗 Connect"));return}
     const sheetRow=(tdata.headerIdx>=0?tdata.headerIdx:0)+2+i2;
     r(!0,"…");
-    fetch(wsUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:wsTk,tab:cfgTab,row:sheetRow,col:"J",value:v2})}).then(function(x2){return x2.json()}).then(function(j2){
+    fetch(wsUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:wsTk,tab:tabName,row:sheetRow,col:"J",value:v2})}).then(function(x2){return x2.json()}).then(function(j2){
       if(j2&&j2.ok){setDescDet(Object.assign({},descDet,{}));const nx=Object.assign({},descDet);nx[i2]=v2;setDescDet(nx);r(!0,AT(f,"சேமிக்கப்பட்டது (Sheet row ","Saved (Sheet row ")+sheetRow+")")}
       else r(!1,AT(f,"சேமிக்க முடியவில்லை: ","Save failed: ")+((j2&&j2.error)||"?"));
     }).catch(function(e3){r(!1,AT(f,"இணைப்பு பிழை — URL/Token சரிபார்க்கவும்","Connection error — check URL/Token"))});
@@ -445,19 +447,19 @@ function AuditorStmtPageFn({user:c}){
   const printCss="@media print {\n@page { size: A4 "+(orientation==="landscape"?"landscape":"portrait")+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }\n.app-sidebar, .app-topbar, .app-bell, .ui-btn, .ai-fab, .no-print { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}";
   return n.jsxs("div",{className:"reports-centre",children:[
     !isPrint&&n.jsxs("div",{className:"no-print",children:[
-      n.jsx(st,{title:AT(f,"ஆடிட்டர் — பேங்க் ஸ்டேட்மெண்ட்","Auditor — Bank Statement"),sub:cfgTab+" — "+AT(f,"தானியங்கி ஏற்றம் · Description Details edit → Google Sheet-ல் சேமிப்பு","auto-loaded · Description Details edits save back to Google Sheet")}),
+      n.jsx(st,{title:AT(f,"ஆடிட்டர் — பேங்க் ஸ்டேட்மெண்ட்","Auditor — Bank Statement"),sub:tabName+" — "+AT(f,"தானியங்கி ஏற்றம் · Description Details edit → Google Sheet-ல் சேமிப்பு","auto-loaded · Description Details edits save back to Google Sheet")}),
       n.jsxs("div",{className:"ui-stats",style:{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",marginBottom:12},children:[
         n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"பரிவர்த்தனைகள்","Transactions")}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsx("div",{className:"ui-stat-sub",children:AT(f,"வடிகட்டியது: ","Filtered: ")+visible.length})]}),
         D.credit>=0&&n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"மொத்த வரவு","Total credits")}),n.jsx("div",{className:"ui-stat-value",style:{color:"#059669"},children:Q(totals.credit)}),n.jsx("div",{className:"ui-stat-sub",children:AT(f,"வடிகட்டியது: ","Filtered: ")+Q(visible.reduce(function(a2,o2){return a2+audNum(o2.vals[D.credit])},0))})]}),
         D.debit>=0&&n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"மொத்த செலவு","Total debits")}),n.jsx("div",{className:"ui-stat-value",style:{color:"#dc2626"},children:Q(totals.debit)}),n.jsx("div",{className:"ui-stat-sub",children:"—"})]}),
         D.bal>=0&&n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"இறுதி இருப்பு","Closing balance")}),n.jsx("div",{className:"ui-stat-value",children:String(totals.lastBal||"—")}),n.jsx("div",{className:"ui-stat-sub",children:"Running Balance"})]})
       ]}),
-      showConn&&n.jsx(oe,{title:"🔗 "+AT(f,"Sheet write-back இணைப்பு (ஒரே முறை)","Sheet write-back connection (one-time)"),sub:AT(f,"Apps Script Web App /exec URL + Token சேர்த்தால் Description Details edit Google Sheet-ல் சேமிக்கும்","Add the Apps Script Web App /exec URL + Token so Description Details edits save to Google Sheet"),style:{marginBottom:12},children:
+      showConn&&n.jsx(oe,{title:"🔗 "+AT(f,"Sheet write-back இணைப்பு (ஒரே முறை)","Sheet write-back connection (one-time)"),sub:AT(f,"Web App /exec URL (script.google.com/macros/…) + ARST- Token — Sheet URL அல்ல!","Web App /exec URL (script.google.com/macros/…) + ARST- Token — NOT the Sheet URL!"),style:{marginBottom:12},children:
         n.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[
           n.jsx("input",{className:"ui-input",placeholder:"https://script.google.com/macros/s/…/exec",value:wsUrl,onChange:function(e2){setWsUrl(e2.target.value)}}),
           n.jsx("input",{className:"ui-input",placeholder:"ARST-xxxxxxxxxxxxxxxx (arStmtToken)",value:wsTk,onChange:function(e2){setWsTk(e2.target.value)}}),
           n.jsxs("div",{style:{display:"flex",gap:8},children:[
-            n.jsx(L,{kind:"primary",small:!0,onClick:function(){saveCfg({sheetId:cfgId,tab:cfgTab,wsUrl:wsUrl,wsTk:wsTk});setShowConn(!1);r(!0,AT(f,"இணைப்பு சேமிக்கப்பட்டது","Connection saved"))},children:"💾 "+AT(f,"சேமி","Save")}),
+            n.jsx(L,{kind:"primary",small:!0,onClick:function(){if(wsUrl&&wsUrl.indexOf("script.google.com/macros")<0){r(!1,AT(f,"❌ இது Sheet URL — Web App /exec URL (script.google.com/macros/…) வேண்டும்","❌ That is a Sheet URL — need the Web App /exec URL (script.google.com/macros/…)"));return}if(wsTk&&wsTk.indexOf("ARST-")!==0){r(!1,AT(f,"❌ Token என்பது arStmtToken log வரும் ARST-… வடிவம்","❌ Token must look like ARST-… from the arStmtToken log"));return}saveCfg({sheetId:cfgId,tab:cfgTab,tabName:tabName,wsUrl:wsUrl,wsTk:wsTk});setShowConn(!1);r(!0,AT(f,"இணைப்பு சேமிக்கப்பட்டது","Connection saved"))},children:"💾 "+AT(f,"சேமி","Save")}),
             n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowConn(!1)},children:"✕ "+AT(f,"மூடு","Close")})
           ]}),
           n.jsxs("ol",{style:{margin:0,paddingLeft:18,fontSize:12,lineHeight:1.6},children:[
@@ -489,7 +491,7 @@ function AuditorStmtPageFn({user:c}){
           n.jsx(L,{kind:"primary",small:!0,onClick:function(){setIsPrint(!0)},children:"🖨️ "+AT(f,"A4 அச்சு","A4 Print")})
         ]})
       ]}),
-      n.jsx(oe,{title:"🏦 "+AT(f,"பேங்க் ஸ்டேட்மெண்ட்","Bank Statement")+" — "+cfgTab,sub:visible.length+" / "+R2.length+AT(f," பரிவர்த்தனைகள் | ✏️ Description Details edit → Google Sheet-ல் சேமிக்கப்படும்"," transactions | ✏️ Description Details edits save to Google Sheet"),children:
+      n.jsx(oe,{title:"🏦 "+AT(f,"பேங்க் ஸ்டேட்மெண்ட்","Bank Statement")+" — "+tabName,sub:visible.length+" / "+R2.length+AT(f," பரிவர்த்தனைகள் | ✏️ Description Details edit → Google Sheet-ல் சேமிக்கப்படும்"," transactions | ✏️ Description Details edits save to Google Sheet"),children:
         loading2?n.jsx(Ze,{label:AT(f,"Google Sheet ஏற்றப்படுகிறது…","Loading Google Sheet…")}):
         !tdata?n.jsx(Yl,{children:err2||AT(f,"தரவு இல்லை","No data")}):
         !visible.length?n.jsx(Yl,{children:AT(f,"இந்த வடிகட்டலுக்கு வரிசைகள் இல்லை.","No rows for this filter.")}):
@@ -539,7 +541,7 @@ function AuditorStmtPageFn({user:c}){
           n.jsx("p",{style:{margin:"0 0 4px 0",fontSize:9.5},children:"DOOR NO 2/150 CHITTANGADU, THIRUNALUR POST, ARANTHANGI TALUK, PUDUKKOTTAI DISTRICT - 614624"}),
           n.jsxs("div",{style:{marginTop:6,paddingTop:5,borderTop:"1px dashed #666",display:"flex",justifyContent:"space-between",fontSize:9.5},children:[
             n.jsx("b",{children:AT(f,"பேங்க் ஸ்டேட்மெண்ட் அறிக்கை / Bank Statement Report","Bank Statement Report")}),
-            n.jsx("span",{children:cfgTab}),
+            n.jsx("span",{children:tabName}),
             n.jsx("span",{children:AT(f,"தேதி: ","Date: ")+new Date().toLocaleDateString("en-IN")}),
             n.jsx("span",{children:AT(f,"பயனர்: ","User: ")+c.name+" ("+c.role+")"}),
             n.jsx("span",{children:orientation==="landscape"?"A4 Landscape":"A4 Portrait"})

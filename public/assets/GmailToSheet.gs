@@ -1,20 +1,31 @@
 /********************************************************************
- * AR ENTERPRISES ERP — Gmail → Google Sheet Auto-Sync v2 (Apps Script)
+ * AR ENTERPRISES ERP — Gmail → Sheet Sync + Bank Statement v3
  *
- * v2 மாற்றங்கள்:
- *   • arMailBackfillAll() — பழைய மெயில்கள் முழுவதும் (ஒரு வருடம்/அதற்கு மேல்)
- *     ஒரே முறை இழுத்து MailInbox-ல் எழுதும் (பல முறை run செய்தால் தொடரும்)
- *   • தினமும் வரும் sync-க்கு இயல்பாகவே 366 நாள் பின்னோக்கி பார்க்கும்
- *   • முந்தைய v1-ஐ முழுவதும் நீக்கி இதை paste செய்து, Save செய்துவிட்டு,
- *     function list-ல் "arMailBackfillAll" தேர்ந்தெடுத்து Run அழுத்தவும்.
+ * v3 புதியவை:
+ *  1) City Union Bank mails சரியாக "Bank" வகைப்படும் (classifier fix)
+ *  2) arMailReclassify() — ஏற்கனவே உள்ள எல்லா mails-ஐயும் மீண்டும்
+ *     வகைப்படுத்தும் (ஒரு முறை run செய்யவும்)
+ *  3) arStmtDumpSample() — bank statement mails-ன் உள்ளடக்கத்தை
+ *     "MailRaw" tab-ல் எழுதும் (auto-parser வடிவமைக்க உதவும்)
+ *  4) arStmtToken() — website-ல் இருந்து Description Details edit-ஐ
+ *     Sheet-ல் எழுத write-back-க்கு token உருவாக்கும்
+ *  5) doPost() — website "Bank Statement" page edit → Sheet write
+ *
+ * வரிசை: பழையதை முழுவதும் நீக்கி இதை paste → Save →
+ *   Run arMailSetup (ஒரே முறை) → Run arMailReclassify →
+ *   Run arStmtToken (token-ஐ log-ல் copy செய்யவும்) →
+ *   Run arStmtDumpSample (statement mail format ஆராய) →
+ *   Deploy → New deployment → Web app (Execute as: Me, Access: Anyone)
+ *   → /exec URL-ஐ website Bank Statement page-ன் 🔗 Connect-ல் paste.
  ********************************************************************/
 
 // ---- CONFIG ----
 var WORKBOOK_ID = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
 var TAB_NAME = 'MailInbox';
-var INITIAL_DAYS = 366;         // முதல் sync: கடந்த 1 வருடம்
-var MAX_PER_RUN = 200;          // trigger sync-ல் ஒரு run-ல் அதிகபட்சம்
-var SAVE_ATTACHMENTS = true;    // attachment Drive-ல் save (trigger sync மட்டும்)
+var STMT_TAB = 'Polinchi BS 1712';
+var INITIAL_DAYS = 366;
+var MAX_PER_RUN = 200;
+var SAVE_ATTACHMENTS = true;
 
 function arMailSheet_() {
   var ss = SpreadsheetApp.openById(WORKBOOK_ID);
@@ -63,14 +74,12 @@ function arMailRow_(msg, thread, saveAtts) {
   return [dt, from, subj, cat, inv, amt, attLinks || attNames, thread.getPermalink(), msg.getId()];
 }
 
-// ---- தினசரி trigger sync (ஒவ்வொரு 10 நிமிடமும்) ----
 function arMailSync() {
   var sh = arMailSheet_();
   var props = PropertiesService.getScriptProperties();
   var lastEpoch = Number(props.getProperty('arMailLast') || 0);
   if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;
   var seen = arMailSeen_(sh);
-
   var threads = GmailApp.search('after:' + Math.floor(lastEpoch), 0, 60);
   var rows = [], newest = lastEpoch;
   for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {
@@ -93,16 +102,13 @@ function arMailSync() {
   return rows.length + ' mail(s) synced';
 }
 
-// ---- பழைய மெயில்கள் முழுவதும் இழுக்க — ஒரு முறை இதை Run செய்யவும் ----
-// (~4.5 நிமிடம் ஒரு run; mail அளவு அதிகமானால் log சொல்லும் — மீண்டும் run செய்யவும்)
 function arMailBackfillAll() {
   var sh = arMailSheet_();
   var props = PropertiesService.getScriptProperties();
   var seen = arMailSeen_(sh);
   var start = Number(props.getProperty('arBackfillStart') || 0);
-  var deadline = Date.now() + 270000; // 4.5 நிமிடம் (6-min limit-க்கு உள்ளே)
+  var deadline = Date.now() + 270000;
   var PAGEZ = 150, totalNew = 0;
-
   while (Date.now() < deadline) {
     var threads = GmailApp.search('after:2020/01/01', start, PAGEZ);
     if (!threads.length) { props.setProperty('arBackfillStart', '0'); break; }
@@ -112,7 +118,7 @@ function arMailBackfillAll() {
       for (var m = 0; m < msgs.length; m++) {
         if (seen[msgs[m].getId()]) continue;
         seen[msgs[m].getId()] = true;
-        batch.push(arMailRow_(msgs[m], threads[t], false)); // backfill-ல் attachment Drive copy வேண்டாம் (வேகம்)
+        batch.push(arMailRow_(msgs[m], threads[t], false));
       }
     }
     for (var b = 0; b < batch.length; b += 400) {
@@ -125,29 +131,107 @@ function arMailBackfillAll() {
     if (threads.length < PAGEZ) { props.setProperty('arBackfillStart', '0'); break; }
   }
   var cont = Number(props.getProperty('arBackfillStart') || 0) > 0;
-  return totalNew + ' mails backfilled' + (cont ? ' — இன்னும் மீதம் உள்ளது; arMailBackfillAll-ஐ மீண்டும் run செய்யவும்' : ' — முழுவதும் முடிந்தது!');
+  return totalNew + ' mails backfilled' + (cont ? ' — மீண்டும் run செய்யவும்' : ' — முடிந்தது!');
 }
 
-// ---- உள்ளடக்க வகைப்பாடு ----
+// ---- வகைப்பாடு (v3: cityunionbank / cub / cheque / statement fix) ----
 function arMailClassify(from, subj, body) {
   var s = (subj + ' ' + from + ' ' + body.slice(0, 600));
   if (/income\s?tax|incometax|\bpan\b|\btds\b|26as|traces|efiling|\bitr[\s\-]?\d|form\s?16/i.test(s)) return 'Income Tax';
   if (/gst|gstr|goods\s?and\s?services|gstn|e-?way\s?bill|e-?invoice/i.test(s)) return 'GST';
-  if (/\bbank\b|neft|rtgs|\bimps\b|\bupi\b|credited|debited|\bemi\b|loan statement/i.test(s)) return 'Bank';
+  if (/bank|cityunionbank|\bcub\b|neft|rtgs|\bimps\b|\bupi\b|credited|debited|\bemi\b|loan statement|cheque|statement of account/i.test(s)) return 'Bank';
   if (/invoice|purchase\s?order|quotation|delivery\s?challan|payment\s?due|proforma/i.test(s)) return 'Vendor';
   if (/municipality|panchayat|twad|jelc|electricity|\btneb\b|property\s?tax|\b Court\b|taluk|registrar/i.test(s)) return 'Government';
   return 'Other';
+}
+
+// ---- ஏற்கனவே உள்ள mails-ஐ மீண்டும் வகைப்படுத்த (ஒரு முறை run) ----
+function arMailReclassify() {
+  var sh = arMailSheet_();
+  var data = sh.getDataRange().getValues();
+  var n = 0;
+  for (var r = 1; r < data.length; r++) {
+    var cat = arMailClassify(String(data[r][1]), String(data[r][2]), '');
+    if (cat !== data[r][3]) { sh.getRange(r + 1, 4).setValue(cat); n++; }
+  }
+  Logger.log('Reclassified: ' + n + ' rows updated');
+  return n + ' rows reclassified';
+}
+
+// ---- Statement mail format ஆராய (MailRaw tab-ல் sample எழுதும்) ----
+function arStmtDumpSample() {
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = ss.getSheetByName('MailRaw') || ss.insertSheet('MailRaw');
+  sh.clear();
+  sh.appendRow(['Date', 'From', 'Subject', 'Attachments', 'Body (first 3000 chars)']);
+  var threads = GmailApp.search('(statement OR "account statement") (cityunionbank OR CUB)', 0, 20);
+  if (!threads.length) threads = GmailApp.search('statement', 0, 20);
+  var n = 0;
+  for (var t = 0; t < threads.length && n < 10; t++) {
+    var msgs = threads[t].getMessages();
+    for (var m = 0; m < msgs.length && n < 10; m++) {
+      var msg = msgs[m];
+      var body = '';
+      try { body = msg.getPlainBody().slice(0, 3000); } catch (e) {}
+      var atts = '';
+      try { atts = msg.getAttachments().map(function (a) { return a.getName(); }).join(', '); } catch (e2) {}
+      sh.appendRow([msg.getDate(), msg.getFrom(), msg.getSubject(), atts, body]);
+      n++;
+    }
+  }
+  Logger.log('MailRaw: ' + n + ' statement mail samples written');
+  return n + ' samples in MailRaw';
+}
+
+// ---- Write-back token ----
+function arStmtToken() {
+  var props = PropertiesService.getScriptProperties();
+  var tk = props.getProperty('arStmtToken');
+  if (!tk) {
+    tk = 'ARST-' + Utilities.getUuid().replace(/-/g, '').slice(0, 20);
+    props.setProperty('arStmtToken', tk);
+  }
+  Logger.log('Website Token (copy செய்யவும்): ' + tk);
+  return tk;
+}
+
+// ---- Website edit → Sheet write (Web App POST) ----
+function doPost(e) {
+  var out = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
+  try {
+    var b = JSON.parse(e.postData.contents);
+    var props = PropertiesService.getScriptProperties();
+    if (String(b.token || '') !== String(props.getProperty('arStmtToken') || '')) {
+      return out.setContent(JSON.stringify({ ok: false, error: 'bad token' }));
+    }
+    var tab = String(b.tab || STMT_TAB);
+    var sh = SpreadsheetApp.openById(WORKBOOK_ID).getSheetByName(tab);
+    if (!sh) return out.setContent(JSON.stringify({ ok: false, error: 'tab missing' }));
+    var colNum = 0, letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', cl = String(b.col || 'J').toUpperCase();
+    for (var i = 0; i < cl.length; i++) colNum = colNum * 26 + (letters.indexOf(cl[i]) + 1);
+    var row = parseInt(b.row, 10);
+    if (!(row > 0) || !colNum) return out.setContent(JSON.stringify({ ok: false, error: 'bad row/col' }));
+    // header label இல்லையெனில் எழுது
+    var hdr = sh.getRange(row - (b.rowOffset || 1), colNum).getValue();
+    sh.getRange(row, colNum).setValue(String(b.value || ''));
+    return out.setContent(JSON.stringify({ ok: true, row: row, col: cl, value: String(b.value || '') }));
+  } catch (err) {
+    return out.setContent(JSON.stringify({ ok: false, error: String(err) }));
+  }
+}
+
+function doGet() {
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v3' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
-// ---- ஒரே முறை இதை Run (trigger அமைக்கும்) ----
 function arMailSetup() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'arMailSync') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('arMailSync').timeBased().everyMinutes(10).create();
-  Logger.log('Setup OK — trigger ஒவ்வொரு 10 நிமிடத்திலும் run ஆகும். Backfill-க்கு arMailBackfillAll-ஐ run செய்யவும்.');
+  Logger.log('Setup OK — trigger 10 நிமிடம் ஒன்றுக்கு run ஆகும்.');
 }

@@ -217,7 +217,7 @@ function AuditorMailPageFn({user:c}){
   const printCols=viewCols.slice(0,7);
   const printCss="@media print {\n@page { size: A4 "+(orientation==="landscape"?"landscape":"portrait")+"; margin: 8mm 6mm; }\nhtml, body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }\n.app-sidebar, .app-topbar, .app-bell, .ui-btn, .ai-fab, .no-print, header.app-head { display: none !important; }\n.reports-centre { padding: 0 !important; margin: 0 !important; }\n.a4-print-document { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }\n.a4-page { width: 100% !important; padding: 0 !important; margin: 0 !important; }\ntable { page-break-inside: auto !important; }\ntr { page-break-inside: avoid !important; }\nthead { display: table-header-group !important; }\n}";
   return n.jsxs("div",{className:"reports-centre",children:[
-    n.jsxs("div",{className:"no-print",children:[
+    !isPrint&&n.jsxs("div",{className:"no-print",children:[
       n.jsx(st,{title:AT(f,"ஆடிட்டர் — மெயில் மேசை","Auditor — Mail Desk"),sub:AT(f,"Gmail மெயில்கள் தானாக ஏற்றம் — வகைப்பாடு, வடிகட்டி, மொத்தம், A4 அச்சு","Gmail mails auto-loaded — categories, filters, totals & A4 print")}),
       n.jsxs("div",{className:"ui-stats",style:{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",marginBottom:12},children:[
         n.jsxs("div",{className:"ui-stat",children:[n.jsx("div",{className:"ui-stat-label",children:AT(f,"மொத்த மெயில்கள்","Total mails")}),n.jsx("div",{className:"ui-stat-value",children:R2.length}),n.jsx("div",{className:"ui-stat-sub",children:"Gmail Inbox"})]}),
@@ -275,6 +275,7 @@ function AuditorMailPageFn({user:c}){
     ]}),
     isPrint&&n.jsxs("div",{className:"a4-print-document",children:[
       n.jsxs("div",{className:"no-print",style:{position:"fixed",top:12,right:12,zIndex:9999,display:"flex",gap:8,background:"#fff",padding:8,borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.2)"},children:[
+        n.jsx(L,{kind:orientation==="landscape"?"primary":"soft",small:!0,onClick:function(){setOrientation(orientation==="landscape"?"portrait":"landscape")},children:orientation==="landscape"?"⬍ Portrait":"⬌ Landscape"}),
         n.jsx(L,{kind:"primary",onClick:function(){window.print()},children:"🖨️ "+AT(f,"மீண்டும் அச்சிடு","Print again")}),
         n.jsx(L,{kind:"soft",onClick:function(){window.__arShare({})},children:"📲 WhatsApp Share"}),
         n.jsx(L,{kind:"ghost",onClick:function(){setIsPrint(!1)},children:"✕ "+AT(f,"மூடு","Close")})

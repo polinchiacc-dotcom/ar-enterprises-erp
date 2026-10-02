@@ -71,7 +71,7 @@ const AudPageDefs=[
 {id:"aDocs",path:"/auditor-documents",tab:"Documents",en:"Company Documents",ta:"நிறுவன ஆவணங்கள்",hint:"PAN, GST பதிவு, உரிமங்கள், முக்கிய ஆவணங்கள்"},
 {id:"aStat",path:"/auditor-statutory",tab:"Statutory",en:"IT · GST · TDS · E-Invoice · E-Way",ta:"IT · GST · TDS · E-Invoice · E-Way Bill",hint:"அனைத்து வரி தாக்கல் / E-Bill விவரங்கள்"},
 {id:"aChallan",path:"/auditor-challans",tab:"GSTChallans",en:"GST Payment Challans",ta:"GST செலுத்தும் சலான் விவரங்கள்",hint:"GST கட்டும் சலான் CIN / தொகை விவரங்கள்"},
-{id:"aMail",path:"/auditor-mail",tab:"Mail",en:"Mail",ta:"மின்னஞ்சல் (Mail)",hint:"முக்கிய கடிதங்கள் / மின்னஞ்சல் பதிவேடு"}
+{id:"aMail",path:"/auditor-mail",tab:"Mail",en:"Mail",ta:"மின்னஞ்சல் (Mail)",hint:"Gmail மெயில்கள் தானாக வரும் / Gmail inbox auto-sync"}
 ];
 function extractSheetId(v){var m=String(v||"").match(/\/d\/([a-zA-Z0-9_-]{20,})/);return m?m[1]:String(v||"").trim()}
 function gvizFetch(id,tab,cb){

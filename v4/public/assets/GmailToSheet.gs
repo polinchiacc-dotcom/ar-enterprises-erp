@@ -28,7 +28,21 @@
 // ---- CONFIG ----
 var WORKBOOK_ID = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
 var TAB_NAME = 'MailInbox';
-var STMT_TAB = 'Polinchi BS 1712';
+var STMT_TAB = 'Polinchi B/S 1712'; // கவனம்: உண்மையான பெயரில் slash — xlsx export மட்டும் 'BS' என காட்டும்
+var STMT_TAB_GID = 2024650928;
+function arStmtSheet_(ss, tab) {
+  tab = String(tab || '');
+  var sheets = ss.getSheets(), i, s2;
+  if (tab.indexOf('gid:') === 0) {
+    var g = tab.slice(4);
+    for (i = 0; i < sheets.length; i++) if (String(sheets[i].getSheetId()) === g) return sheets[i];
+  }
+  if (tab) { s2 = ss.getSheetByName(tab); if (s2) return s2; }
+  for (i = 0; i < sheets.length; i++) if (String(sheets[i].getSheetId()) === String(STMT_TAB_GID)) return sheets[i];
+  var als = ['Polinchi B/S 1712', 'Polinchi BS 1712'];
+  for (i = 0; i < als.length; i++) { s2 = ss.getSheetByName(als[i]); if (s2) return s2; }
+  return null;
+}
 var INITIAL_DAYS = 366;
 var MAX_PER_RUN = 200;
 var SAVE_ATTACHMENTS = true;
@@ -142,6 +156,7 @@ function arMailBackfillAll() {
 
 // ---- வகைப்பாடு (v3: cityunionbank / cub / cheque / statement fix) ----
 function arMailClassify(from, subj, body) {
+  from = String(from || ''); subj = String(subj || ''); body = String(body || '');
   var s = (subj + ' ' + from + ' ' + body.slice(0, 600));
   if (/income\s?tax|incometax|\bpan\b|\btds\b|26as|traces|efiling|\bitr[\s\-]?\d|form\s?16/i.test(s)) return 'Income Tax';
   if (/gst|gstr|goods\s?and\s?services|gstn|e-?way\s?bill|e-?invoice/i.test(s)) return 'GST';
@@ -211,7 +226,7 @@ function doPost(e) {
       return out.setContent(JSON.stringify({ ok: false, error: 'bad token' }));
     }
     var tab = String(b.tab || STMT_TAB);
-    var sh = SpreadsheetApp.openById(WORKBOOK_ID).getSheetByName(tab);
+    var sh = arStmtSheet_(SpreadsheetApp.openById(WORKBOOK_ID), tab);
     if (!sh) return out.setContent(JSON.stringify({ ok: false, error: 'tab missing' }));
     var colNum = 0, letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', cl = String(b.col || 'J').toUpperCase();
     for (var i = 0; i < cl.length; i++) colNum = colNum * 26 + (letters.indexOf(cl[i]) + 1);
@@ -227,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v3' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.2' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -248,14 +263,14 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.1 — கண்டறிதல்: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.2 — gid tab resolver + classify fix: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
   var out = [];
-  out.push('1) STMT_TAB = "' + STMT_TAB + '"');
+  out.push('1) STMT_TAB = "' + STMT_TAB + '" (gid ' + STMT_TAB_GID + ')');
   var ss = SpreadsheetApp.openById(WORKBOOK_ID);
-  var sh = ss.getSheetByName(STMT_TAB);
+  var sh = arStmtSheet_(ss, STMT_TAB);
   out.push('2) getSheetByName → ' + (sh ? 'FOUND (rows=' + sh.getLastRow() + ')' : '*** NULL — tab கிடைக்கவில்லை! ***'));
   var names = ss.getSheets().map(function (x) { return x.getName(); });
   out.push('3) tabs = ' + names.join(' | '));
@@ -293,8 +308,9 @@ function arStmtParseMails() {
   if (pr) pr.split(',').forEach(function (x) { processed[x] = 1; });
 
   var ss = SpreadsheetApp.openById(WORKBOOK_ID);
-  var sh = ss.getSheetByName(STMT_TAB);
-  if (!sh) return 'Tab missing: ' + STMT_TAB;
+  var sh = arStmtSheet_(ss, STMT_TAB);
+  if (!sh) { Logger.log('FATAL: statement tab கிடைக்கவில்லை (gid ' + STMT_TAB_GID + ')'); return 'Tab missing'; }
+  Logger.log('stmt tab resolved: "' + sh.getName() + '" (gid ' + sh.getSheetId() + ', rows=' + sh.getLastRow() + ')');
   var log = ss.getSheetByName('StmtLog');
   if (!log) { log = ss.insertSheet('StmtLog'); log.appendRow(['Time', 'MailID', 'Status', 'Detail']); }
   var raw = ss.getSheetByName('StmtRaw');
@@ -386,7 +402,7 @@ function arStmtParseText_(text) {
 
 // ஒரே முறை: S.No ஐ மீட்டமை (A column empty rows-க்கு எண் இடும்)
 function arStmtRenumber() {
-  var sh = SpreadsheetApp.openById(WORKBOOK_ID).getSheetByName(STMT_TAB);
+  var sh = arStmtSheet_(SpreadsheetApp.openById(WORKBOOK_ID), STMT_TAB);
   if (!sh) return 'Tab missing';
   var data = sh.getDataRange().getValues();
   var lastHeader = 0;

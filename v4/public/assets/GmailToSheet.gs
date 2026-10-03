@@ -246,7 +246,47 @@ function arMailSetup() {
 // v4 — பேங்க் ஸ்டேட்மெண்ட் PDF mails-ஐ தானாக parse செய்து BS tab-ல் சேர்த்தல்
 // முன்நிபந்தனை: Editor → Services (+) → Drive API (v2) → Add
 // ==================================================================
+
+// ==================================================================
+// v4.1 — கண்டறிதல்: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
+// ==================================================================
+function arStmtDiag() {
+  var out = [];
+  out.push('1) STMT_TAB = "' + STMT_TAB + '"');
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = ss.getSheetByName(STMT_TAB);
+  out.push('2) getSheetByName → ' + (sh ? 'FOUND (rows=' + sh.getLastRow() + ')' : '*** NULL — tab கிடைக்கவில்லை! ***'));
+  var names = ss.getSheets().map(function (x) { return x.getName(); });
+  out.push('3) tabs = ' + names.join(' | '));
+  var t1 = GmailApp.search('from:cityunionbank.in (statement OR statementofaccount OR "statement of account")', 0, 50);
+  out.push('4) search A (from:cityunionbank.in + statement) threads = ' + t1.length);
+  var t2 = GmailApp.search('statement', 0, 50);
+  out.push('5) search B (statement plain) threads = ' + t2.length);
+  var t3 = GmailApp.search('from:cityunionbank.in', 0, 50);
+  out.push('6) search C (from:cityunionbank.in only) threads = ' + t3.length);
+  var pdfCount = 0;
+  for (var i = 0; i < Math.min(t1.length, 20); i++) {
+    var msgs = t1[i].getMessages();
+    for (var j = 0; j < msgs.length; j++) {
+      var atts = msgs[j].getAttachments();
+      for (var k = 0; k < atts.length; k++) if (/\.pdf$/i.test(atts[k].getName())) pdfCount++;
+    }
+  }
+  out.push('7) PDF attachments in search-A sample = ' + pdfCount);
+  try {
+    var tst = Drive.Files.list({ maxResults: 1 });
+    out.push('8) Drive API OK (Files.list works)');
+  } catch (eD) {
+    out.push('8) *** Drive API FAIL: ' + String(eD).slice(0, 120) + ' ***');
+  }
+  var msg = out.join('\n');
+  Logger.log('\n' + msg);
+  return msg;
+}
+
 function arStmtParseMails() {
+  Logger.log('arStmtParseMails: START');
   var props = PropertiesService.getScriptProperties();
   var processed = {};
   var pr = props.getProperty('arStmtProcessed') || '';
@@ -261,6 +301,7 @@ function arStmtParseMails() {
   if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
 
   var threads = GmailApp.search('from:cityunionbank.in (statement OR statementofaccount OR "statement of account")', 0, 50);
+  Logger.log('search threads found: ' + threads.length);
   var added = 0, skipped = 0, failed = 0;
 
   for (var t = 0; t < threads.length; t++) {

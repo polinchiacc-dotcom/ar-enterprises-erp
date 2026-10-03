@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.1' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.2' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.1 — interleaved-line parser (last-page format) + balance-keyed dedupe (legit same-day dup rows kept): arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.2 — hourly trigger (everyWeeks-க்கு weekday கட்டாயம் என்பதால் everyHours(1)); parseMails இப்போது மணிக்கு ஒருமுறை: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -757,11 +757,14 @@ function arStmtImportPdf() {
   return msg;
 }
 
-// வாரம் ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)
+// மணிக்கு ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)
 function arStmtInstallTrigger() {
   var props = PropertiesService.getScriptProperties();
-  if (props.getProperty('arStmtTrigger')) return 'Trigger ஏற்கனவே உள்ளது';
-  ScriptApp.newTrigger('arStmtParseMails').timeBased().everyWeeks(1).create();
-  props.setProperty('arStmtTrigger', 'weekly');
-  return 'Weekly auto-parse trigger installed — இனிவரும் mails தாமதமாக வந்தாலும் தானாக parse ஆகும்';
+  // பழைய trigger இருந்தால் நீக்கி புதிதாக install
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'arStmtParseMails') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('arStmtParseMails').timeBased().everyHours(1).create();
+  props.setProperty('arStmtTrigger', 'hourly');
+  return 'HOURLY trigger installed — மணிக்கு ஒருமுறை புதிய statement mails தானாக parse ஆகும்';
 }

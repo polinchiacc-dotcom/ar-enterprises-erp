@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.4' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.5' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.4 — dedupe + date-sort + net-banking PDF import (arStmtImportPdf) + weekly trigger: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.5 — arStmtRebuild: 3 PDF-களிலிருந்து முழு வரலாறு + dedupe colfix: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -442,8 +442,8 @@ function arStmtAppendRows_(sh, newRows) {
     for (var r = 0; r < ex.length; r++) {
       var d = ex[r][0], dsc = String(ex[r][1] || '').replace(/\s+/g, ' ').trim();
       if (!dsc) continue;
-      var f = parseFloat(String(ex[r][3]).replace(/[^0-9.\-]/g, '')) || 0;
-      var g = parseFloat(String(ex[r][4]).replace(/[^0-9.\-]/g, '')) || 0;
+      var f = parseFloat(String(ex[r][4]).replace(/[^0-9.\-]/g, '')) || 0;
+      var g = parseFloat(String(ex[r][5]).replace(/[^0-9.\-]/g, '')) || 0;
       var a = Math.abs(g) > Math.abs(f) ? g : f;
       var dk = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d).slice(0, 10);
       keys[dk + '|' + dsc + '|' + a] = 1;
@@ -487,6 +487,63 @@ function arStmtRenumber() {
   arStmtFinalize_(sh);
   Logger.log('Sorted by date + renumbered');
   return 'Sorted by date + rows numbered';
+}
+
+// v4.5: பழைய rows நீக்கி → 3 statement PDF-களிலிருந்து முழு வரலாறு rebuild (07-03-2022 → 30-09-2026)
+function arStmtRebuild() {
+  var IDS = [
+    '1iutNpWqijV3mjC8NrwCjgARsJeJ5Yrzz', // Statement 07-03-2022 → 05-09-2025
+    '1u4fgwPeIdkg27BNvulACTylEiIY3CDT8', // Statement 06-05-2025 → 31-08-2026
+    '1SG5nhG608EWkl0Z53fAqHVAujENz6eb6'  // Statement 01-09-2026 → 30-09-2026
+  ];
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = arStmtSheet_(ss, STMT_TAB);
+  if (!sh) { Logger.log('FATAL: stmt tab missing'); return 'Tab missing'; }
+  var log = ss.getSheetByName('StmtLog');
+  if (!log) { log = ss.insertSheet('StmtLog'); log.appendRow(['Time', 'MailID', 'Status', 'Detail']); }
+  var raw = ss.getSheetByName('StmtRaw');
+  if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
+  // StmtRaw-ல் பழைய file: rows நீக்கு
+  var rdata = raw.getDataRange().getValues();
+  for (var rr = rdata.length - 1; rr >= 1; rr--) {
+    if (String(rdata[rr][0]).indexOf('file:') === 0) raw.deleteRow(rr + 1);
+  }
+  // பழைய transaction rows முழுவதும் நீக்கு (title+header மட்டும் வை)
+  var last = sh.getLastRow();
+  var hdr = 4;
+  var v = sh.getRange(1, 3, Math.min(last, 10), 1).getValues();
+  for (var i = 0; i < v.length; i++) if (String(v[i][0]).indexOf('Description') >= 0) hdr = i;
+  if (last > hdr + 1) sh.getRange(hdr + 2, 1, last - (hdr + 1), 8).clearContent();
+  SpreadsheetApp.flush();
+  Logger.log('old rows cleared, building fresh...');
+  var total = 0, notes = [];
+  for (var k = 0; k < IDS.length; k++) {
+    var fid = IDS[k];
+    try {
+      var blob = DriveApp.getFileById(fid).getBlob();
+      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var text = arStmtDocText_(docFile.id);
+      try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 5000)]);
+      var res = arStmtParseText_(text);
+      if (res.rows.length) {
+        var nAdd = arStmtAppendRows_(sh, res.rows);
+        total += nAdd;
+        notes.push('PDF' + (k + 1) + ': ' + nAdd + ' new rows (parsed ' + res.rows.length + ')');
+        log.appendRow([new Date(), 'file:' + fid, 'OK', nAdd + ' new rows | unparsed:' + res.unparsed]);
+      } else {
+        notes.push('PDF' + (k + 1) + ': 0 rows — StmtRaw text பார்க்கவும்');
+        log.appendRow([new Date(), 'file:' + fid, 'NOPARSE', 'text StmtRaw-ல் dump ஆகியது']);
+      }
+    } catch (err) {
+      notes.push('PDF' + (k + 1) + ': ERROR ' + String(err).slice(0, 90));
+      log.appendRow([new Date(), 'file:' + fid, 'ERROR', String(err).slice(0, 200)]);
+    }
+  }
+  try { arStmtFinalize_(sh); } catch (eS) { Logger.log('finalize: ' + String(eS)); }
+  var msg = 'REBUILD முடிந்தது: ' + total + ' rows — ' + notes.join(' | ');
+  Logger.log(msg);
+  return msg;
 }
 
 // v4.4: net-banking download செய்த PDF-ஐ import (gap 04-09-2025 → இன்று நிரப்ப)

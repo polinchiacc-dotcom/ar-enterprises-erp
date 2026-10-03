@@ -231,6 +231,30 @@ function doPost(e) {
     var colNum = 0, letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', cl = String(b.col || 'J').toUpperCase();
     for (var i = 0; i < cl.length; i++) colNum = colNum * 26 + (letters.indexOf(cl[i]) + 1);
     var row = parseInt(b.row, 10);
+    // v5.3: balKey+snoKey கொடுக்கப்பட்டால் சரியான row-ஐ தேடி எழுது (gviz row-கணக்கு தவறாக இருந்தாலும் சரி)
+    if (b.balKey !== undefined && b.balKey !== '') {
+      var dataR = sh.getDataRange().getValues();
+      var hdrR = 0;
+      for (var hI = 0; hI < Math.min(dataR.length, 25); hI++) {
+        if (String(dataR[hI][2]).indexOf('Description') >= 0) hdrR = hI;
+      }
+      var balT = parseFloat(String(b.balKey).replace(/[^0-9.\-]/g, ''));
+      var snoT = String(b.snoKey || '').replace(/[^0-9.\-]/g, '');
+      var hits = [];
+      for (var dI = hdrR + 1; dI < dataR.length; dI++) {
+        var hv = parseFloat(String(dataR[dI][7]).replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(hv) && !isNaN(balT) && Math.abs(hv - balT) < 0.005) {
+          if (snoT !== '') {
+            var sv = String(dataR[dI][0]).replace(/[^0-9.\-]/g, '');
+            if (sv !== '' && !isNaN(parseFloat(sv)) && Math.abs(parseFloat(sv) - parseFloat(snoT)) < 0.5) hits.push(dI + 1);
+          } else hits.push(dI + 1);
+        }
+      }
+      if (hits.length === 1) row = hits[0];
+      else if (hits.length > 1) return out.setContent(JSON.stringify({ ok: false, error: 'ambiguous row (' + hits.length + ') — Refresh செய்து முயற்சிக்கவும்' }));
+      else return out.setContent(JSON.stringify({ ok: false, error: 'row not found — website Refresh செய்யவும்' }));
+      Logger.log('write-back row resolved: ' + row + ' (balKey ' + balT + ')');
+    }
     if (!(row > 0) || !colNum) return out.setContent(JSON.stringify({ ok: false, error: 'bad row/col' }));
     // header label இல்லையெனில் எழுது
     var hdr = sh.getRange(row - (b.rowOffset || 1), colNum).getValue();
@@ -242,7 +266,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.2' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.3' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.2 — hourly trigger (everyWeeks-க்கு weekday கட்டாயம் என்பதால் everyHours(1)); parseMails இப்போது மணிக்கு ஒருமுறை: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.3 — write-back: balance-key row resolution (gviz row-drift proof) + rebuild clears J1:J6 strays: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -677,6 +701,7 @@ function arStmtRebuild() {
   }
   // பழைய rows முழுவதும் STRUCTURAL delete (merge B2:D6-க்கு கீழே எல்லாம்) — title rows 1-6 அப்படியே
   sh.getRange(5, 1, 2, 26).clearContent(); // பழைய header எச்சம் (rows 5-6) — merge-safe clear
+  sh.getRange(1, 10, 6, 1).clearContent(); // J1:J6 title-பகுதி stray notes நீக்கம்
   var mr = sh.getMaxRows();
   if (mr > 6) sh.deleteRows(7, mr - 6);
   SpreadsheetApp.flush();

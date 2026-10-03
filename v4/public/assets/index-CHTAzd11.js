@@ -458,10 +458,10 @@ function AuditorStmtPageFn({user:c}){
     const v2=window.prompt(AT(f,"Description Details — விளக்கம் எழுதவும்:","Description Details — enter your note:"),cur||"");
     if(v2===null)return;
     if(!wsUrl||!wsTk){setShowConn(!0);r(!1,AT(f,"முதலில் 🔗 Connect-ல் Web App URL + Token சேர்க்கவும்","First add Web App URL + Token in 🔗 Connect"));return}
-    const sheetRow=(tdata.headerIdx>=0?tdata.headerIdx:0)+2+i2;
+    const sheetRow=(tdata.headerIdx>=0?tdata.headerIdx:0)+2+i2;const balKey=D.bal>=0?String(R2[i2][D.bal]||""):"";const snoKey=String(R2[i2][0]||"");
     r(!0,"…");
-    fetch(wsUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:wsTk,tab:tabName,row:sheetRow,col:"J",value:v2})}).then(function(x2){return x2.json()}).then(function(j2){
-      if(j2&&j2.ok){setDescDet(Object.assign({},descDet,{}));const nx=Object.assign({},descDet);nx[i2]=v2;setDescDet(nx);r(!0,AT(f,"சேமிக்கப்பட்டது (Sheet row ","Saved (Sheet row ")+sheetRow+")")}
+    fetch(wsUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:wsTk,tab:tabName,row:sheetRow,balKey:balKey,snoKey:snoKey,col:"J",value:v2})}).then(function(x2){return x2.json()}).then(function(j2){
+      if(j2&&j2.ok){setDescDet(Object.assign({},descDet,{}));const nx=Object.assign({},descDet);nx[i2]=v2;setDescDet(nx);r(!0,AT(f,"சேமிக்கப்பட்டது (Sheet row ","Saved (Sheet row ")+((j2&&j2.row)||sheetRow)+")")}
       else r(!1,AT(f,"சேமிக்க முடியவில்லை: ","Save failed: ")+((j2&&j2.error)||"?"));
     }).catch(function(e3){r(!1,AT(f,"இணைப்பு பிழை — URL/Token சரிபார்க்கவும்","Connection error — check URL/Token"))});
   }
@@ -485,7 +485,7 @@ function AuditorStmtPageFn({user:c}){
             n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowConn(!1)},children:"✕ "+AT(f,"மூடு","Close")})
           ]}),
           n.jsxs("ol",{style:{margin:0,paddingLeft:18,fontSize:12,lineHeight:1.6},children:[
-            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v5.2 script paste","In script.google.com → AR Mail Sync, paste the v5.2 script")}),
+            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v5.3 script paste","In script.google.com → AR Mail Sync, paste the v5.3 script")}),
             n.jsxs("li",{children:["arStmtToken ",AT(f,"run செய்து token copy செய்யவும்","— run it and copy the token from the log")]}),
             n.jsxs("li",{children:["Deploy → New deployment → Web app (",AT(f,"Execute as: Me; Access: Anyone","Execute as: Me; Access: Anyone"),") → /exec URL ",AT(f,"நகல்","copy")]}),
             n.jsx("li",{children:AT(f,"URL + Token மேலே paste செய்து 💾 அழுத்தவும்","Paste the URL + Token above and press 💾")})

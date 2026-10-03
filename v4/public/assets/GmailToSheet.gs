@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.7' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.8' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.7 — UrlFetch export + DocumentApp fallback; rebuild: structural delete (merge-safe) + own header row 7: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.8 — CUB column-block parser (dates-line/particulars/balance-diff D-C detection) + legacy fallback; finalize empty-num guard: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -397,8 +397,68 @@ function arStmtDocText_(docId) {
   throw new Error('docText failed [' + errs.join(' | ') + ']');
 }
 
-// PDF text → transaction rows (v4.4 BS 1712 layout: A SNo | B Date | C Desc | F Debit | G Credit | H Balance)
+// v4.8 CUB column-block parser: PDF→Doc text = ஒரு வரியில் எல்லா தேதிகள், பிறகு particulars block, பிறகு debit/credit/balance blocks
+function arStmtParseCUB_(text) {
+  var T = String(text || '');
+  if (T.indexOf('STATEMENT OF ACCOUNT') < 0 && T.indexOf('CITY UNION BANK') < 0) return { rows: [], unparsed: 0 };
+  var pages = T.split(/\n(?=Account No : \d+)/);
+  var rows = [], unparsed = 0, prevBal = null;
+  var AMT = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
+  var DATE = /\d{2}-[A-Z]{3}-\d{4}/g;
+  var MO = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
+  for (var p = 0; p < pages.length; p++) {
+    var lines = pages[p].split(/\r?\n/);
+    var di = -1, best = 0, dates = [];
+    for (var i = 0; i < lines.length; i++) {
+      var ds = lines[i].match(DATE);
+      if (ds && ds.length > best) { best = ds.length; di = i; dates = ds; }
+    }
+    if (di < 0) continue;
+    var N = dates.length;
+    var mBF = pages[p].match(/(?:Amt Brought Forward\s*:?\s*|Opening Balance as on \d{2}-[A-Z]{3}-\d{4}\s+)([\d,]+\.\d{2})/);
+    if (mBF) prevBal = parseFloat(mBF[1].replace(/,/g, ''));
+    var parts = [], amounts = [], cur = null;
+    for (var j = di + 1; j < lines.length; j++) {
+      var t = lines[j].replace(/\t/g, ' ').trim();
+      if (!t || /Page \d+ of \d+/.test(t) || /^Regd\. Office|^Telephone No|^CIN :/.test(t)) { if (/Page \d+ of \d+|^Regd\. Office|^Telephone No|^CIN :/.test(t)) break; continue; }
+      if (/^(TO|BY)\b/.test(t)) {
+        var items = t.split(/\s+(?=(?:TO|BY)\b)/);
+        for (var k = 0; k < items.length; k++) { cur = items[k].trim(); parts.push(cur); }
+        continue;
+      }
+      if (/^[\d\s]+$/.test(t)) continue; // chq no block
+      var amts = t.match(AMT);
+      var pureAmt = amts && t.replace(/[\d,.\s]/g, '') === '';
+      if (cur && !pureAmt) { cur = (cur + ' ' + t).trim(); parts[parts.length - 1] = cur; continue; }
+      if (amts) { for (var a = 0; a < amts.length; a++) amounts.push(parseFloat(amts[a].replace(/,/g, ''))); }
+      else if (cur) { cur = (cur + ' ' + t).trim(); parts[parts.length - 1] = cur; }
+    }
+    if (amounts.length < N) { unparsed += N; continue; }
+    var bals = amounts.slice(amounts.length - N);
+    for (var r = 0; r < N; r++) {
+      var bal = bals[r];
+      var diff = prevBal === null ? null : Math.round((bal - prevBal) * 100) / 100;
+      var desc = parts[r] || '';
+      var isBy = /^BY\b/.test(desc.toUpperCase());
+      var credit = (diff !== null && diff !== 0) ? diff > 0 : isBy;
+      var amt = (diff === null || diff === 0) ? '' : Math.abs(diff);
+      var dm = dates[r].match(/(\d{2})-([A-Z]{3})-(\d{4})/);
+      var dt = new Date(Number(dm[3]), MO[dm[2]] - 1, Number(dm[1]));
+      rows.push([null, dt, desc, '', '', credit ? '' : amt, credit ? amt : '', String(bal)]);
+      prevBal = bal;
+    }
+  }
+  return { rows: rows, unparsed: unparsed };
+}
+
 function arStmtParseText_(text) {
+  var res = arStmtParseCUB_(text);
+  if (res.rows.length) return res;
+  return arStmtParseLegacy_(text);
+}
+
+// பழைய line-parser (fallback — மற்ற format-களுக்கு)
+function arStmtParseLegacy_(text) {
   var rows = [], unparsed = 0, prevBal = null;
   var lines = String(text || '').split(/[\r\n]+/);
   for (var i = 0; i < lines.length; i++) {
@@ -489,7 +549,7 @@ function arStmtFinalize_(sh) {
   var data2 = sh.getDataRange().getValues();
   var num = [];
   for (var r2 = lastHeader + 1; r2 < data2.length; r2++) num.push([r2 - lastHeader]);
-  sh.getRange(lastHeader + 2, 1, num.length, 1).setValues(num);
+  if (num.length) sh.getRange(lastHeader + 2, 1, num.length, 1).setValues(num);
 }
 
 // ஒரே முறை: date ஏற்றம் + S.No மீட்டமை (கைமுறையாக run செய்யவும்)

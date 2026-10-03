@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.3' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.4' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.3 — Drive export (DocumentApp scope தேவையில்லை) + pagination 200: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.4 — dedupe + date-sort + net-banking PDF import (arStmtImportPdf) + weekly trigger: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -349,9 +349,9 @@ function arStmtParseMails() {
         var text = arStmtDocText_(docFile.id);
         var res = arStmtParseText_(text);
         if (res.rows.length) {
-          sh.getRange(sh.getLastRow() + 1, 1, res.rows.length, res.rows[0].length).setValues(res.rows);
-          added += res.rows.length;
-          log.appendRow([new Date(), mid, 'OK', res.rows.length + ' rows | ' + pdfName + ' | unparsed:' + res.unparsed]);
+          var nAdd = arStmtAppendRows_(sh, res.rows);
+          added += nAdd;
+          log.appendRow([new Date(), mid, 'OK', nAdd + ' new rows | ' + pdfName + ' | unparsed:' + res.unparsed]);
         } else {
           failed++;
           log.appendRow([new Date(), mid, 'NOPARSE', '0 rows | ' + pdfName + ' — StmtRaw-ல் text பார்க்கவும்']);
@@ -372,7 +372,8 @@ function arStmtParseMails() {
   if (threads.length < 50) break;
   }
   props.setProperty('arStmtProcessed', Object.keys(processed).join(','));
-  var msg2 = added + ' rows added, ' + skipped + ' skipped, ' + failed + ' failed — விவரம் StmtLog tab';
+  try { arStmtFinalize_(sh); } catch (eS) { Logger.log('finalize: ' + String(eS)); }
+  var msg2 = added + ' NEW rows, ' + skipped + ' skipped, ' + failed + ' failed — date ஏற்றம் முடிந்தது, விவரம் StmtLog tab';
   Logger.log(msg2);
   return msg2;
 }
@@ -393,49 +394,148 @@ function arStmtDocText_(docId) {
   throw new Error('docText failed [' + errs.join(' | ') + ']');
 }
 
-// PDF text → transaction rows (BS 1712 layout: A SNo | B Date | C Desc | F Amount | H Balance)
+// PDF text → transaction rows (v4.4 BS 1712 layout: A SNo | B Date | C Desc | F Debit | G Credit | H Balance)
 function arStmtParseText_(text) {
-  var rows = [], unparsed = 0;
+  var rows = [], unparsed = 0, prevBal = null;
   var lines = String(text || '').split(/[\r\n]+/);
   for (var i = 0; i < lines.length; i++) {
-    var L = lines[i].replace(/\s+/g, ' ').trim();
-    var m = L.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s+(.+)$/);
+    var line = lines[i].trim();
+    var m = line.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\s+(.*)$/);
     if (!m) continue;
-    var dd = m[1], mo = m[2], yy = m[3];
+    var dd = m[1], mo = m[2], yy = m[3], rest = m[4];
     if (String(yy).length === 2) yy = '20' + yy;
-    var rest = m[4];
-    var nums = [], re2 = /((?:\d{1,3}(?:,\d{2,3})*|\d+)(?:\.\d{1,2})?)(?:\s*(?:Cr|Dr|CR|DR))?/g, mm;
+    var nums = [], re2 = /(?:\d{1,3}(?:,\d{2,3})*|\d+)(?:\.\d{1,2})?(?=\s*(?:Cr|Dr|CR|DR))?/g, mm;
     while ((mm = re2.exec(rest)) !== null) {
-      if (mm[1].length <= 2 && nums.length === 0) continue;
-      nums.push({ v: mm[1], idx: mm.index });
+      if (mm[0].length < 2 && nums.length === 0) continue;
+      nums.push({ v: mm[0], idx: mm.index });
     }
     if (!nums.length) continue;
-    var desc = rest.slice(0, nums[0].idx).replace(/[\|\-·]+\s*$/, '').trim();
-    if (!desc || desc.length < 2) { desc = rest.replace(/[\d,.\s CrDr]+$/, '').trim(); }
-    var amtRaw = nums[nums.length - 1].v.replace(/,/g, '');
-    var balRaw = nums.length >= 2 ? nums[nums.length - 2].v.replace(/,/g, '') : '';
+    var lastN = nums[nums.length - 1];
+    var amtRaw = lastN.v.replace(/,/g, '');
+    var balRaw = nums.length > 1 ? nums[nums.length - 2].v.replace(/,/g, '') : '';
+    var desc = rest.slice(0, lastN.idx).replace(/[|\-]+\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+    if (!desc) desc = rest.replace(/[|\-]+\s*$/, '').trim();
     var amt = parseFloat(amtRaw), bal = balRaw !== '' ? parseFloat(balRaw) : '';
     if (isNaN(amt)) { unparsed++; continue; }
+    // Debit/Credit கண்டறிதல்: 1) வார்த்தை 2) balance வேறுபாடு
+    var dsc = desc.toUpperCase();
+    var isCredit;
+    if (/\bCR\b|CREDIT|DEPOSIT|REVERSAL|INTEREST/.test(dsc)) isCredit = true;
+    else if (/\bDR\b|DEBIT|WITHDRAW|ATM|CHQ PAID|CHARGE|EMI|TAX/.test(dsc)) isCredit = false;
+    else if (prevBal !== null && bal !== '' && !isNaN(bal)) isCredit = bal > prevBal;
+    else isCredit = false;
+    if (bal !== '' && !isNaN(bal)) prevBal = bal;
     var dt = new Date(Number(yy), Number(mo) - 1, Number(dd));
-    rows.push([null, dt, desc, '', '', amt, '', bal === '' ? '' : String(bal)]);
+    rows.push([null, dt, desc, '', '', isCredit ? '' : amt, isCredit ? amt : '', bal === '' ? '' : String(bal)]);
   }
   return { rows: rows, unparsed: unparsed };
 }
 
-// ஒரே முறை: S.No ஐ மீட்டமை (A column empty rows-க்கு எண் இடும்)
-function arStmtRenumber() {
-  var sh = arStmtSheet_(SpreadsheetApp.openById(WORKBOOK_ID), STMT_TAB);
-  if (!sh) return 'Tab missing';
+// v4.4: புதிய rows append (dedupe: date+desc+amount ஏற்கனவே இருந்தால் தவிர் — இரட்டிப்பு இல்லை)
+function arStmtAppendRows_(sh, newRows) {
+  if (!newRows.length) return 0;
+  var tz = Session.getScriptTimeZone();
+  var lastRow = sh.getLastRow();
+  var keys = {};
+  if (lastRow > 5) {
+    var ex = sh.getRange(1, 2, lastRow, 6).getValues();
+    for (var r = 0; r < ex.length; r++) {
+      var d = ex[r][0], dsc = String(ex[r][1] || '').replace(/\s+/g, ' ').trim();
+      if (!dsc) continue;
+      var f = parseFloat(String(ex[r][3]).replace(/[^0-9.\-]/g, '')) || 0;
+      var g = parseFloat(String(ex[r][4]).replace(/[^0-9.\-]/g, '')) || 0;
+      var a = Math.abs(g) > Math.abs(f) ? g : f;
+      var dk = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d).slice(0, 10);
+      keys[dk + '|' + dsc + '|' + a] = 1;
+    }
+  }
+  var out = [];
+  for (var i = 0; i < newRows.length; i++) {
+    var nr = newRows[i];
+    var nd = (nr[1] instanceof Date) ? Utilities.formatDate(nr[1], tz, 'yyyy-MM-dd') : String(nr[1]).slice(0, 10);
+    var ndsc = String(nr[2] || '').replace(/\s+/g, ' ').trim();
+    var nf = parseFloat(nr[5]) || 0, ng = parseFloat(nr[6]) || 0;
+    var na = Math.abs(ng) > Math.abs(nf) ? ng : nf;
+    if (keys[nd + '|' + ndsc + '|' + na]) continue;
+    keys[nd + '|' + ndsc + '|' + na] = 1;
+    out.push(nr);
+  }
+  if (out.length) sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  return out.length;
+}
+
+// v4.4: date ஏற்றம் (பழையது மேலே, புதியது கீழே) + S.No மறுஎண்ணிடல்
+function arStmtFinalize_(sh) {
   var data = sh.getDataRange().getValues();
   var lastHeader = 0;
   for (var r = 0; r < Math.min(data.length, 10); r++) {
     if (String(data[r][2]).indexOf('Description') >= 0) lastHeader = r;
   }
-  var n = 0;
-  for (var r2 = lastHeader + 1; r2 < data.length; r2++) {
-    n++;
-    if (data[r2][0] === '' || data[r2][0] === null) sh.getRange(r2 + 1, 1).setValue(n);
+  if (data.length > lastHeader + 2) {
+    sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8).sort({ column: 2, ascending: true });
   }
-  Logger.log('Renumbered ' + n + ' rows');
-  return n + ' rows numbered';
+  var data2 = sh.getDataRange().getValues();
+  var num = [];
+  for (var r2 = lastHeader + 1; r2 < data2.length; r2++) num.push([r2 - lastHeader]);
+  sh.getRange(lastHeader + 2, 1, num.length, 1).setValues(num);
+}
+
+// ஒரே முறை: date ஏற்றம் + S.No மீட்டமை (கைமுறையாக run செய்யவும்)
+function arStmtRenumber() {
+  var sh = arStmtSheet_(SpreadsheetApp.openById(WORKBOOK_ID), STMT_TAB);
+  if (!sh) return 'Tab missing';
+  arStmtFinalize_(sh);
+  Logger.log('Sorted by date + renumbered');
+  return 'Sorted by date + rows numbered';
+}
+
+// v4.4: net-banking download செய்த PDF-ஐ import (gap 04-09-2025 → இன்று நிரப்ப)
+// பயன்பாடு: statement PDF-ஐ Google Drive-ல் upload → arStmtImportPdf() run
+function arStmtImportPdf() {
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = arStmtSheet_(ss, STMT_TAB);
+  if (!sh) return 'Tab missing';
+  var log = ss.getSheetByName('StmtLog');
+  if (!log) { log = ss.insertSheet('StmtLog'); log.appendRow(['Time', 'MailID', 'Status', 'Detail']); }
+  var files = [];
+  try { files = Drive.Files.list({ q: "mimeType='application/pdf' and trashed=false", orderBy: 'modifiedDate desc', maxResults: 30 }).items || []; } catch (e) { return 'Drive list fail: ' + e; }
+  var added = 0, filesOk = 0, notes = [];
+  for (var i = 0; i < files.length; i++) {
+    var fname = files[i].title || '';
+    try {
+      var blob = DriveApp.getFileById(files[i].id).getBlob();
+      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var text = arStmtDocText_(docFile.id);
+      try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      var res = arStmtParseText_(text);
+      if (!res.rows.length) {
+        notes.push(fname + ': 0 rows');
+        log.appendRow([new Date(), 'drive:' + fname, 'NOPARSE', 'StmtRaw-ல் text பார்க்கவும்']);
+        var raw = ss.getSheetByName('StmtRaw');
+        if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
+        raw.appendRow(['drive:' + fname, fname, String(text).slice(0, 5000)]);
+        continue;
+      }
+      var n = arStmtAppendRows_(sh, res.rows);
+      added += n; filesOk++;
+      notes.push(fname + ': ' + n + ' new rows');
+      log.appendRow([new Date(), 'drive:' + fname, 'OK', n + ' new rows']);
+    } catch (err) {
+      notes.push(fname + ': ERROR ' + String(err).slice(0, 100));
+      log.appendRow([new Date(), 'drive:' + fname, 'ERROR', String(err).slice(0, 200)]);
+    }
+  }
+  try { arStmtFinalize_(sh); } catch (eS) {}
+  var msg = filesOk + ' files parsed, ' + added + ' NEW rows appended — ' + notes.join(' | ');
+  Logger.log(msg);
+  return msg;
+}
+
+// வாரம் ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)
+function arStmtInstallTrigger() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('arStmtTrigger')) return 'Trigger ஏற்கனவே உள்ளது';
+  ScriptApp.newTrigger('arStmtParseMails').timeBased().everyWeeks(1).create();
+  props.setProperty('arStmtTrigger', 'weekly');
+  return 'Weekly auto-parse trigger installed — இனிவரும் mails தாமதமாக வந்தாலும் தானாக parse ஆகும்';
 }

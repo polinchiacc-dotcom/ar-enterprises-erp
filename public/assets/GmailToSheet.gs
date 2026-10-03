@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.2' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.3' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.2 — gid tab resolver + classify fix: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.3 — Drive export (DocumentApp scope தேவையில்லை) + pagination 200: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -316,9 +316,12 @@ function arStmtParseMails() {
   var raw = ss.getSheetByName('StmtRaw');
   if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
 
-  var threads = GmailApp.search('from:cityunionbank.in (statement OR statementofaccount OR "statement of account")', 0, 50);
-  Logger.log('search threads found: ' + threads.length);
-  var added = 0, skipped = 0, failed = 0;
+  var added = 0, skipped = 0, failed = 0, start = 0;
+  var QUERY = 'from:cityunionbank.in (statement OR statementofaccount OR "statement of account")';
+  while (start < 200) {
+  var threads = GmailApp.search(QUERY, start, 50);
+  if (!threads.length) break;
+  Logger.log('search page ' + start + ' → ' + threads.length + ' threads');
 
   for (var t = 0; t < threads.length; t++) {
     var msgs = threads[t].getMessages();
@@ -342,8 +345,8 @@ function arStmtParseMails() {
         var docFile = Drive.Files.insert({
           title: 'STMT_' + mid,
           mimeType: 'application/vnd.google-apps.document'
-        }, blob, { convert: true });
-        var text = DocumentApp.openById(docFile.id).getBody().getText();
+        }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+        var text = arStmtDocText_(docFile.id);
         var res = arStmtParseText_(text);
         if (res.rows.length) {
           sh.getRange(sh.getLastRow() + 1, 1, res.rows.length, res.rows[0].length).setValues(res.rows);
@@ -365,10 +368,29 @@ function arStmtParseMails() {
       }
     }
   }
+  start += threads.length;
+  if (threads.length < 50) break;
+  }
   props.setProperty('arStmtProcessed', Object.keys(processed).join(','));
   var msg2 = added + ' rows added, ' + skipped + ' skipped, ' + failed + ' failed — விவரம் StmtLog tab';
   Logger.log(msg2);
   return msg2;
+}
+
+// v4.3: Doc text via Drive export (documents scope தேவையே இல்லை)
+function arStmtDocText_(docId) {
+  var errs = [];
+  try {
+    var b1 = Drive.Files.export(docId, 'text/plain');
+    if (b1 && typeof b1.getDataAsString === 'function') return b1.getDataAsString('utf-8');
+    errs.push('export1:no-blob');
+  } catch (e1) { errs.push('export1:' + String(e1).slice(0, 90)); }
+  try {
+    var b2 = Drive.Files.export(docId, { mimeType: 'text/plain' });
+    if (b2 && typeof b2.getDataAsString === 'function') return b2.getDataAsString('utf-8');
+    errs.push('export2:no-blob');
+  } catch (e2) { errs.push('export2:' + String(e2).slice(0, 90)); }
+  throw new Error('docText failed [' + errs.join(' | ') + ']');
 }
 
 // PDF text → transaction rows (BS 1712 layout: A SNo | B Date | C Desc | F Amount | H Balance)

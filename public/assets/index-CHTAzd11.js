@@ -334,7 +334,7 @@ function AuditorStmtPageFn({user:c}){
   const cfgKey="arAuditorStmtCfg";
   const cfg0=(function(){try{return JSON.parse(localStorage.getItem(cfgKey)||"{}")}catch(e2){return{}}})();
   const[cfgId,cfgSetId]=E.useState(cfg0.sheetId||AUD_DEFAULT_SHEET),[cfgTab,cfgSetTab]=E.useState(/^gid:/.test(cfg0.tab||"")?cfg0.tab:"gid:2024650928");
-  const tabName=cfgTab.indexOf("gid:")===0?(cfg0.tabName||"Polinchi BS 1712"):cfgTab;
+  const tabName=(!cfg0.tabName||cfg0.tabName==="Polinchi BS 1712")?"Polinchi B/S 1712":cfg0.tabName;
   const[loading2,setLoading2]=E.useState(!0),[err2,setErr2]=E.useState(""),[tdata,setTdata]=E.useState(null);
   const[srch,setSrch]=E.useState(""),[dFrom,setDFrom]=E.useState(""),[dTo,setDTo]=E.useState(""),[txF,setTxF]=E.useState("all");
   const[isPrint,setIsPrint]=E.useState(!1),[orientation,setOrientation]=E.useState("landscape");
@@ -459,11 +459,11 @@ function AuditorStmtPageFn({user:c}){
           n.jsx("input",{className:"ui-input",placeholder:"https://script.google.com/macros/s/…/exec",value:wsUrl,onChange:function(e2){setWsUrl(e2.target.value)}}),
           n.jsx("input",{className:"ui-input",placeholder:"ARST-xxxxxxxxxxxxxxxx (arStmtToken)",value:wsTk,onChange:function(e2){setWsTk(e2.target.value)}}),
           n.jsxs("div",{style:{display:"flex",gap:8},children:[
-            n.jsx(L,{kind:"primary",small:!0,onClick:function(){if(wsUrl&&wsUrl.indexOf("script.google.com/macros")<0){r(!1,AT(f,"❌ இது Sheet URL — Web App /exec URL (script.google.com/macros/…) வேண்டும்","❌ That is a Sheet URL — need the Web App /exec URL (script.google.com/macros/…)"));return}if(wsTk&&wsTk.indexOf("ARST-")!==0){r(!1,AT(f,"❌ Token என்பது arStmtToken log வரும் ARST-… வடிவம்","❌ Token must look like ARST-… from the arStmtToken log"));return}saveCfg({sheetId:cfgId,tab:/^gid:/.test(cfgTab)?cfgTab:"gid:2024650928",tabName:tabName,wsUrl:wsUrl,wsTk:wsTk});setShowConn(!1);r(!0,AT(f,"இணைப்பு சேமிக்கப்பட்டது","Connection saved"))},children:"💾 "+AT(f,"சேமி","Save")}),
+            n.jsx(L,{kind:"primary",small:!0,onClick:function(){if(wsUrl&&wsUrl.indexOf("script.google.com/macros")<0){r(!1,AT(f,"❌ இது Sheet URL — Web App /exec URL (script.google.com/macros/…) வேண்டும்","❌ That is a Sheet URL — need the Web App /exec URL (script.google.com/macros/…)"));return}var tk2=String(wsTk||"").trim();if(tk2&&tk2.indexOf("ARST-")!==0&&/^[a-f0-9]{10,32}$/i.test(tk2))tk2="ARST-"+tk2;if(tk2&&tk2.indexOf("ARST-")!==0){r(!1,AT(f,"❌ Token என்பது arStmtToken log வரும் ARST-… வடிவம்","❌ Token must look like ARST-… from the arStmtToken log"));return}saveCfg({sheetId:cfgId,tab:/^gid:/.test(cfgTab)?cfgTab:"gid:2024650928",tabName:tabName,wsUrl:wsUrl,wsTk:tk2});setShowConn(!1);r(!0,AT(f,"இணைப்பு சேமிக்கப்பட்டது","Connection saved"))},children:"💾 "+AT(f,"சேமி","Save")}),
             n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowConn(!1)},children:"✕ "+AT(f,"மூடு","Close")})
           ]}),
           n.jsxs("ol",{style:{margin:0,paddingLeft:18,fontSize:12,lineHeight:1.6},children:[
-            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v3 script paste","In script.google.com → AR Mail Sync, paste the v3 script")}),
+            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v4.3 script paste","In script.google.com → AR Mail Sync, paste the v4.3 script")}),
             n.jsxs("li",{children:["arStmtToken ",AT(f,"run செய்து token copy செய்யவும்","— run it and copy the token from the log")]}),
             n.jsxs("li",{children:["Deploy → New deployment → Web app (",AT(f,"Execute as: Me; Access: Anyone","Execute as: Me; Access: Anyone"),") → /exec URL ",AT(f,"நகல்","copy")]}),
             n.jsx("li",{children:AT(f,"URL + Token மேலே paste செய்து 💾 அழுத்தவும்","Paste the URL + Token above and press 💾")})

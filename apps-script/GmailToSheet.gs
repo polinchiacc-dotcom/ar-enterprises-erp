@@ -231,6 +231,30 @@ function doPost(e) {
     var colNum = 0, letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', cl = String(b.col || 'J').toUpperCase();
     for (var i = 0; i < cl.length; i++) colNum = colNum * 26 + (letters.indexOf(cl[i]) + 1);
     var row = parseInt(b.row, 10);
+    // v5.3: balKey+snoKey கொடுக்கப்பட்டால் சரியான row-ஐ தேடி எழுது (gviz row-கணக்கு தவறாக இருந்தாலும் சரி)
+    if (b.balKey !== undefined && b.balKey !== '') {
+      var dataR = sh.getDataRange().getValues();
+      var hdrR = 0;
+      for (var hI = 0; hI < Math.min(dataR.length, 25); hI++) {
+        if (String(dataR[hI][2]).indexOf('Description') >= 0) hdrR = hI;
+      }
+      var balT = parseFloat(String(b.balKey).replace(/[^0-9.\-]/g, ''));
+      var snoT = String(b.snoKey || '').replace(/[^0-9.\-]/g, '');
+      var hits = [];
+      for (var dI = hdrR + 1; dI < dataR.length; dI++) {
+        var hv = parseFloat(String(dataR[dI][7]).replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(hv) && !isNaN(balT) && Math.abs(hv - balT) < 0.005) {
+          if (snoT !== '') {
+            var sv = String(dataR[dI][0]).replace(/[^0-9.\-]/g, '');
+            if (sv !== '' && !isNaN(parseFloat(sv)) && Math.abs(parseFloat(sv) - parseFloat(snoT)) < 0.5) hits.push(dI + 1);
+          } else hits.push(dI + 1);
+        }
+      }
+      if (hits.length === 1) row = hits[0];
+      else if (hits.length > 1) return out.setContent(JSON.stringify({ ok: false, error: 'ambiguous row (' + hits.length + ') — Refresh செய்து முயற்சிக்கவும்' }));
+      else return out.setContent(JSON.stringify({ ok: false, error: 'row not found — website Refresh செய்யவும்' }));
+      Logger.log('write-back row resolved: ' + row + ' (balKey ' + balT + ')');
+    }
     if (!(row > 0) || !colNum) return out.setContent(JSON.stringify({ ok: false, error: 'bad row/col' }));
     // header label இல்லையெனில் எழுது
     var hdr = sh.getRange(row - (b.rowOffset || 1), colNum).getValue();
@@ -242,7 +266,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.0' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.3' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.0 — old-header rows 5-6 cleared (single header row 7!), StmtRaw 45K dump, per-page parse counters: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.3 — write-back: balance-key row resolution (gviz row-drift proof) + rebuild clears J1:J6 strays: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -478,9 +502,57 @@ function arStmtParseCUB_(text) {
   return { rows: rows, unparsed: unparsed };
 }
 
+// v5.1: interleaved வரி parser (ஒரே வரியில் date bal desc chq amt — கடைசி பக்க வடிவம்)
+function arStmtParseCUBIL_(text) {
+  var T = String(text || '');
+  if (T.indexOf('CITY UNION BANK') < 0) return [];
+  var DATER = /\d{2}-[A-Z]{3}-\d{4}/g;
+  var AMTR = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
+  var MO = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
+  var rows = [], lines = T.split(/\r?\n/), prevBal = null;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].replace(/\t/g, ' ').trim();
+    if (!/^\d{2}-[A-Z]{3}-\d{4}\b/.test(line) || !/\b(TO|BY)\b/.test(line)) continue;
+    var amAll = line.match(AMTR);
+    if (!amAll || amAll.length < 2) continue;
+    var dm0 = line.match(/^(\d{2})-([A-Z]{3})-(\d{4})/);
+    if (!dm0) continue;
+    var firstDt = new Date(Number(dm0[3]), MO[dm0[2]] - 1, Number(dm0[1]));
+    var dts = [], mD;
+    while ((mD = DATER.exec(line)) !== null) dts.push({ d: mD[0], i: mD.index });
+    if (dts.length === 0) dts.push({ d: null, i: 0 });
+    // segments per date
+    var segs = [];
+    for (var dI = 0; dI < dts.length; dI++) {
+      var st = dts[dI].i, en = (dI + 1 < dts.length) ? dts[dI + 1].i : line.length;
+      segs.push(line.slice(st, en));
+    }
+    for (var gI = 0; gI < segs.length; gI++) {
+      var seg = segs[gI].replace(/\t/g, ' ').trim();
+      var am = seg.match(AMTR);
+      if (!am || am.length < 2) continue;
+      var bal, amt;
+      if (dts.length === 1) { bal = am[0]; amt = am[1]; }
+      else { bal = am[am.length - 1]; amt = am[0]; }
+      var bF = parseFloat(bal.replace(/,/g, ''));
+      var dsc = seg.replace(/\d{2}-[A-Z]{3}-\d{4}/g, ' ').replace(AMTR, ' ').replace(/\s{2,}/g, ' ').trim();
+      var dParts = seg.match(/\d{2}-[A-Z]{3}-\d{4}/);
+      var dtx = firstDt;
+      if (dParts) { var pm = dParts[0].match(/(\d{2})-([A-Z]{3})-(\d{4})/); dtx = new Date(Number(pm[3]), MO[pm[2]] - 1, Number(pm[1])); }
+      rows.push([null, dtx, dsc, '', '', '', '', String(bF)]);
+      prevBal = bF;
+    }
+  }
+  return rows;
+}
+
 function arStmtParseText_(text) {
   var res = arStmtParseCUB_(text);
-  if (res.rows.length) return res;
+  if (res.rows.length) {
+    var il = arStmtParseCUBIL_(text);
+    if (il.length) Logger.log('CUB interleaved extra rows: ' + il.length);
+    return { rows: res.rows.concat(il), unparsed: res.unparsed };
+  }
   return arStmtParseLegacy_(text);
 }
 
@@ -528,15 +600,13 @@ function arStmtAppendRows_(sh, newRows) {
   var lastRow = sh.getLastRow();
   var keys = {};
   if (lastRow > 5) {
-    var ex = sh.getRange(1, 2, lastRow, 6).getValues();
+    var ex = sh.getRange(1, 2, lastRow, 7).getValues();
     for (var r = 0; r < ex.length; r++) {
       var d = ex[r][0], dsc = String(ex[r][1] || '').replace(/\s+/g, ' ').trim();
       if (!dsc) continue;
-      var f = parseFloat(String(ex[r][4]).replace(/[^0-9.\-]/g, '')) || 0;
-      var g = parseFloat(String(ex[r][5]).replace(/[^0-9.\-]/g, '')) || 0;
-      var a = Math.abs(g) > Math.abs(f) ? g : f;
+      var bS = String(ex[r][6]).replace(/[^0-9.\-]/g, '');
       var dk = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d).slice(0, 10);
-      keys[dk + '|' + dsc + '|' + a] = 1;
+      keys[dk + '|' + dsc + '|' + bS] = 1;
     }
   }
   var out = [];
@@ -544,10 +614,9 @@ function arStmtAppendRows_(sh, newRows) {
     var nr = newRows[i];
     var nd = (nr[1] instanceof Date) ? Utilities.formatDate(nr[1], tz, 'yyyy-MM-dd') : String(nr[1]).slice(0, 10);
     var ndsc = String(nr[2] || '').replace(/\s+/g, ' ').trim();
-    var nf = parseFloat(nr[5]) || 0, ng = parseFloat(nr[6]) || 0;
-    var na = Math.abs(ng) > Math.abs(nf) ? ng : nf;
-    if (keys[nd + '|' + ndsc + '|' + na]) continue;
-    keys[nd + '|' + ndsc + '|' + na] = 1;
+    var nbS = String(nr[7] === undefined || nr[7] === null ? '' : nr[7]).replace(/[^0-9.\-]/g, '');
+    if (keys[nd + '|' + ndsc + '|' + nbS]) continue;
+    keys[nd + '|' + ndsc + '|' + nbS] = 1;
     out.push(nr);
   }
   if (out.length) {
@@ -632,6 +701,7 @@ function arStmtRebuild() {
   }
   // பழைய rows முழுவதும் STRUCTURAL delete (merge B2:D6-க்கு கீழே எல்லாம்) — title rows 1-6 அப்படியே
   sh.getRange(5, 1, 2, 26).clearContent(); // பழைய header எச்சம் (rows 5-6) — merge-safe clear
+  sh.getRange(1, 10, 6, 1).clearContent(); // J1:J6 title-பகுதி stray notes நீக்கம்
   var mr = sh.getMaxRows();
   if (mr > 6) sh.deleteRows(7, mr - 6);
   SpreadsheetApp.flush();
@@ -712,11 +782,14 @@ function arStmtImportPdf() {
   return msg;
 }
 
-// வாரம் ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)
+// மணிக்கு ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)
 function arStmtInstallTrigger() {
   var props = PropertiesService.getScriptProperties();
-  if (props.getProperty('arStmtTrigger')) return 'Trigger ஏற்கனவே உள்ளது';
-  ScriptApp.newTrigger('arStmtParseMails').timeBased().everyWeeks(1).create();
-  props.setProperty('arStmtTrigger', 'weekly');
-  return 'Weekly auto-parse trigger installed — இனிவரும் mails தாமதமாக வந்தாலும் தானாக parse ஆகும்';
+  // பழைய trigger இருந்தால் நீக்கி புதிதாக install
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'arStmtParseMails') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('arStmtParseMails').timeBased().everyHours(1).create();
+  props.setProperty('arStmtTrigger', 'hourly');
+  return 'HOURLY trigger installed — மணிக்கு ஒருமுறை புதிய statement mails தானாக parse ஆகும்';
 }

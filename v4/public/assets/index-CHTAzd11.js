@@ -410,6 +410,8 @@ function AuditorStmtPageFn({user:c}){
     const keep=[];
     if(D.date>=0)keep.push(D.date);
     if(D.desc>=0)keep.push(D.desc);
+    if(D.debit>=0)keep.push(D.debit);
+    if(D.credit>=0)keep.push(D.credit);
     for(let i2=0;i2<L2.length;i2++){if(keep.indexOf(i2)<0&&i2!==D.ddet&&L2[i2]&&String(L2[i2]).trim()!==""&&i2!==D.bal)keep.push(i2)}
     if(D.bal>=0)keep.push(D.bal);
     return keep.slice(0,9).map(function(i2){return{idx:i2,label:L2[i2]||(i2===D.date?AT(f,"தேதி","Date"):i2===D.desc?AT(f,"விவரம்","Description"):i2===D.credit?AT(f,"வரவு","Credit"):i2===D.debit?AT(f,"செலவு","Debit"):i2===D.bal?AT(f,"இருப்பு","Balance"):AT(f,"நெடுவரிசை ","Col ")+(i2+1)),num:TY[i2]==="number"}});

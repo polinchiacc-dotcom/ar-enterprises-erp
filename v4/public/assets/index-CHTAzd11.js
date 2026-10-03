@@ -373,11 +373,31 @@ function AuditorStmtPageFn({user:c}){
     }
     if(out.date<0)out.date=findLbl(/date|தேதி/i);
     if(out.desc<0)out.desc=findLbl(/particulars|narration|details/i);
+    if(out.desc<0){for(let i2=0;i2<L2.length;i2++){if(i2===out.ddet||TY[i2]!=="string")continue;let c=0,tt=0;R2.forEach(function(v2){const x=String(v2[i2]||"").trim();if(!x)return;tt++;if(/^(TO|BY)\b/i.test(x))c++});if(tt&&c/tt>0.3){out.desc=i2;break}}}
+    if(out.bal<0){let best=-1,bestHits=-1;for(let i2=0;i2<L2.length;i2++){if(TY[i2]!=="number")continue;let fl=0;R2.forEach(function(v2){if(String(v2[i2]||"")!=="")fl++});if(fl/n<0.6)continue;let hits=0;for(let i3=1;i3<R2.length;i3++){const b1=audNum(R2[i3][i2]),b0=audNum(R2[i3-1][i2]);if(!b1&&!String(R2[i3][i2]||"").trim())continue;const d=Math.round((b1-b0)*100)/100;if(Math.abs(d)<0.005){hits++;continue}let m=false;for(let i4=0;i4<L2.length;i4++){if(i4===i2||TY[i4]!=="number")continue;if(Math.abs(audNum(R2[i3][i4])-Math.abs(d))<0.01){m=true;break}}if(m)hits++}if(hits>bestHits){bestHits=hits;best=i2}}if(best>=0&&bestHits>=Math.min(20,n*0.3))out.bal=best}
     if(out.credit<0||out.debit<0){
       const numCols=[];
       for(let i2=0;i2<L2.length;i2++){
         if(i2===out.bal||i2===out.credit||i2===out.debit)continue;
-        if(TY[i2]==="number"){let fl=0;R2.forEach(function(v2){if(String(v2[i2]||"")!=="")fl++});if(fl/n>0.3)numCols.push(i2)}
+        if(TY[i2]!=="number")continue;
+        let fl=0,ser=0,pr=null;
+        R2.forEach(function(v2){const x=String(v2[i2]||"");if(x!=="")fl++;const vn=audNum(x);if(pr!==null&&Math.abs(vn-pr-1)<0.001)ser++;pr=vn});
+        if(fl/n>0.15&&ser/Math.max(1,fl)<0.85)numCols.push(i2);
+      }
+      if(out.bal>=0&&numCols.length>=2){
+        const vc={},vd={};
+        for(let i3=1;i3<R2.length;i3++){
+          const d=Math.round((audNum(R2[i3][out.bal])-audNum(R2[i3-1][out.bal]))*100)/100;
+          if(Math.abs(d)<0.005)continue;
+          for(let k2=0;k2<numCols.length;k2++){
+            const c2=numCols[k2],x=audNum(R2[i3][c2]);
+            if(x&&Math.abs(x-Math.abs(d))<0.01){if(d>0)vc[c2]=(vc[c2]||0)+1;else vd[c2]=(vd[c2]||0)+1}
+          }
+        }
+        let bc=-1,bcn=-1,bd=-1,bdn=-1;
+        numCols.forEach(function(c2){if((vc[c2]||0)>bcn){bcn=vc[c2]||0;bc=c2}if((vd[c2]||0)>bdn){bdn=vd[c2]||0;bd=c2}});
+        if(out.credit<0&&bcn>0)out.credit=bc;
+        if(out.debit<0&&bdn>0&&bd!==out.credit)out.debit=bd;
       }
       if(out.credit<0&&numCols.length)out.credit=numCols[0];
       if(out.debit<0&&numCols.length>1)out.debit=numCols[1];
@@ -392,7 +412,7 @@ function AuditorStmtPageFn({user:c}){
     if(D.desc>=0)keep.push(D.desc);
     for(let i2=0;i2<L2.length;i2++){if(keep.indexOf(i2)<0&&i2!==D.ddet&&L2[i2]&&String(L2[i2]).trim()!==""&&i2!==D.bal)keep.push(i2)}
     if(D.bal>=0)keep.push(D.bal);
-    return keep.slice(0,9).map(function(i2){return{idx:i2,label:L2[i2]||AT(f,"நெடுவரிசை ","Col ")+(i2+1),num:TY[i2]==="number"}});
+    return keep.slice(0,9).map(function(i2){return{idx:i2,label:L2[i2]||(i2===D.date?AT(f,"தேதி","Date"):i2===D.desc?AT(f,"விவரம்","Description"):i2===D.credit?AT(f,"வரவு","Credit"):i2===D.debit?AT(f,"செலவு","Debit"):i2===D.bal?AT(f,"இருப்பு","Balance"):AT(f,"நெடுவரிசை ","Col ")+(i2+1)),num:TY[i2]==="number"}});
   },[tdata,D,f]);
   const visible=E.useMemo(function(){
     const q2=srch.trim().toUpperCase(),df=dFrom?normAudDate(dFrom):"",dt=dTo?normAudDate(dTo):"",out=[];
@@ -463,7 +483,7 @@ function AuditorStmtPageFn({user:c}){
             n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowConn(!1)},children:"✕ "+AT(f,"மூடு","Close")})
           ]}),
           n.jsxs("ol",{style:{margin:0,paddingLeft:18,fontSize:12,lineHeight:1.6},children:[
-            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v4.9 script paste","In script.google.com → AR Mail Sync, paste the v4.9 script")}),
+            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v5.0 script paste","In script.google.com → AR Mail Sync, paste the v5.0 script")}),
             n.jsxs("li",{children:["arStmtToken ",AT(f,"run செய்து token copy செய்யவும்","— run it and copy the token from the log")]}),
             n.jsxs("li",{children:["Deploy → New deployment → Web app (",AT(f,"Execute as: Me; Access: Anyone","Execute as: Me; Access: Anyone"),") → /exec URL ",AT(f,"நகல்","copy")]}),
             n.jsx("li",{children:AT(f,"URL + Token மேலே paste செய்து 💾 அழுத்தவும்","Paste the URL + Token above and press 💾")})

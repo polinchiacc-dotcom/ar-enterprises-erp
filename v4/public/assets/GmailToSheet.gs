@@ -266,7 +266,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.3' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.4b' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.3 — write-back: balance-key row resolution (gviz row-drift proof) + rebuild clears J1:J6 strays: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.4b — merge-walk: block(trusted)+IL candidates date-merged, single balance-chain walk recovers interleaved tx, dups auto-dropped: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -437,6 +437,12 @@ function arStmtParseCUB_(text) {
   }
   var rows = [], unparsed = 0, carryBal = null;
   for (var p = 0; p < pages.length; p++) {
+    if (/END OF REPORT|Total Debits|Total Credits/.test(pages[p])) { Logger.log('CUB page ' + (p + 1) + ' = summary, skipped'); continue; }
+    var ilLines = 0;
+    for (var li = 0; li < pages[p].split(/\r?\n/).length; li++) {
+      if (/^\s*\d{2}-[A-Z]{3}-\d{4}\b/.test(pages[p].split(/\r?\n/)[li]) && /\b(TO|BY)\b/.test(pages[p].split(/\r?\n/)[li])) ilLines++;
+    }
+    if (ilLines >= 2) { Logger.log('CUB page ' + (p + 1) + ' = interleaved (' + ilLines + ' lines), block-skip'); continue; }
     var lines = pages[p].split(/\r?\n/);
     var di = -1, best = 0, dates = [];
     for (var i = 0; i < lines.length; i++) {
@@ -502,98 +508,97 @@ function arStmtParseCUB_(text) {
   return { rows: rows, unparsed: unparsed };
 }
 
-// v5.1: interleaved வரி parser (ஒரே வரியில் date bal desc chq amt — கடைசி பக்க வடிவம்)
+// v5.4b: interleaved candidates (dt, desc, chq, amount-pair options) — chain தீர்வு arStmtParseText_ merge-walk-ல்
 function arStmtParseCUBIL_(text) {
   var T = String(text || '');
   if (T.indexOf('CITY UNION BANK') < 0) return [];
   var DATER = /\d{2}-[A-Z]{3}-\d{4}/g;
   var AMTR = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
   var MO = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
-  var rows = [], lines = T.split(/\r?\n/), prevBal = null;
+  var cands = [], lines = T.split(/\r?\n/);
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].replace(/\t/g, ' ').trim();
-    if (!/^\d{2}-[A-Z]{3}-\d{4}\b/.test(line) || !/\b(TO|BY)\b/.test(line)) continue;
-    var amAll = line.match(AMTR);
-    if (!amAll || amAll.length < 2) continue;
-    var dm0 = line.match(/^(\d{2})-([A-Z]{3})-(\d{4})/);
-    if (!dm0) continue;
-    var firstDt = new Date(Number(dm0[3]), MO[dm0[2]] - 1, Number(dm0[1]));
+    if (!/^\d{2}-[A-Z]{3}-\d{4}\b/.test(line)) continue;
+    var hasTB = /\b(TO|BY)\b/.test(line);
     var dts = [], mD;
+    DATER.lastIndex = 0;
     while ((mD = DATER.exec(line)) !== null) dts.push({ d: mD[0], i: mD.index });
-    if (dts.length === 0) dts.push({ d: null, i: 0 });
-    // segments per date
+    if (!dts.length) continue;
     var segs = [];
-    for (var dI = 0; dI < dts.length; dI++) {
-      var st = dts[dI].i, en = (dI + 1 < dts.length) ? dts[dI + 1].i : line.length;
-      segs.push(line.slice(st, en));
+    for (var gI = 0; gI < dts.length; gI++) {
+      var st = dts[gI].i, en = (gI + 1 < dts.length) ? dts[gI + 1].i : line.length;
+      segs.push({ d: dts[gI].d, txt: line.slice(st, en) });
     }
-    for (var gI = 0; gI < segs.length; gI++) {
-      var seg = segs[gI].replace(/\t/g, ' ').trim();
-      var am = seg.match(AMTR);
+    for (var sI = 0; sI < segs.length; sI++) {
+      var seg = segs[sI].txt.replace(/\t/g, ' ').trim(), am = seg.match(AMTR);
       if (!am || am.length < 2) continue;
-      var bal, amt;
-      if (dts.length === 1) { bal = am[0]; amt = am[1]; }
-      else { bal = am[am.length - 1]; amt = am[0]; }
-      var bF = parseFloat(bal.replace(/,/g, ''));
-      var dsc = seg.replace(/\d{2}-[A-Z]{3}-\d{4}/g, ' ').replace(AMTR, ' ').replace(/\s{2,}/g, ' ').trim();
-      var dParts = seg.match(/\d{2}-[A-Z]{3}-\d{4}/);
-      var dtx = firstDt;
-      if (dParts) { var pm = dParts[0].match(/(\d{2})-([A-Z]{3})-(\d{4})/); dtx = new Date(Number(pm[3]), MO[pm[2]] - 1, Number(pm[1])); }
-      rows.push([null, dtx, dsc, '', '', '', '', String(bF)]);
-      prevBal = bF;
+      var pm = segs[sI].d.match(/(\d{2})-([A-Z]{3})-(\d{4})/);
+      var dtx = new Date(Number(pm[3]), MO[pm[2]] - 1, Number(pm[1]));
+      var a0 = parseFloat(am[0].replace(/,/g, '')), a1 = parseFloat(am[1].replace(/,/g, ''));
+      var aL = parseFloat(am[am.length - 1].replace(/,/g, ''));
+      var narrIdx = seg.search(/\b(TO|BY)\b/);
+      var firstAmtIdx = seg.indexOf(am[0]);
+      var pairs = [];
+      if (narrIdx < 0 || (firstAmtIdx >= 0 && firstAmtIdx < narrIdx)) {
+        pairs.push([aL, a0]); // balance முதலில் (date பின்), amount கடைசியில் — CUB interleaved TO-format
+      } else {
+        pairs.push([a0, a1]); // narration பின் (amt, bal) — BY-format
+      }
+      pairs.push([a1, a0]);
+      if (am.length > 2) pairs.push([a0, aL]);
+      var dsc = seg.replace(/\d{2}-[A-Z]{3}-\d{4}/g, ' ');
+      for (var xI = 0; xI < am.length; xI++) dsc = dsc.replace(am[xI], ' ');
+      dsc = dsc.replace(/\s{2,}/g, ' ').trim();
+      if (!hasTB) {
+        var prevL = i > 0 ? lines[i - 1].replace(/\t/g, ' ').trim() : '';
+        var nextL = i + 1 < lines.length ? lines[i + 1].replace(/\t/g, ' ').trim() : '';
+        if (prevL && !/\d{2}-[A-Z]{3}-\d{4}/.test(prevL) && !AMTR.test(prevL) && /[A-Za-z]{3}/.test(prevL)) dsc = prevL + ' ' + dsc;
+        if (nextL && !/\d{2}-[A-Z]{3}-\d{4}/.test(nextL) && !AMTR.test(nextL) && /[A-Za-z]{3}/.test(nextL)) dsc = (dsc + ' ' + nextL).trim();
+        AMTR.lastIndex = 0;
+      }
+      var chq = '';
+      var mc = dsc.match(/\b(\d{3,6})\b\s*$/);
+      if (mc && mc[1] !== '00060') { chq = mc[1]; dsc = dsc.replace(/\b\d{3,6}\b\s*$/, '').trim(); }
+      if (!dsc) dsc = '(narration வரி மாறுபட்டது)';
+      cands.push({ dt: dtx, dsc: dsc, chq: chq, pairs: pairs });
     }
   }
-  return rows;
+  return cands;
 }
 
 function arStmtParseText_(text) {
   var res = arStmtParseCUB_(text);
-  if (res.rows.length) {
-    var il = arStmtParseCUBIL_(text);
-    if (il.length) Logger.log('CUB interleaved extra rows: ' + il.length);
-    return { rows: res.rows.concat(il), unparsed: res.unparsed };
-  }
-  return arStmtParseLegacy_(text);
-}
-
-// பழைய line-parser (fallback — மற்ற format-களுக்கு)
-function arStmtParseLegacy_(text) {
-  var rows = [], unparsed = 0, prevBal = null;
-  var lines = String(text || '').split(/[\r\n]+/);
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].trim();
-    var m = line.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\s+(.*)$/);
-    if (!m) continue;
-    var dd = m[1], mo = m[2], yy = m[3], rest = m[4];
-    if (String(yy).length === 2) yy = '20' + yy;
-    var nums = [], re2 = /(?:\d{1,3}(?:,\d{2,3})*|\d+)(?:\.\d{1,2})?(?=\s*(?:Cr|Dr|CR|DR))?/g, mm;
-    while ((mm = re2.exec(rest)) !== null) {
-      if (mm[0].length < 2 && nums.length === 0) continue;
-      nums.push({ v: mm[0], idx: mm.index });
+  if (!res.rows.length) return arStmtParseLegacy_(text);
+  // merge-walk: block rows (trusted) + IL candidates ஒன்றாக date-sort → ஒரே balance-chain walk
+  var cands = arStmtParseCUBIL_(text);
+  var combined = [];
+  for (var bI = 0; bI < res.rows.length; bI++) combined.push({ t: res.rows[bI][1].getTime(), blk: res.rows[bI], il: null });
+  for (var cI = 0; cI < cands.length; cI++) combined.push({ t: cands[cI].dt.getTime(), blk: null, il: cands[cI] });
+  combined.sort(function (a, b) { return a.t - b.t || (a.blk ? -1 : 1); });
+  var out = [], prev = null, kept = 0, dropped = 0;
+  for (var k = 0; k < combined.length; k++) {
+    var o = combined[k];
+    if (o.blk) {
+      out.push(o.blk);
+      var hv = parseFloat(String(o.blk[7]).replace(/[^0-9.\-]/g, ''));
+      if (!isNaN(hv)) prev = hv;
+      continue;
     }
-    if (!nums.length) continue;
-    var lastN = nums[nums.length - 1];
-    var amtRaw = lastN.v.replace(/,/g, '');
-    var balRaw = nums.length > 1 ? nums[nums.length - 2].v.replace(/,/g, '') : '';
-    var desc = rest.slice(0, lastN.idx).replace(/[|\-]+\s*$/, '').replace(/\s{2,}/g, ' ').trim();
-    if (!desc) desc = rest.replace(/[|\-]+\s*$/, '').trim();
-    var amt = parseFloat(amtRaw), bal = balRaw !== '' ? parseFloat(balRaw) : '';
-    if (isNaN(amt)) { unparsed++; continue; }
-    // Debit/Credit கண்டறிதல்: 1) வார்த்தை 2) balance வேறுபாடு
-    var dsc = desc.toUpperCase();
-    var isCredit;
-    if (/\bCR\b|CREDIT|DEPOSIT|REVERSAL|INTEREST/.test(dsc)) isCredit = true;
-    else if (/\bDR\b|DEBIT|WITHDRAW|ATM|CHQ PAID|CHARGE|EMI|TAX/.test(dsc)) isCredit = false;
-    else if (prevBal !== null && bal !== '' && !isNaN(bal)) isCredit = bal > prevBal;
-    else isCredit = false;
-    if (bal !== '' && !isNaN(bal)) prevBal = bal;
-    var dt = new Date(Number(yy), Number(mo) - 1, Number(dd));
-    rows.push([null, dt, desc, '', '', isCredit ? '' : amt, isCredit ? amt : '', bal === '' ? '' : String(bal)]);
+    var c = o.il, got = null;
+    for (var pI = 0; pI < c.pairs.length && !got; pI++) {
+      var amt = c.pairs[pI][0], bal = c.pairs[pI][1];
+      if (prev === null) { got = { amt: amt, bal: bal }; break; }
+      if (Math.abs(prev + amt - bal) < 0.01 || Math.abs(prev - amt - bal) < 0.01) got = { amt: amt, bal: bal };
+    }
+    if (!got || prev === null) { dropped++; Logger.log('IL drop: prev=' + prev + ' pairs0=' + JSON.stringify(c.pairs[0]) + ' | ' + c.dsc.slice(0, 50)); continue; }
+    var credit = got.bal > prev;
+    out.push([null, c.dt, c.dsc, c.chq, '', credit ? '' : got.amt, credit ? got.amt : '', String(got.bal)]);
+    prev = got.bal; kept++;
   }
-  return { rows: rows, unparsed: unparsed };
+  Logger.log('CUB merge-walk: block=' + res.rows.length + ' IL-kept=' + kept + ' IL-dropped=' + dropped + ' total=' + out.length);
+  return { rows: out, unparsed: res.unparsed };
 }
 
-// v4.4: புதிய rows append (dedupe: date+desc+amount ஏற்கனவே இருந்தால் தவிர் — இரட்டிப்பு இல்லை)
 function arStmtAppendRows_(sh, newRows) {
   if (!newRows.length) return 0;
   var tz = Session.getScriptTimeZone();
@@ -657,13 +662,16 @@ function arStmtFinalize_(sh) {
     var h = parseFloat(String(vals[i][2]).replace(/[^0-9.\-]/g, ''));
     if (isNaN(h)) continue;
     var diff = Math.round((h - prev) * 100) / 100;
-    var nf = diff < 0 ? Math.abs(diff) : '';
-    var ng = diff > 0 ? diff : '';
-    if (String(vals[i][0]) !== String(nf) || String(vals[i][1]) !== String(ng)) fixed++;
-    vals[i][0] = nf; vals[i][1] = ng;
+    var hasAmt = String(vals[i][0]).trim() !== '' || String(vals[i][1]).trim() !== '';
+    if (!hasAmt && diff !== 0) {
+      vals[i][0] = diff < 0 ? Math.abs(diff) : '';
+      vals[i][1] = diff > 0 ? diff : '';
+      fixed++;
+    }
     prev = h;
   }
   rng.setValues(vals);
+  if (vals.length) sh.getRange(lastHeader + 2, 6, vals.length, 3).setNumberFormat('#,##,##0.00');
   Logger.log('finalize: dropped=' + dropped + ' chainFixed=' + fixed);
   var data2 = sh.getDataRange().getValues();
   var num = [];

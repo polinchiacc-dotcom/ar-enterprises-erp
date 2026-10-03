@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.9b' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.0' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.9b — expClose anchor + dates continuation + chain-repair finalize (F/G≡Hdiff, trailing junk dropped): arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.0 — old-header rows 5-6 cleared (single header row 7!), StmtRaw 45K dump, per-page parse counters: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -449,7 +449,7 @@ function arStmtParseCUB_(text) {
       if (amts) { for (var a = 0; a < amts.length; a++) amounts.push(parseFloat(amts[a].replace(/,/g, ''))); }
       else if (cur) { cur = (cur + ' ' + t).trim(); parts[parts.length - 1] = cur; }
     }
-    if (amounts.length < N) { unparsed += N; continue; }
+    if (amounts.length < N) { Logger.log('CUB page ' + (p + 1) + ' SKIP: dates=' + N + ' amounts=' + amounts.length); unparsed += N; continue; }
     // balance block: அடுத்த பக்கத்தின் Brought Forward = இப்பக்க closing → amounts-ல் கடைசி நிகழ்வை தேடு
     var endIdx = amounts.length - 1;
     var expClose = (p + 1 < pages.length && meta[p + 1].bf !== null) ? meta[p + 1].bf : null;
@@ -459,7 +459,8 @@ function arStmtParseCUB_(text) {
       }
     }
     var startIdx = endIdx - N + 1;
-    if (startIdx < 0) { unparsed += N; continue; }
+    if (startIdx < 0) { Logger.log('CUB page ' + (p + 1) + ' SKIP2: N=' + N + ' amounts=' + amounts.length); unparsed += N; continue; }
+    Logger.log('CUB page ' + (p + 1) + ' OK: N=' + N + ' endIdx=' + endIdx + '/' + (amounts.length - 1) + (expClose !== null ? ' anchored' : ' blind'));
     var prev = (meta[p].bf !== null) ? meta[p].bf : carryBal;
     for (var r = 0; r < N; r++) {
       var bal = amounts[startIdx + r];
@@ -630,6 +631,7 @@ function arStmtRebuild() {
     if (String(rdata[rr][0]).indexOf('file:') === 0) raw.deleteRow(rr + 1);
   }
   // பழைய rows முழுவதும் STRUCTURAL delete (merge B2:D6-க்கு கீழே எல்லாம்) — title rows 1-6 அப்படியே
+  sh.getRange(5, 1, 2, 26).clearContent(); // பழைய header எச்சம் (rows 5-6) — merge-safe clear
   var mr = sh.getMaxRows();
   if (mr > 6) sh.deleteRows(7, mr - 6);
   SpreadsheetApp.flush();
@@ -646,7 +648,7 @@ function arStmtRebuild() {
       var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
-      raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 5000)]);
+      raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 45000)]);
       var res = arStmtParseText_(text);
       if (res.rows.length) {
         var nAdd = arStmtAppendRows_(sh, res.rows);

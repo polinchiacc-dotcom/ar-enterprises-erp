@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.7' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.0' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.7 — UrlFetch export + DocumentApp fallback; rebuild: structural delete (merge-safe) + own header row 7: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.0 — old-header rows 5-6 cleared (single header row 7!), StmtRaw 45K dump, per-page parse counters: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -397,8 +397,95 @@ function arStmtDocText_(docId) {
   throw new Error('docText failed [' + errs.join(' | ') + ']');
 }
 
-// PDF text → transaction rows (v4.4 BS 1712 layout: A SNo | B Date | C Desc | F Debit | G Credit | H Balance)
+// v4.9 CUB column-block parser: ஒவ்வொரு பக்கத்திற்கும் Amt Brought Forward seed + balance-block சரிபார்ப்பு
+// (dates-line + continuation lines → N tx; amounts-ல் expected closing-ஐ தேடி balance block அமைத்தல்; diff-ஆல் debit/credit)
+function arStmtParseCUB_(text) {
+  var T = String(text || '');
+  if (T.indexOf('STATEMENT OF ACCOUNT') < 0 && T.indexOf('CITY UNION BANK') < 0) return { rows: [], unparsed: 0 };
+  var pages = T.split(/\n(?=Account No : \d+)/);
+  var AMT = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
+  var DATE = /\d{2}-[A-Z]{3}-\d{4}/g;
+  var MO = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
+  var meta = [];
+  for (var q = 0; q < pages.length; q++) {
+    var bf = pages[q].match(/(?:Amt Brought Forward\s*:?\s*|Opening Balance as on \d{2}-[A-Z]{3}-\d{4}\s+)([\d,]+\.\d{2})/);
+    meta.push({ bf: bf ? parseFloat(bf[1].replace(/,/g, '')) : null });
+  }
+  var rows = [], unparsed = 0, carryBal = null;
+  for (var p = 0; p < pages.length; p++) {
+    var lines = pages[p].split(/\r?\n/);
+    var di = -1, best = 0, dates = [];
+    for (var i = 0; i < lines.length; i++) {
+      var ds = lines[i].match(DATE);
+      if (ds && ds.length > best) { best = ds.length; di = i; dates = ds; }
+    }
+    if (di < 0) continue;
+    // dates-வரி அடுத்த வரியிலும் தொடரலாம் (date-only lines சேர்)
+    var k = di + 1;
+    while (k < lines.length) {
+      var dd = lines[k].match(DATE);
+      if (dd && lines[k].replace(DATE, '').replace(/[\s\t]/g, '') === '') { dates = dates.concat(dd); k++; }
+      else break;
+    }
+    var N = dates.length;
+    if (!N) continue;
+    // amounts + particulars சேகரிப்பு
+    var amounts = [], parts = [], cur = null;
+    for (var j = di + 1; j < lines.length; j++) {
+      var t = lines[j].replace(/\t/g, ' ').trim();
+      if (!t || /Page \d+ of \d+/.test(t) || /^Regd\. Office|^Telephone No|^CIN :/.test(t)) {
+        if (/Page \d+ of \d+|^Regd\. Office|^Telephone No|^CIN :/.test(t)) break;
+        continue;
+      }
+      if (/^(TO|BY)\b/.test(t)) {
+        var items = t.split(/\s+(?=(?:TO|BY)\b)/);
+        for (var x = 0; x < items.length; x++) { cur = items[x].trim(); parts.push(cur); }
+        continue;
+      }
+      if (/^[\d\s]+$/.test(t)) continue; // chq-no block
+      var amts = t.match(AMT);
+      var pureAmt = amts && t.replace(/[\d,.\s]/g, '') === '';
+      if (cur && !pureAmt) { cur = (cur + ' ' + t).trim(); parts[parts.length - 1] = cur; continue; }
+      if (amts) { for (var a = 0; a < amts.length; a++) amounts.push(parseFloat(amts[a].replace(/,/g, ''))); }
+      else if (cur) { cur = (cur + ' ' + t).trim(); parts[parts.length - 1] = cur; }
+    }
+    if (amounts.length < N) { Logger.log('CUB page ' + (p + 1) + ' SKIP: dates=' + N + ' amounts=' + amounts.length); unparsed += N; continue; }
+    // balance block: அடுத்த பக்கத்தின் Brought Forward = இப்பக்க closing → amounts-ல் கடைசி நிகழ்வை தேடு
+    var endIdx = amounts.length - 1;
+    var expClose = (p + 1 < pages.length && meta[p + 1].bf !== null) ? meta[p + 1].bf : null;
+    if (expClose !== null) {
+      for (var y = amounts.length - 1; y >= N - 1; y--) {
+        if (Math.abs(amounts[y] - expClose) < 0.005) { endIdx = y; break; }
+      }
+    }
+    var startIdx = endIdx - N + 1;
+    if (startIdx < 0) { Logger.log('CUB page ' + (p + 1) + ' SKIP2: N=' + N + ' amounts=' + amounts.length); unparsed += N; continue; }
+    Logger.log('CUB page ' + (p + 1) + ' OK: N=' + N + ' endIdx=' + endIdx + '/' + (amounts.length - 1) + (expClose !== null ? ' anchored' : ' blind'));
+    var prev = (meta[p].bf !== null) ? meta[p].bf : carryBal;
+    for (var r = 0; r < N; r++) {
+      var bal = amounts[startIdx + r];
+      var diff = (prev !== null && prev !== undefined) ? Math.round((bal - prev) * 100) / 100 : null;
+      var desc = parts[r] || '';
+      var isBy = /^BY\b/.test(desc.toUpperCase());
+      var credit = (diff !== null && diff !== 0) ? diff > 0 : isBy;
+      var amt = (diff !== null && diff !== 0) ? Math.abs(diff) : '';
+      var dm = dates[r].match(/(\d{2})-([A-Z]{3})-(\d{4})/);
+      var dt = new Date(Number(dm[3]), MO[dm[2]] - 1, Number(dm[1]));
+      rows.push([null, dt, desc, '', '', credit ? '' : amt, credit ? amt : '', String(bal)]);
+      prev = bal; carryBal = bal;
+    }
+  }
+  return { rows: rows, unparsed: unparsed };
+}
+
 function arStmtParseText_(text) {
+  var res = arStmtParseCUB_(text);
+  if (res.rows.length) return res;
+  return arStmtParseLegacy_(text);
+}
+
+// பழைய line-parser (fallback — மற்ற format-களுக்கு)
+function arStmtParseLegacy_(text) {
   var rows = [], unparsed = 0, prevBal = null;
   var lines = String(text || '').split(/[\r\n]+/);
   for (var i = 0; i < lines.length; i++) {
@@ -471,7 +558,7 @@ function arStmtAppendRows_(sh, newRows) {
   return out.length;
 }
 
-// v4.4: date ஏற்றம் (பழையது மேலே, புதியது கீழே) + S.No மறுஎண்ணிடல்
+// v4.9: date ஏற்றம் + trailing garbage cleanup + CHAIN REPAIR (F/G = balance வேறுபாடு) + S.No
 function arStmtFinalize_(sh) {
   var data = sh.getDataRange().getValues();
   var lastHeader = 0;
@@ -486,10 +573,33 @@ function arStmtFinalize_(sh) {
       catch (eM2) { Logger.log('sort skipped: ' + String(eM2)); }
     }
   }
+  // trailing empty-description garbage rows நீக்கு (parse junk)
+  var dropped = 0;
+  while (sh.getLastRow() > lastHeader + 2) {
+    var lr = sh.getLastRow();
+    var dsc = String(sh.getRange(lr, 3).getValue() || '').trim();
+    if (!dsc) { sh.deleteRow(lr); dropped++; } else break;
+  }
+  // CHAIN REPAIR: F/G ஐ H வேறுபாட்டிலிருந்து மறுகணித்தல் (தொடக்க 0.00)
+  var rng = sh.getRange(lastHeader + 2, 6, sh.getLastRow() - lastHeader - 1, 3);
+  var vals = rng.getValues();
+  var fixed = 0, prev = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var h = parseFloat(String(vals[i][2]).replace(/[^0-9.\-]/g, ''));
+    if (isNaN(h)) continue;
+    var diff = Math.round((h - prev) * 100) / 100;
+    var nf = diff < 0 ? Math.abs(diff) : '';
+    var ng = diff > 0 ? diff : '';
+    if (String(vals[i][0]) !== String(nf) || String(vals[i][1]) !== String(ng)) fixed++;
+    vals[i][0] = nf; vals[i][1] = ng;
+    prev = h;
+  }
+  rng.setValues(vals);
+  Logger.log('finalize: dropped=' + dropped + ' chainFixed=' + fixed);
   var data2 = sh.getDataRange().getValues();
   var num = [];
   for (var r2 = lastHeader + 1; r2 < data2.length; r2++) num.push([r2 - lastHeader]);
-  sh.getRange(lastHeader + 2, 1, num.length, 1).setValues(num);
+  if (num.length) sh.getRange(lastHeader + 2, 1, num.length, 1).setValues(num);
 }
 
 // ஒரே முறை: date ஏற்றம் + S.No மீட்டமை (கைமுறையாக run செய்யவும்)
@@ -521,6 +631,7 @@ function arStmtRebuild() {
     if (String(rdata[rr][0]).indexOf('file:') === 0) raw.deleteRow(rr + 1);
   }
   // பழைய rows முழுவதும் STRUCTURAL delete (merge B2:D6-க்கு கீழே எல்லாம்) — title rows 1-6 அப்படியே
+  sh.getRange(5, 1, 2, 26).clearContent(); // பழைய header எச்சம் (rows 5-6) — merge-safe clear
   var mr = sh.getMaxRows();
   if (mr > 6) sh.deleteRows(7, mr - 6);
   SpreadsheetApp.flush();
@@ -537,7 +648,7 @@ function arStmtRebuild() {
       var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
-      raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 5000)]);
+      raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 45000)]);
       var res = arStmtParseText_(text);
       if (res.rows.length) {
         var nAdd = arStmtAppendRows_(sh, res.rows);

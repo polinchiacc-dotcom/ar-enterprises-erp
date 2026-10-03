@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.5' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.6' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.5 — arStmtRebuild: 3 PDF-களிலிருந்து முழு வரலாறு + dedupe colfix: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.6 — OCR param நீக்கம் (conversion fix) + merge-safe sort/clear: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -345,7 +345,7 @@ function arStmtParseMails() {
         var docFile = Drive.Files.insert({
           title: 'STMT_' + mid,
           mimeType: 'application/vnd.google-apps.document'
-        }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+        }, blob, { convert: true });
         var text = arStmtDocText_(docFile.id);
         var res = arStmtParseText_(text);
         if (res.rows.length) {
@@ -472,7 +472,12 @@ function arStmtFinalize_(sh) {
     if (String(data[r][2]).indexOf('Description') >= 0) lastHeader = r;
   }
   if (data.length > lastHeader + 2) {
-    sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8).sort({ column: 2, ascending: true });
+    var srt = sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8);
+    try { srt.sort({ column: 2, ascending: true }); }
+    catch (eM) {
+      try { srt.breakApart(); srt.sort({ column: 2, ascending: true }); }
+      catch (eM2) { Logger.log('sort skipped: ' + String(eM2)); }
+    }
   }
   var data2 = sh.getDataRange().getValues();
   var num = [];
@@ -513,7 +518,11 @@ function arStmtRebuild() {
   var hdr = 4;
   var v = sh.getRange(1, 3, Math.min(last, 10), 1).getValues();
   for (var i = 0; i < v.length; i++) if (String(v[i][0]).indexOf('Description') >= 0) hdr = i;
-  if (last > hdr + 1) sh.getRange(hdr + 2, 1, last - (hdr + 1), 8).clearContent();
+  if (last > hdr + 1) {
+    var dRange = sh.getRange(hdr + 2, 1, last - (hdr + 1), 8);
+    try { dRange.breakApart(); } catch (eB) { Logger.log('breakApart: ' + String(eB)); }
+    dRange.clearContent();
+  }
   SpreadsheetApp.flush();
   Logger.log('old rows cleared, building fresh...');
   var total = 0, notes = [];
@@ -521,7 +530,7 @@ function arStmtRebuild() {
     var fid = IDS[k];
     try {
       var blob = DriveApp.getFileById(fid).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
       raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 5000)]);
@@ -561,7 +570,7 @@ function arStmtImportPdf() {
     var fname = files[i].title || '';
     try {
       var blob = DriveApp.getFileById(files[i].id).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
       var res = arStmtParseText_(text);

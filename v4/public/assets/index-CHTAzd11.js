@@ -463,7 +463,7 @@ function AuditorStmtPageFn({user:c}){
             n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowConn(!1)},children:"✕ "+AT(f,"மூடு","Close")})
           ]}),
           n.jsxs("ol",{style:{margin:0,paddingLeft:18,fontSize:12,lineHeight:1.6},children:[
-            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v4.4 script paste","In script.google.com → AR Mail Sync, paste the v4.4 script")}),
+            n.jsx("li",{children:AT(f,"script.google.com → AR Mail Sync project-ல் v4.6 script paste","In script.google.com → AR Mail Sync, paste the v4.6 script")}),
             n.jsxs("li",{children:["arStmtToken ",AT(f,"run செய்து token copy செய்யவும்","— run it and copy the token from the log")]}),
             n.jsxs("li",{children:["Deploy → New deployment → Web app (",AT(f,"Execute as: Me; Access: Anyone","Execute as: Me; Access: Anyone"),") → /exec URL ",AT(f,"நகல்","copy")]}),
             n.jsx("li",{children:AT(f,"URL + Token மேலே paste செய்து 💾 அழுத்தவும்","Paste the URL + Token above and press 💾")})

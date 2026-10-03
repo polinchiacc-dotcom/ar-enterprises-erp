@@ -242,7 +242,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.5' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v4.7' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -263,7 +263,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v4.5 — arStmtRebuild: 3 PDF-களிலிருந்து முழு வரலாறு + dedupe colfix: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v4.7 — UrlFetch export + DocumentApp fallback; rebuild: structural delete (merge-safe) + own header row 7: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -345,7 +345,7 @@ function arStmtParseMails() {
         var docFile = Drive.Files.insert({
           title: 'STMT_' + mid,
           mimeType: 'application/vnd.google-apps.document'
-        }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+        }, blob, { convert: true });
         var text = arStmtDocText_(docFile.id);
         var res = arStmtParseText_(text);
         if (res.rows.length) {
@@ -381,16 +381,19 @@ function arStmtParseMails() {
 // v4.3: Doc text via Drive export (documents scope தேவையே இல்லை)
 function arStmtDocText_(docId) {
   var errs = [];
+  // வழி 1: Drive v2 REST export (UrlFetchApp)
   try {
-    var b1 = Drive.Files.export(docId, 'text/plain');
-    if (b1 && typeof b1.getDataAsString === 'function') return b1.getDataAsString('utf-8');
-    errs.push('export1:no-blob');
-  } catch (e1) { errs.push('export1:' + String(e1).slice(0, 90)); }
+    var resp = UrlFetchApp.fetch('https://www.googleapis.com/drive/v2/files/' + docId + '/export?mimeType=text/plain', {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() === 200) return resp.getContentText('utf-8');
+    errs.push('rest:' + resp.getResponseCode() + ':' + resp.getContentText().slice(0, 140));
+  } catch (e1) { errs.push('rest:' + String(e1).slice(0, 140)); }
+  // வழி 2: DocumentApp
   try {
-    var b2 = Drive.Files.export(docId, { mimeType: 'text/plain' });
-    if (b2 && typeof b2.getDataAsString === 'function') return b2.getDataAsString('utf-8');
-    errs.push('export2:no-blob');
-  } catch (e2) { errs.push('export2:' + String(e2).slice(0, 90)); }
+    return DocumentApp.openById(docId).getBody().getText();
+  } catch (e2) { errs.push('docapp:' + String(e2).slice(0, 140)); }
   throw new Error('docText failed [' + errs.join(' | ') + ']');
 }
 
@@ -460,7 +463,11 @@ function arStmtAppendRows_(sh, newRows) {
     keys[nd + '|' + ndsc + '|' + na] = 1;
     out.push(nr);
   }
-  if (out.length) sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  if (out.length) {
+    var need = sh.getLastRow() + out.length;
+    if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows() + 50);
+    sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  }
   return out.length;
 }
 
@@ -468,11 +475,16 @@ function arStmtAppendRows_(sh, newRows) {
 function arStmtFinalize_(sh) {
   var data = sh.getDataRange().getValues();
   var lastHeader = 0;
-  for (var r = 0; r < Math.min(data.length, 10); r++) {
+  for (var r = 0; r < Math.min(data.length, 25); r++) {
     if (String(data[r][2]).indexOf('Description') >= 0) lastHeader = r;
   }
   if (data.length > lastHeader + 2) {
-    sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8).sort({ column: 2, ascending: true });
+    var srt = sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8);
+    try { srt.sort({ column: 2, ascending: true }); }
+    catch (eM) {
+      try { srt.breakApart(); srt.sort({ column: 2, ascending: true }); }
+      catch (eM2) { Logger.log('sort skipped: ' + String(eM2)); }
+    }
   }
   var data2 = sh.getDataRange().getValues();
   var num = [];
@@ -508,20 +520,21 @@ function arStmtRebuild() {
   for (var rr = rdata.length - 1; rr >= 1; rr--) {
     if (String(rdata[rr][0]).indexOf('file:') === 0) raw.deleteRow(rr + 1);
   }
-  // பழைய transaction rows முழுவதும் நீக்கு (title+header மட்டும் வை)
-  var last = sh.getLastRow();
-  var hdr = 4;
-  var v = sh.getRange(1, 3, Math.min(last, 10), 1).getValues();
-  for (var i = 0; i < v.length; i++) if (String(v[i][0]).indexOf('Description') >= 0) hdr = i;
-  if (last > hdr + 1) sh.getRange(hdr + 2, 1, last - (hdr + 1), 8).clearContent();
+  // பழைய rows முழுவதும் STRUCTURAL delete (merge B2:D6-க்கு கீழே எல்லாம்) — title rows 1-6 அப்படியே
+  var mr = sh.getMaxRows();
+  if (mr > 6) sh.deleteRows(7, mr - 6);
   SpreadsheetApp.flush();
-  Logger.log('old rows cleared, building fresh...');
+  // புதிய header (row 7)
+  sh.getRange(7, 1, 1, 10).setValues([['S.No', 'Date', 'Description', 'Ref / Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance', 'Notes', 'Description Details']]);
+  sh.getRange(7, 1, 1, 10).setFontWeight('bold');
+  SpreadsheetApp.flush();
+  Logger.log('old rows deleted structurally, fresh header at row 7');
   var total = 0, notes = [];
   for (var k = 0; k < IDS.length; k++) {
     var fid = IDS[k];
     try {
       var blob = DriveApp.getFileById(fid).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
       raw.appendRow(['file:' + fid, 'statement ' + (k + 1), String(text).slice(0, 5000)]);
@@ -561,7 +574,7 @@ function arStmtImportPdf() {
     var fname = files[i].title || '';
     try {
       var blob = DriveApp.getFileById(files[i].id).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true, ocr: true, ocrLanguage: 'en' });
+      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
       var text = arStmtDocText_(docFile.id);
       try { Drive.Files.remove(docFile.id); } catch (e2) {}
       var res = arStmtParseText_(text);

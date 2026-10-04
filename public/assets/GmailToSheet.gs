@@ -266,7 +266,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.6' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.7' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.6 — INTEGRITY GATE: per-page counters + file-level C−D≡close−open check; rebuild parse-first (fail → old data preserved); full-text StmtRaw dump: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.7 — queue-based D/C assignment from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -500,21 +500,44 @@ function arStmtParseCUB_(text) {
     var startIdx = endIdx - N + 1;
     if (startIdx < 0) { Logger.log('CUB page ' + (p + 1) + ' SKIP2: N=' + N + ' amounts=' + amounts.length); unparsed += N; pgs.push({ p: p + 1, dates: N, built: 0, mode: 'SKIP:anchor' }); continue; }
     Logger.log('CUB page ' + (p + 1) + ' OK: N=' + N + ' endIdx=' + endIdx + '/' + (amounts.length - 1) + (expClose !== null ? ' anchored' : ' blind'));
-    var pgBefore = rows.length;
+    // v5.7: bank-ன் சொந்த Debit/Credit column values-ஐ queue முறையில் பயன்படுத்துதல்
+    // text வரிசை = [Debit values] [Credit values] [Balance values]; TO/BY கணக்கு பொருந்தினால் மட்டும் queue முறை
+    var pre = amounts.slice(0, startIdx);
+    var cntTo = 0, cntBy = 0;
+    for (var pr = 0; pr < parts.length; pr++) {
+      var upc = String(parts[pr]).toUpperCase();
+      if (/^TO\b/.test(upc)) cntTo++;
+      else if (/^BY\b/.test(upc)) cntBy++;
+    }
+    var useQ = (pre.length === cntTo + cntBy && (cntTo + cntBy) > 0);
+    var dQ = useQ ? pre.slice(0, cntTo) : [];
+    var cQ = useQ ? pre.slice(cntTo) : [];
+    var pgBefore = rows.length, pgMis = 0, qUsed = 0, qFall = 0;
     var prev = (meta[p].bf !== null) ? meta[p].bf : carryBal;
     for (var r = 0; r < N; r++) {
       var bal = amounts[startIdx + r];
-      var diff = (prev !== null && prev !== undefined) ? Math.round((bal - prev) * 100) / 100 : null;
       var desc = parts[r] || '';
-      var isBy = /^BY\b/.test(desc.toUpperCase());
-      var credit = (diff !== null && diff !== 0) ? diff > 0 : isBy;
-      var amt = (diff !== null && diff !== 0) ? Math.abs(diff) : '';
+      var upr = desc.toUpperCase();
+      var amt = '', credit = false;
+      if (useQ && /^TO\b/.test(upr) && dQ.length) { amt = dQ.shift(); credit = false; qUsed++; }
+      else if (useQ && /^BY\b/.test(upr) && cQ.length) { amt = cQ.shift(); credit = true; qUsed++; }
+      else {
+        qFall++;
+        var diff2 = (prev !== null && prev !== undefined) ? Math.round((bal - prev) * 100) / 100 : null;
+        credit = (diff2 !== null && diff2 !== 0) ? diff2 > 0 : /^BY\b/.test(upr);
+        amt = (diff2 !== null && diff2 !== 0) ? Math.abs(diff2) : '';
+      }
+      if (amt !== '' && prev !== null && prev !== undefined) {
+        var expBal = Math.round((credit ? prev + amt : prev - amt) * 100) / 100;
+        if (Math.abs(expBal - bal) > 0.02) pgMis++;
+      }
       var dm = dates[r].match(/(\d{2})-([A-Z]{3})-(\d{4})/);
       var dt = new Date(Number(dm[3]), MO[dm[2]] - 1, Number(dm[1]));
       rows.push([null, dt, desc, '', '', credit ? '' : amt, credit ? amt : '', String(bal)]);
       prev = bal; carryBal = bal;
     }
-    pgs.push({ p: p + 1, dates: N, built: rows.length - pgBefore, mode: (expClose !== null ? 'anchored' : 'blind') });
+    Logger.log('CUB page ' + (p + 1) + ' assign: ' + (useQ ? 'queue(TO=' + cntTo + ',BY=' + cntBy + ')' : 'diff-fallback') + ' used=' + qUsed + ' fall=' + qFall + ' chainMis=' + pgMis);
+    pgs.push({ p: p + 1, dates: N, built: rows.length - pgBefore, mode: (useQ ? 'queue' : 'diff') + '/' + (expClose !== null ? 'anchored' : 'blind') + '/mis' + pgMis });
   }
   return { rows: rows, unparsed: unparsed, pages: pgs };
 }
@@ -735,9 +758,15 @@ function arStmtRenumber() {
 function arStmtRebuild() {
   var IDS = [
     '1iutNpWqijV3mjC8NrwCjgARsJeJ5Yrzz', // Statement 07-03-2022 → 05-09-2025
-    '1u4fgwPeIdkg27BNvulACTylEiIY3CDT8', // Statement 06-05-2025 → 31-08-2026
+    '1u4fgwPeIdkg27BNvulACTylEiIY3CDT8', // Statement 06-09-2025 → 31-08-2026
     '1SG5nhG608EWkl0Z53fAqHVAujENz6eb6'  // Statement 01-09-2026 → 30-09-2026
   ];
+  // கூடுதல் PDF-கள் (விடுபட்ட range mini-statement): ScriptProperties → arStmtExtraPdf = 'id1,id2'
+  var EXTRA = String(PropertiesService.getScriptProperties().getProperty('arStmtExtraPdf') || '').split(',');
+  for (var ei = 0; ei < EXTRA.length; ei++) {
+    var ex = EXTRA[ei].replace(/[^a-zA-Z0-9_\-]/g, '');
+    if (ex) { IDS.push(ex); Logger.log('extra PDF added: ' + ex); }
+  }
   var ss = SpreadsheetApp.openById(WORKBOOK_ID);
   var sh = arStmtSheet_(ss, STMT_TAB);
   if (!sh) { Logger.log('FATAL: stmt tab missing'); return 'Tab missing'; }

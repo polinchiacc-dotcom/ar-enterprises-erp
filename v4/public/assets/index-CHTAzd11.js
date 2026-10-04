@@ -402,6 +402,11 @@ function AuditorStmtPageFn({user:c}){
       if(out.credit<0&&numCols.length)out.credit=numCols[0];
       if(out.debit<0&&numCols.length>1)out.debit=numCols[1];
     }
+    if(out.credit>=0&&out.debit>=0&&out.credit!==out.debit&&out.bal>=0){
+      let C=0,DD=0,lbv="";R2.forEach(function(v2){C+=audNum(v2[out.credit]);DD+=audNum(v2[out.debit]);if(String(v2[out.bal]||"").trim()!=="")lbv=v2[out.bal]});
+      const LB=audNum(lbv);
+      if(LB&&Math.abs(C-DD-LB)>1&&Math.abs(DD-C-LB)<=1){const t2=out.credit;out.credit=out.debit;out.debit=t2}
+    }
     function findLbl(re){for(let i2=0;i2<L2.length;i2++){if(re.test(String(L2[i2]||"")))return i2}return -1}
     return out;
   },[tdata]);

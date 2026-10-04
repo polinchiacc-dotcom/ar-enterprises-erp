@@ -266,7 +266,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.4b' })).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'AR Mail Sync v5.5' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function arMailToday() {
@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.4b — merge-walk: block(trusted)+IL candidates date-merged, single balance-chain walk recovers interleaved tx, dups auto-dropped: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.5 — STABLE in-memory sort (ties keep statement order; Sheet.sort broke intra-day order → chain/debit-credit detection): arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -640,12 +640,21 @@ function arStmtFinalize_(sh) {
     if (String(data[r][2]).indexOf('Description') >= 0) lastHeader = r;
   }
   if (data.length > lastHeader + 2) {
-    var srt = sh.getRange(lastHeader + 2, 1, data.length - lastHeader - 1, 8);
-    try { srt.sort({ column: 2, ascending: true }); }
-    catch (eM) {
-      try { srt.breakApart(); srt.sort({ column: 2, ascending: true }); }
-      catch (eM2) { Logger.log('sort skipped: ' + String(eM2)); }
-    }
+    // STABLE in-memory sort: date ஏற்றம்; ஒரே தேதியில் statement-ன் அசல் வரிசை பாதுகாக்கப்படும்
+    // (Google Sheet sort ties-ஐ கலக்கும் → balance chain உடையும் → debit/credit detection தவறும்)
+    var nR = data.length - lastHeader - 1;
+    var dA = sh.getRange(lastHeader + 2, 1, nR, 10).getValues();
+    var ix = [];
+    for (var ii = 0; ii < nR; ii++) ix.push(ii);
+    ix.sort(function (a, b) {
+      var da = (dA[a][1] instanceof Date) ? dA[a][1].getTime() : 0;
+      var db = (dA[b][1] instanceof Date) ? dA[b][1].getTime() : 0;
+      return da - db || a - b;
+    });
+    var sA = [];
+    for (var i2 = 0; i2 < nR; i2++) sA.push(dA[ix[i2]]);
+    sh.getRange(lastHeader + 2, 1, nR, 10).setValues(sA);
+    SpreadsheetApp.flush();
   }
   // trailing empty-description garbage rows நீக்கு (parse junk)
   var dropped = 0;

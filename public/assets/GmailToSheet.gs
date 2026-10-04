@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.7 — queue-based D/C assignment from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf: arStmtParseMails ஏன் வேலை செய்யவில்லை என காட்டும்
+// v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -550,46 +550,78 @@ function arStmtParseCUBIL_(text) {
   var AMTR = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
   var MO = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
   var cands = [], lines = T.split(/\r?\n/);
+  var isDateStart = function (s) { return /^\d{2}-[A-Z]{3}-\d{4}\b/.test(s); };
+  var leadBalOf = function (s) { var m = s.match(/^(\d{1,3}(?:,\d{2,3})*\.\d{2})\s*(\d{2}-[A-Z]{3}-\d{4})\b/); return m ? parseFloat(m[1].replace(/,/g, '')) : null; };
+  // v5.8: netbanking balance-first layout ("1,000.0007-MAR-2022 BY ...") + பழைய date-start layout இரண்டும் ஆதரவு
   for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].replace(/\t/g, ' ').trim();
-    if (!/^\d{2}-[A-Z]{3}-\d{4}\b/.test(line)) continue;
-    var hasTB = /\b(TO|BY)\b/.test(line);
+    var raw = lines[i].replace(/\t/g, ' ').trim();
+    raw = raw.replace(/(\.\d{2})(\d{2}-[A-Z]{3}-\d{4})/g, '$1 $2').replace(/(\d{2}-[A-Z]{3}-\d{4})(\d)/g, '$1 $2'); // glue split
+    if (/Brought\s*Forward|Opening\s*Balance/i.test(raw)) continue; // anchor/heading lines — ஒருபோதும் txn இல்லை
+    var leadBal = leadBalOf(raw);
+    if (!isDateStart(raw) && leadBal === null) continue;
+    var hasTB = /\b(TO|BY)\b/.test(raw);
     var dts = [], mD;
     DATER.lastIndex = 0;
-    while ((mD = DATER.exec(line)) !== null) dts.push({ d: mD[0], i: mD.index });
+    while ((mD = DATER.exec(raw)) !== null) dts.push({ d: mD[0], i: mD.index });
     if (!dts.length) continue;
     var segs = [];
     for (var gI = 0; gI < dts.length; gI++) {
-      var st = dts[gI].i, en = (gI + 1 < dts.length) ? dts[gI + 1].i : line.length;
-      segs.push({ d: dts[gI].d, txt: line.slice(st, en) });
+      var st = dts[gI].i, en = (gI + 1 < dts.length) ? dts[gI + 1].i : raw.length;
+      segs.push({ d: dts[gI].d, txt: raw.slice(st, en) });
     }
     for (var sI = 0; sI < segs.length; sI++) {
       var seg = segs[sI].txt.replace(/\t/g, ' ').trim(), am = seg.match(AMTR);
-      if (!am || am.length < 2) continue;
       var pm = segs[sI].d.match(/(\d{2})-([A-Z]{3})-(\d{4})/);
       var dtx = new Date(Number(pm[3]), MO[pm[2]] - 1, Number(pm[1]));
-      var a0 = parseFloat(am[0].replace(/,/g, '')), a1 = parseFloat(am[1].replace(/,/g, ''));
-      var aL = parseFloat(am[am.length - 1].replace(/,/g, ''));
-      var narrIdx = seg.search(/\b(TO|BY)\b/);
-      var firstAmtIdx = seg.indexOf(am[0]);
       var pairs = [];
-      if (narrIdx < 0 || (firstAmtIdx >= 0 && firstAmtIdx < narrIdx)) {
-        pairs.push([aL, a0]); // balance முதலில் (date பின்), amount கடைசியில் — CUB interleaved TO-format
-      } else {
-        pairs.push([a0, a1]); // narration பின் (amt, bal) — BY-format
-      }
-      pairs.push([a1, a0]);
-      if (am.length > 2) pairs.push([a0, aL]);
       var dsc = seg.replace(/\d{2}-[A-Z]{3}-\d{4}/g, ' ');
-      for (var xI = 0; xI < am.length; xI++) dsc = dsc.replace(am[xI], ' ');
-      dsc = dsc.replace(/\s{2,}/g, ' ').trim();
-      if (!hasTB) {
-        var prevL = i > 0 ? lines[i - 1].replace(/\t/g, ' ').trim() : '';
-        var nextL = i + 1 < lines.length ? lines[i + 1].replace(/\t/g, ' ').trim() : '';
-        if (prevL && !/\d{2}-[A-Z]{3}-\d{4}/.test(prevL) && !AMTR.test(prevL) && /[A-Za-z]{3}/.test(prevL)) dsc = prevL + ' ' + dsc;
-        if (nextL && !/\d{2}-[A-Z]{3}-\d{4}/.test(nextL) && !AMTR.test(nextL) && /[A-Za-z]{3}/.test(nextL)) dsc = (dsc + ' ' + nextL).trim();
-        AMTR.lastIndex = 0;
+      var segBal = (sI === 0 && leadBal !== null) ? leadBal : null;
+      if (segBal !== null) {
+        // balance date-க்கு முன்; amount narration பின் (அதே வரி அல்லது அடுத்த 1-3 வரிகளில்)
+        if (am && am.length) {
+          var aL = parseFloat(am[am.length - 1].replace(/,/g, ''));
+          pairs.push([aL, segBal]);
+          pairs.push([segBal, aL]);
+        } else {
+          var nxt = '', got2 = null, got2s = '';
+          for (var fJ = 1; fJ <= 6; fJ++) { // v5.8: amount 4-5 வரி கீழே இருக்கலாம் (TO ONL/NACH/00060/AMT wrap)
+            var ln = (i + fJ < lines.length) ? lines[i + fJ].replace(/\t/g, ' ').trim() : '';
+            if (!ln || isDateStart(ln) || leadBalOf(ln) !== null) break;
+            if (/Brought\s*Forward|Page \d+ of \d+|END OF REPORT|Total/i.test(ln)) break;
+            var am2 = ln.match(AMTR);
+            nxt += ' ' + ln;
+            if (am2 && am2.length) { got2 = parseFloat(am2[am2.length - 1].replace(/,/g, '')); got2s = am2[am2.length - 1]; break; }
+          }
+          if (got2 === null) continue;
+          pairs.push([got2, segBal]);
+          pairs.push([segBal, got2]);
+          dsc = dsc + ' ' + nxt;
+          dsc = dsc.replace(got2s, ' ');
+        }
+        for (var xI2 = 0; am && xI2 < am.length; xI2++) dsc = dsc.replace(am[xI2], ' ');
+      } else {
+        if (!am || am.length < 2) continue;
+        var a0 = parseFloat(am[0].replace(/,/g, '')), a1 = parseFloat(am[1].replace(/,/g, ''));
+        var aL2 = parseFloat(am[am.length - 1].replace(/,/g, ''));
+        var narrIdx = seg.search(/\b(TO|BY)\b/);
+        var firstAmtIdx = seg.indexOf(am[0]);
+        if (narrIdx < 0 || (firstAmtIdx >= 0 && firstAmtIdx < narrIdx)) {
+          pairs.push([aL2, a0]); // balance முதலில் (date பின்), amount கடைசியில் — CUB interleaved TO-format
+        } else {
+          pairs.push([a0, a1]); // narration பின் (amt, bal) — BY-format
+        }
+        pairs.push([a1, a0]);
+        if (am.length > 2) pairs.push([a0, aL2]);
+        for (var xI = 0; xI < am.length; xI++) dsc = dsc.replace(am[xI], ' ');
+        if (!hasTB) {
+          var prevL = i > 0 ? lines[i - 1].replace(/\t/g, ' ').trim() : '';
+          var nextL = i + 1 < lines.length ? lines[i + 1].replace(/\t/g, ' ').trim() : '';
+          if (prevL && !/\d{2}-[A-Z]{3}-\d{4}/.test(prevL) && !AMTR.test(prevL) && /[A-Za-z]{3}/.test(prevL)) dsc = prevL + ' ' + dsc;
+          if (nextL && !/\d{2}-[A-Z]{3}-\d{4}/.test(nextL) && !AMTR.test(nextL) && /[A-Za-z]{3}/.test(nextL)) dsc = (dsc + ' ' + nextL).trim();
+          AMTR.lastIndex = 0;
+        }
       }
+      dsc = dsc.replace(/\s{2,}/g, ' ').trim();
       var chq = '';
       var mc = dsc.match(/\b(\d{3,6})\b\s*$/);
       if (mc && mc[1] !== '00060') { chq = mc[1]; dsc = dsc.replace(/\b\d{3,6}\b\s*$/, '').trim(); }
@@ -602,37 +634,74 @@ function arStmtParseCUBIL_(text) {
 
 function arStmtParseText_(text) {
   var res = arStmtParseCUB_(text);
-  if (!res.rows.length) return arStmtParseLegacy_(text);
-  // merge-walk: block rows (trusted) + IL candidates ஒன்றாக date-sort → ஒரே balance-chain walk
+  // v5.8: legacy fallback (undefined arStmtParseLegacy_ crash) நீக்கம் — block=0 எனில் IL-only merge-walk தொடரும்
+  // ---- INTEGRITY GATE: opening/closing/மொத்தக் கணக்கு சரிபார்ப்பு ----
+  var mOpen = text.match(/Opening Balance as on \d{2}-[A-Z]{3}-\d{4}\s+([\d,]+\.\d{2})/);
+  if (!mOpen) mOpen = text.match(/([\d,]+\.\d{2})\s*Opening\s+Balance\s+as on \d{2}-[A-Z]{3}-\d{4}/); // v5.8: balance-முன் form
+  var opening = mOpen ? parseFloat(mOpen[1].replace(/,/g, '')) : 0;
+  // merge-walk v5.8: block rows + IL candidates → date-sort → **per-date GREEDY BALANCE-CHAIN reorder**
+  // (bank print order = running-balance chain order; Google conversion same-date வரிசையை குலைக்கும் — chain மூலம் மீட்கப்படும்)
   var cands = arStmtParseCUBIL_(text);
   var combined = [];
   for (var bI = 0; bI < res.rows.length; bI++) combined.push({ t: res.rows[bI][1].getTime(), blk: res.rows[bI], il: null });
   for (var cI = 0; cI < cands.length; cI++) combined.push({ t: cands[cI].dt.getTime(), blk: null, il: cands[cI] });
   combined.sort(function (a, b) { return a.t - b.t || (a.blk ? -1 : 1); });
-  var out = [], prev = null, kept = 0, dropped = 0;
-  for (var k = 0; k < combined.length; k++) {
-    var o = combined[k];
-    if (o.blk) {
-      out.push(o.blk);
-      var hv = parseFloat(String(o.blk[7]).replace(/[^0-9.\-]/g, ''));
-      if (!isNaN(hv)) prev = hv;
-      continue;
+  var out = [], prev = opening, kept = 0, dropped = 0, ordMis = 0;
+  var numv = function (x) { var v = parseFloat(String(x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? NaN : v; };
+  var gi = 0;
+  while (gi < combined.length) {
+    var gj = gi;
+    while (gj < combined.length && combined[gj].t === combined[gi].t) gj++;
+    var gN = gj - gi, used = new Array(gN);
+    for (var uI = 0; uI < gN; uI++) used[uI] = false;
+    var made = 0;
+    while (made < gN) {
+      var pick = -1, pickAmt = 0, pickBal = 0;
+      for (var mI = gi; mI < gj; mI++) {
+        if (used[mI - gi]) continue;
+        var o = combined[mI];
+        if (o.blk) {
+          var hv = numv(o.blk[7]);
+          if (isNaN(hv)) continue;
+          var dv = numv(o.blk[5]) || 0, cv = numv(o.blk[6]) || 0;
+          if (Math.abs(prev - dv + cv - hv) < 0.01) { pick = mI; pickBal = hv; break; }
+        } else {
+          var cc = o.il;
+          for (var pI = 0; pI < cc.pairs.length; pI++) {
+            var amt = cc.pairs[pI][0], bal = cc.pairs[pI][1];
+            if (Math.abs(prev + amt - bal) < 0.01 || Math.abs(prev - amt - bal) < 0.01) { pick = mI; pickAmt = amt; pickBal = bal; break; }
+          }
+          if (pick >= 0) break;
+        }
+      }
+      if (pick < 0) break; // இந்த date-ல் chain தொடரவில்லை — மீதி original வரிசையில்
+      var og = combined[pick];
+      if (og.blk) {
+        out.push(og.blk);
+      } else {
+        var credit = pickBal > prev;
+        out.push([null, og.il.dt, og.il.dsc, og.il.chq, '', credit ? '' : pickAmt, credit ? pickAmt : '', String(pickBal)]);
+        kept++;
+      }
+      used[pick - gi] = true; made++;
+      prev = pickBal;
     }
-    var c = o.il, got = null;
-    for (var pI = 0; pI < c.pairs.length && !got; pI++) {
-      var amt = c.pairs[pI][0], bal = c.pairs[pI][1];
-      if (prev === null) { got = { amt: amt, bal: bal }; break; }
-      if (Math.abs(prev + amt - bal) < 0.01 || Math.abs(prev - amt - bal) < 0.01) got = { amt: amt, bal: bal };
+    for (var rI = gi; rI < gj; rI++) {
+      if (used[rI - gi]) continue;
+      var oo = combined[rI];
+      if (oo.blk) {
+        out.push(oo.blk); ordMis++;
+        var hv2 = numv(oo.blk[7]);
+        if (!isNaN(hv2)) prev = hv2; // fallback-லும் balance chain தொடரும்
+        Logger.log('ORDER-MIS: ' + String(oo.blk[1]) + ' | ' + String(oo.blk[2]).slice(0, 45) + ' | prev=' + prev);
+      } else {
+        dropped++;
+        Logger.log('IL drop: prev=' + prev + ' pairs0=' + JSON.stringify(oo.il.pairs[0]) + ' | ' + oo.il.dsc.slice(0, 50));
+      }
     }
-    if (!got || prev === null) { dropped++; Logger.log('IL drop: prev=' + prev + ' pairs0=' + JSON.stringify(c.pairs[0]) + ' | ' + c.dsc.slice(0, 50)); continue; }
-    var credit = got.bal > prev;
-    out.push([null, c.dt, c.dsc, c.chq, '', credit ? '' : got.amt, credit ? got.amt : '', String(got.bal)]);
-    prev = got.bal; kept++;
+    gi = gj;
   }
-  Logger.log('CUB merge-walk: block=' + res.rows.length + ' IL-kept=' + kept + ' IL-dropped=' + dropped + ' total=' + out.length);
-  // ---- INTEGRITY GATE: opening/closing/மொத்தக் கணக்கு சரிபார்ப்பு ----
-  var mOpen = text.match(/Opening Balance as on \d{2}-[A-Z]{3}-\d{4}\s+([\d,]+\.\d{2})/);
-  var opening = mOpen ? parseFloat(mOpen[1].replace(/,/g, '')) : 0;
+  Logger.log('CUB merge-walk: block=' + res.rows.length + ' IL-kept=' + kept + ' IL-dropped=' + dropped + ' order-mis=' + ordMis + ' total=' + out.length);
   var sorted = out.slice().sort(function (a, b) { return a[1] - b[1]; });
   var closing = NaN, sumC = 0, sumD = 0;
   for (var z = 0; z < sorted.length; z++) {
@@ -642,17 +711,30 @@ function arStmtParseText_(text) {
     sumC += parseFloat(sorted[z][6]) || 0;
   }
   sumD = Math.round(sumD * 100) / 100; sumC = Math.round(sumC * 100) / 100;
-  var pass = (!isNaN(closing)) && Math.abs(sumC - sumD - (closing - opening)) <= 1;
+  // v5.8: bank-ன் printed Total line cross-check (statement-ல் இருந்தால் கட்டாயம் பொருந்த வேண்டும்)
+  var tD = null, tC = null, tLines = String(text).split(/\r?\n/);
+  for (var ti = tLines.length - 1; ti >= 0 && tD === null; ti--) {
+    var mT = tLines[ti].match(/([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*Total\b/) || tLines[ti].match(/\bTotal\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/);
+    if (mT) { tD = parseFloat(mT[1].replace(/,/g, '')); tC = parseFloat(mT[2].replace(/,/g, '')); }
+  }
+  var totOk = true, totNote = 'no-total-line';
+  if (tD !== null) {
+    var oFwd = Math.abs(sumD - tD) <= 1 && Math.abs(sumC - tC) <= 1;
+    var oRev = Math.abs(sumD - tC) <= 1 && Math.abs(sumC - tD) <= 1;
+    totOk = oFwd || oRev;
+    totNote = 'printed Total: D=' + tD + ' C=' + tC + ' -> ' + (totOk ? (oFwd ? 'MATCH(D,C)' : 'MATCH(C,D)') : 'MISMATCH');
+  }
+  var pass = (!isNaN(closing)) && Math.abs(sumC - sumD - (closing - opening)) <= 1 && ordMis === 0; // v5.8: order-mis=0 கட்டாயம் (ஒவ்வொரு row-ம் chain-ல் verify); printed-Total MISMATCH soft மட்டும் (PDF2 bank Total line rows-உடன் பொருந்தாது)
   var stats = {
     pages: (res.pages || []).length,
     pgAnchored: (res.pages || []).filter(function (x) { return x.mode === 'anchored'; }).length,
     pgBlind: (res.pages || []).filter(function (x) { return x.mode === 'blind'; }).length,
     pgSkipped: (res.pages || []).filter(function (x) { return String(x.mode).indexOf('SKIP') === 0; }).length,
     pgInterleaved: (res.pages || []).filter(function (x) { return x.mode === 'interleaved'; }).length,
-    blockRows: res.rows.length, ilKept: kept, ilDropped: dropped,
-    rows: out.length, credits: sumC, debits: sumD, opening: opening, closing: closing, pass: pass
+    blockRows: res.rows.length, ilKept: kept, ilDropped: dropped, ordMis: ordMis,
+    rows: out.length, credits: sumC, debits: sumD, opening: opening, closing: closing, totals: totNote, pass: pass
   };
-  Logger.log('INTEGRITY ' + (pass ? 'PASS' : 'FAIL') + ': rows=' + out.length + ' C=' + sumC + ' D=' + sumD + ' open=' + opening + ' close=' + closing + ' | pages=' + stats.pages + ' anchored=' + stats.pgAnchored + ' blind=' + stats.pgBlind + ' interleaved=' + stats.pgInterleaved + ' skipped=' + stats.pgSkipped);
+  Logger.log('INTEGRITY ' + (pass ? 'PASS' : 'FAIL') + ': rows=' + out.length + ' C=' + sumC + ' D=' + sumD + ' open=' + opening + ' close=' + closing + ' | pages=' + stats.pages + ' anchored=' + stats.pgAnchored + ' blind=' + stats.pgBlind + ' interleaved=' + stats.pgInterleaved + ' skipped=' + stats.pgSkipped + ' ordMis=' + stats.ordMis + ' | ' + totNote);
   return { rows: out, unparsed: res.unparsed, stats: stats };
 }
 
@@ -757,7 +839,7 @@ function arStmtRenumber() {
 // v4.5: பழைய rows நீக்கி → 3 statement PDF-களிலிருந்து முழு வரலாறு rebuild (07-03-2022 → 30-09-2026)
 function arStmtRebuild() {
   var IDS = [
-    '1iutNpWqijV3mjC8NrwCjgARsJeJ5Yrzz', // Statement 07-03-2022 → 05-09-2025
+    '1nsLjSP9CY0A84j7B7Tdub6gRXEP3h16C', // Statement 07-03-2022 → 05-09-2025 (v5.8 fresh netbanking copy — பழைய PDF Google conversion-ல் 20-Aug→04-Sep pages இழப்பு)
     '1u4fgwPeIdkg27BNvulACTylEiIY3CDT8', // Statement 06-09-2025 → 31-08-2026
     '1SG5nhG608EWkl0Z53fAqHVAujENz6eb6'  // Statement 01-09-2026 → 30-09-2026
   ];
@@ -766,6 +848,14 @@ function arStmtRebuild() {
   for (var ei = 0; ei < EXTRA.length; ei++) {
     var ex = EXTRA[ei].replace(/[^a-zA-Z0-9_\-]/g, '');
     if (ex) { IDS.push(ex); Logger.log('extra PDF added: ' + ex); }
+  }
+  // v5.8: முழு IDS override — ScriptProperties arStmtRebuildIds = 'id1,id2' (PDF list-ஐ code மாற்றாமல் மாற்ற)
+  var OVS = String(PropertiesService.getScriptProperties().getProperty('arStmtRebuildIds') || '').replace(/\s/g, '');
+  if (OVS) {
+    var OVL = OVS.split(',');
+    var OVA = [];
+    for (var oi = 0; oi < OVL.length; oi++) { var ox = OVL[oi].replace(/[^a-zA-Z0-9_\-]/g, ''); if (ox) OVA.push(ox); }
+    if (OVA.length) { IDS = OVA; Logger.log('IDS overridden via arStmtRebuildIds: ' + IDS.join(',')); }
   }
   var ss = SpreadsheetApp.openById(WORKBOOK_ID);
   var sh = arStmtSheet_(ss, STMT_TAB);
@@ -795,10 +885,10 @@ function arStmtRebuild() {
       if (res.stats && !res.stats.pass) {
         allPass = false;
         notes.push('PDF' + (k + 1) + ': ❌INTEGRITY FAIL (rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' close=' + st.closing + ')');
-        log.appendRow([new Date(), 'file:' + fid, 'INTEGRITY FAIL', 'rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' close=' + st.closing + ' pages=' + st.pages + ' anchored=' + st.pgAnchored + ' blind=' + st.pgBlind + ' interleaved=' + st.pgInterleaved + ' skipped=' + st.pgSkipped + ' — பழைய data பாதுகாக்கப்பட்டது']);
+        log.appendRow([new Date(), 'file:' + fid, 'INTEGRITY FAIL', 'rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' close=' + st.closing + ' pages=' + st.pages + ' anchored=' + st.pgAnchored + ' blind=' + st.pgBlind + ' interleaved=' + st.pgInterleaved + ' skipped=' + st.pgSkipped + ' totals=[' + (st.totals || '') + '] — பழைய data பாதுகாக்கப்பட்டது']);
       } else {
         notes.push('PDF' + (k + 1) + ': ✅PASS (' + st.rows + ' rows, C=' + st.credits + ', D=' + st.debits + ', ' + st.opening + '→' + st.closing + ')');
-        log.appendRow([new Date(), 'file:' + fid, 'INTEGRITY PASS', 'rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' → close=' + st.closing + ' pages=' + st.pages + ' anchored=' + st.pgAnchored + ' blind=' + st.pgBlind + ' interleaved=' + st.pgInterleaved + ' skipped=' + st.pgSkipped]);
+        log.appendRow([new Date(), 'file:' + fid, 'INTEGRITY PASS', 'rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' → close=' + st.closing + ' pages=' + st.pages + ' anchored=' + st.pgAnchored + ' blind=' + st.pgBlind + ' interleaved=' + st.pgInterleaved + ' skipped=' + st.pgSkipped + ' totals=[' + (st.totals || '') + ']']);
       }
     } catch (err) {
       allPass = false;
@@ -821,11 +911,22 @@ function arStmtRebuild() {
   sh.getRange(7, 1, 1, 10).setFontWeight('bold');
   SpreadsheetApp.flush();
   Logger.log('ALL PASS — old rows deleted structurally, fresh header at row 7, importing...');
-  var total = 0;
+  var total = 0, seen = {};
+  var numvI = function (x) { var v = parseFloat(String(x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? 0 : v; };
   for (var k2 = 0; k2 < parsed.length; k2++) {
     var P = parsed[k2];
     try {
-      var nAdd = arStmtAppendRows_(sh, P.res.rows);
+      var rowsF = [], dupes = 0;
+      for (var ri = 0; ri < P.res.rows.length; ri++) {
+        var rw = P.res.rows[ri];
+        // v5.8 overlap dedupe: date+D+C+balance ஒன்றாக இருந்தால் அதே txn (running balance தனித்தது) — இரு முறை எழுதாது
+        var dkey = (rw[1] && rw[1].getTime ? rw[1].getTime() : String(rw[1])) + '|' + numvI(rw[5]).toFixed(2) + '|' + numvI(rw[6]).toFixed(2) + '|' + numvI(rw[7]).toFixed(2);
+        if (seen[dkey]) { dupes++; continue; }
+        seen[dkey] = 1;
+        rowsF.push(rw);
+      }
+      if (dupes) Logger.log('file ' + P.fid + ': ' + dupes + ' overlap rows skipped (dupe-safe)');
+      var nAdd = arStmtAppendRows_(sh, rowsF);
       total += nAdd;
     } catch (err2) {
       notes.push('PDF' + (P.k + 1) + ' import ERROR: ' + String(err2).slice(0, 80));

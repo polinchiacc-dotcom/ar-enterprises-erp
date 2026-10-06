@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.9b — arStmtTextFiles (.txt bypass) + வேற-account guard + arStmtMailToDrive (mail PDF → Drive share); v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v6.0 — arStmtRebuildMails: MailInbox attachment links + StmtText1 → per-file gates → ONE global chain walk → all-pass rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -642,7 +642,7 @@ function arStmtParseText_(text) {
   var res = arStmtParseCUB_(text);
   // v5.8: legacy fallback (undefined arStmtParseLegacy_ crash) நீக்கம் — block=0 எனில் IL-only merge-walk தொடரும்
   // ---- INTEGRITY GATE: opening/closing/மொத்தக் கணக்கு சரிபார்ப்பு ----
-  var mOpen = text.match(/Opening Balance as on \d{2}-[A-Z]{3}-\d{4}\s+([\d,]+\.\d{2})/);
+  var mOpen = text.match(/Opening Balance as on \d{2}-[A-Z]{3}-\d{4}[ \t]+([\d,]+\.\d{2})/); // v6.0: \s+ → [ \t]+ (newline தாண்டி அடுத்த line balance விழுங்க கூடாது)
   if (!mOpen) mOpen = text.match(/([\d,]+\.\d{2})\s*Opening\s+Balance\s+as on \d{2}-[A-Z]{3}-\d{4}/); // v5.8: balance-முன் form
   var opening = mOpen ? parseFloat(mOpen[1].replace(/,/g, '')) : 0;
   // merge-walk v5.8: block rows + IL candidates → date-sort → **per-date GREEDY BALANCE-CHAIN reorder**
@@ -744,12 +744,13 @@ function arStmtParseText_(text) {
   return { rows: out, unparsed: res.unparsed, stats: stats };
 }
 
-function arStmtAppendRows_(sh, newRows) {
+function arStmtAppendRows_(sh, newRows, skipDedupe) {
+  // v6.0: skipDedupe=true → union multiplicity-merge முடிந்த rows (உண்மையான identical DD ஜோடிகள் உட்பட) அப்படியே எழுது
   if (!newRows.length) return 0;
   var tz = Session.getScriptTimeZone();
   var lastRow = sh.getLastRow();
   var keys = {};
-  if (lastRow > 5) {
+  if (!skipDedupe && lastRow > 5) {
     var ex = sh.getRange(1, 2, lastRow, 7).getValues();
     for (var r = 0; r < ex.length; r++) {
       var d = ex[r][0], dsc = String(ex[r][1] || '').replace(/\s+/g, ' ').trim();
@@ -765,6 +766,7 @@ function arStmtAppendRows_(sh, newRows) {
     var nd = (nr[1] instanceof Date) ? Utilities.formatDate(nr[1], tz, 'yyyy-MM-dd') : String(nr[1]).slice(0, 10);
     var ndsc = String(nr[2] || '').replace(/\s+/g, ' ').trim();
     var nbS = String(nr[7] === undefined || nr[7] === null ? '' : nr[7]).replace(/[^0-9.\-]/g, '');
+    if (skipDedupe) { out.push(nr); continue; } // v6.0: union முடிந்த rows — ஒத்த ஜோடிகள் (DD presented twice) கூட கட்டாயம் எழுத வேண்டும்
     if (keys[nd + '|' + ndsc + '|' + nbS]) continue;
     keys[nd + '|' + ndsc + '|' + nbS] = 1;
     out.push(nr);
@@ -954,7 +956,7 @@ function arStmtRebuild() {
         rowsF.push(rw);
       }
       if (dupes) Logger.log('file ' + P.fid + ': ' + dupes + ' overlap rows skipped (dupe-safe)');
-      var nAdd = arStmtAppendRows_(sh, rowsF);
+      var nAdd = arStmtAppendRows_(sh, rowsF, true);
       total += nAdd;
     } catch (err2) {
       notes.push('PDF' + (P.k + 1) + ' import ERROR: ' + String(err2).slice(0, 80));
@@ -1046,6 +1048,200 @@ function arStmtMailToDrive(ids) {
   }
   if (!out.length) Logger.log('எந்த PDF-உம் கிடைக்கவில்லை');
   return out.join('\n');
+}
+
+// ==================================================================
+// v6.0 — Mail-Page-ல் இருக்கும் statement mails-இலிருந்தே முழு rebuild
+//  • StmtText1.txt (07-03-2022→05-09-2025, lossless, ஏற்கனவே Drive-ல் உள்ளது) +
+//    MailInbox sheet-ல் drive.google.com/file/d/<id> attachment links உள்ள எல்லா mail PDF-களும்
+//  • ஒவ்வொன்றும்: வேற-account guard → parse → INTEGRITY GATE (chain + printed totals)
+//  • PASS ஆன sources ஒன்றாக இணைக்கப்பட்டு ONE global balance-chain walk (dupe-safe)
+//  • chain முழுதும் ஒரே பிடியாக + கடைசி தேதி இன்றுக்கு 45 நாளுக்குள் இருந்தால் மட்டுமே import
+//  • எதுவும் சந்தேகம் எனில் → STOP, பழைய data பாதுகாப்பு
+// ==================================================================
+function arStmtRebuildMails() {
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var sh = arStmtSheet_(ss, STMT_TAB);
+  if (!sh) { Logger.log('FATAL: stmt tab missing'); return 'Tab missing'; }
+  var log = ss.getSheetByName('StmtLog');
+  if (!log) { log = ss.insertSheet('StmtLog'); log.appendRow(['Time', 'MailID', 'Status', 'Detail']); }
+  var raw = ss.getSheetByName('StmtRaw');
+  if (!raw) { raw = ss.insertSheet('StmtRaw'); raw.appendRow(['MailID', 'PDF Name', 'Text (first 5000)']); }
+  var rdata = raw.getDataRange().getValues();
+  for (var rr = rdata.length - 1; rr >= 1; rr--) {
+    var tg = String(rdata[rr][0]);
+    if (tg.indexOf('file:') === 0 || tg.indexOf('txt:') === 0 || tg.indexOf('mail:') === 0) raw.deleteRow(rr + 1);
+  }
+  var numv = function (x) { var v = parseFloat(String(x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? NaN : v; };
+  var sources = [];
+  // ---- Source A: StmtText1.txt (lossless netbanking text — 07-03-2022→05-09-2025) ----
+  var TEXT_SRC = '18xKeiNxQ1iMwqVeVlFWakR3B6iTU-8vl';
+  try {
+    var t1 = DriveApp.getFileById(TEXT_SRC).getBlob().getDataAsString('UTF-8');
+    raw.appendRow(['txt:' + TEXT_SRC, 'StmtText1 (FULL ' + t1.length + ' chars)', String(t1).slice(0, 300000)]);
+    sources.push({ tag: 'txt:StmtText1', text: t1 });
+    Logger.log('StmtText1: ' + t1.length + ' chars');
+  } catch (eT) { Logger.log('StmtText1 read FAIL: ' + eT); }
+  // ---- Source B: MailInbox sheet-ல் attachment drive links (வெப்சைட் Mail page data) ----
+  var mb = ss.getSheetByName('MailInbox');
+  var ids = [], seenId = {};
+  if (mb) {
+    var mv = mb.getDataRange().getValues();
+    var URGR = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_\-]{20,})/;
+    for (var i = 0; i < mv.length; i++) {
+      var subj = String(mv[i][2] || '');
+      for (var j = 0; j < mv[i].length; j++) {
+        var cell = String(mv[i][j]);
+        if (cell.indexOf('drive.google.com/file/d/') < 0) continue;
+        var mm = cell.match(URGR);
+        if (mm && !seenId[mm[1]]) { seenId[mm[1]] = 1; ids.push({ id: mm[1], subj: subj }); }
+        break;
+      }
+    }
+  }
+  Logger.log('MailInbox attachment files: ' + ids.length + ' unique');
+  var converted = 0, convSeen = {};
+  for (var f = 0; f < ids.length && converted < 60; f++) {
+    var F = ids[f];
+    try {
+      var blob = DriveApp.getFileById(F.id).getBlob();
+      var docFile = Drive.Files.insert({ title: 'STMT_MAIL_' + F.id }, blob, { convert: true });
+      var text = arStmtDocText_(docFile.id);
+      try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      converted++;
+      var hkey = String(text).length + ':' + String(text).slice(0, 150);
+      if (convSeen[hkey]) { Logger.log('dupe text skip: ' + F.subj.slice(0, 40)); continue; }
+      convSeen[hkey] = 1;
+      raw.appendRow(['mail:' + F.id, F.subj + ' | FULL ' + String(text).length, String(text).slice(0, 300000)]);
+      sources.push({ tag: 'mail:' + F.subj.slice(0, 38), text: text });
+    } catch (e) {
+      Logger.log('conv skip [' + F.subj.slice(0, 34) + ']: ' + String(e).slice(0, 70));
+    }
+  }
+  Logger.log('converted: ' + converted + ' PDFs → ' + sources.length + ' sources');
+  if (!sources.length) { log.appendRow([new Date(), 'rebuildMails', 'STOP', 'sources கிடைக்கவில்லை']); return 'No sources'; }
+  // ---- parse + gate ஒவ்வொன்றும் ----
+  var parsed = [];
+  for (var k = 0; k < sources.length; k++) {
+    var S = sources[k];
+    try {
+      var res = arStmtParseText_(S.text);
+      var st = res.stats || {};
+      if (String(st.totals || '').indexOf('OTHER-ACCOUNT') === 0) {
+        log.appendRow([new Date(), S.tag, 'SKIP', 'வேற account — ' + st.totals]);
+        continue;
+      }
+      if (!st.rows) {
+        log.appendRow([new Date(), S.tag, 'SKIP', 'txn rows 0 (statement அல்லாத file)']);
+        continue;
+      }
+      var dts = res.rows.map(function (r) { return r[1].getTime(); });
+      var info = { tag: S.tag, rows: res.rows, st: st, t0: Math.min.apply(null, dts), t1: Math.max.apply(null, dts) };
+      if (st.pass) {
+        parsed.push(info);
+        log.appendRow([new Date(), S.tag, 'PASS', 'rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' → close=' + st.closing + ' ordMis=' + st.ordMis + ' totals=[' + (st.totals || '') + ']']);
+      } else {
+        log.appendRow([new Date(), S.tag, 'EXCLUDE', 'gate fail — rows=' + st.rows + ' C=' + st.credits + ' D=' + st.debits + ' open=' + st.opening + ' close=' + st.closing + ' totals=[' + (st.totals || '') + '] (conversion loss? — இந்த file விலக்கப்பட்டது)']);
+      }
+    } catch (eP) {
+      log.appendRow([new Date(), S.tag, 'ERROR', String(eP).slice(0, 140)]);
+    }
+  }
+  if (!parsed.length) {
+    var m0 = '❌ REBUILD நிறுத்தப்பட்டது — ஒரு source-உம் PASS ஆகவில்லை. பழைய data பாதுகாக்கப்பட்டது.';
+    log.appendRow([new Date(), 'rebuildMails', 'STOP', m0]);
+    Logger.log(m0);
+    return m0;
+  }
+  // ---- UNION (multiplicity dedupe) + ONE global balance-chain walk ----
+  // v6.0 fix: ஒரே file-ல் உண்மையாக இரண்டு முறை வரும் txns (DD presented-return-presented: அதே தேதி/தொகை/balance)
+  // key-ன் count-ஐ file-வாரிக் கணக்கிட்டு, files-களின் overlap-ஐ மட்டும் dedupe செய்யும் (max-count merge)
+  var maxCnt = {}, perSrcCnt = [];
+  var openOfMin = null, tMin = Infinity, openTag = '';
+  for (var p1 = 0; p1 < parsed.length; p1++) {
+    var P1 = parsed[p1];
+    if (P1.t0 < tMin) { tMin = P1.t0; openOfMin = P1.st.opening; openTag = P1.tag; }
+    var cnt1 = {};
+    for (var q1 = 0; q1 < P1.rows.length; q1++) {
+      var rw1 = P1.rows[q1];
+      var k1 = rw1[1].getTime() + '|' + (numv(rw1[5]) || 0).toFixed(2) + '|' + (numv(rw1[6]) || 0).toFixed(2) + '|' + numv(rw1[7]).toFixed(2);
+      cnt1[k1] = (cnt1[k1] || 0) + 1;
+      if (cnt1[k1] > (maxCnt[k1] || 0)) maxCnt[k1] = cnt1[k1];
+    }
+    perSrcCnt.push(cnt1);
+  }
+  var union = [], emittedU = {};
+  for (var p2 = 0; p2 < parsed.length; p2++) {
+    var P2 = parsed[p2], cnt2 = perSrcCnt[p2], got2 = {};
+    for (var q2 = 0; q2 < P2.rows.length; q2++) {
+      var rw2 = P2.rows[q2];
+      var tU = rw2[1].getTime();
+      var k2 = tU + '|' + (numv(rw2[5]) || 0).toFixed(2) + '|' + (numv(rw2[6]) || 0).toFixed(2) + '|' + numv(rw2[7]).toFixed(2);
+      got2[k2] = (got2[k2] || 0) + 1;
+      if (got2[k2] > cnt2[k2]) continue; // இந்த file-ல் மீதி இல்லை (impossible, safety)
+      if ((emittedU[k2] || 0) >= maxCnt[k2]) continue; // மற்ற file-ல் இருந்தது — overlap dedupe
+      emittedU[k2] = (emittedU[k2] || 0) + 1;
+      union.push({ t: tU, D: numv(rw2[5]) || 0, C: numv(rw2[6]) || 0, B: numv(rw2[7]), row: rw2, tag: P2.tag });
+    }
+  }
+  union.sort(function (a, b) { return a.t - b.t; });
+  var prevU = openOfMin, orphans = 0, orphanLog = [], lastT = 0, chained = 0, ui = 0;
+  while (ui < union.length) {
+    var uj = ui;
+    while (uj < union.length && union[uj].t === union[ui].t) uj++;
+    var uN = uj - ui, usedU = new Array(uN), madeU = 0;
+    while (madeU < uN) {
+      var pickU = -1, pickB = 0;
+      for (var w = ui; w < uj; w++) {
+        if (usedU[w - ui]) continue;
+        var oU = union[w];
+        if (!isNaN(oU.B) && (Math.abs(prevU - oU.D + oU.C - oU.B) < 0.01)) { pickU = w; pickB = oU.B; break; }
+      }
+      if (pickU < 0) break;
+      usedU[pickU - ui] = true; madeU++;
+      prevU = pickB; chained++;
+      if (union[pickU].t > lastT) lastT = union[pickU].t;
+    }
+    for (var w2 = ui; w2 < uj; w2++) {
+      if (usedU[w2 - ui]) continue;
+      orphans++;
+      if (orphanLog.length < 10) orphanLog.push(new Date(union[w2].t).toISOString().slice(0, 10) + ' ' + union[w2].tag + ' | ' + String(union[w2].row[2]).slice(0, 40) + ' | prev=' + prevU + ' B=' + union[w2].B);
+    }
+    ui = uj;
+  }
+  var lastD = new Date(lastT);
+  var days45 = 45 * 24 * 60 * 60 * 1000;
+  var coverageOk = lastT > 0 && (Date.now() - lastT) <= days45;
+  Logger.log('GLOBAL CHAIN: start=' + openOfMin + ' (' + openTag + ') chained=' + chained + ' orphans=' + orphans + ' last=' + lastD.toISOString().slice(0, 10) + ' endBal=' + prevU);
+  if (orphanLog.length) orphanLog.forEach(function (l) { Logger.log('ORPHAN: ' + l); });
+  var passAll = (orphans === 0) && coverageOk;
+  if (!passAll) {
+    var why = [];
+    if (orphans > 0) why.push('chain இடறியது (orphans=' + orphans + ' — ' + (orphanLog[0] || '') + ')');
+    if (!coverageOk) why.push('data இன்று வரை வரவில்லை (last=' + lastD.toISOString().slice(0, 10) + ' — மாத statement mails விடுபாடு)');
+    var m1 = '❌ REBUILD நிறுத்தப்பட்டது — ' + why.join(' | ') + '. பழைய data பாதுகாக்கப்பட்டது.';
+    log.appendRow([new Date(), 'rebuildMails', 'STOP', m1 + ' sources=' + parsed.map(function (x) { return x.tag.slice(0, 22) + ':' + x.st.rows; }).join(', ')]);
+    Logger.log(m1);
+    return m1;
+  }
+  // ---- ALL PASS → clear + import (பழைய rebuild அதே முறை) ----
+  sh.getRange(5, 1, 2, 26).clearContent();
+  sh.getRange(1, 10, 6, 1).clearContent();
+  var mr = sh.getMaxRows();
+  if (mr > 6) sh.deleteRows(7, mr - 6);
+  SpreadsheetApp.flush();
+  sh.getRange(7, 1, 1, 10).setValues([['S.No', 'Date', 'Description', 'Ref / Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance', 'Notes', 'Description Details']]);
+  sh.getRange(7, 1, 1, 10).setFontWeight('bold');
+  SpreadsheetApp.flush();
+  Logger.log('ALL PASS — fresh header row 7, importing ' + union.length + ' rows...');
+  var rowsOut = union.map(function (u) { return u.row; });
+  var totalN = 0;
+  try { totalN = arStmtAppendRows_(sh, rowsOut, true); } catch (eI) { Logger.log('import ERROR: ' + eI); }
+  try { arStmtFinalize_(sh); } catch (eF) { Logger.log('finalize: ' + eF); }
+  var m2 = '✅ REBUILD முடிந்தது: ' + totalN + ' rows | sources=' + parsed.length + ' | chain start=' + openOfMin + ' → end=' + prevU + ' | last=' + lastD.toISOString().slice(0, 10) + ' | orphans=0 (integrity-verified)';
+  log.appendRow([new Date(), 'rebuildMails', 'REBUILD OK', m2]);
+  Logger.log(m2);
+  return m2;
 }
 
 // மணிக்கு ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)

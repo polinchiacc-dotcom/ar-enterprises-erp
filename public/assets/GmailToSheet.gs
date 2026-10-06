@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v5.9 — arStmtTextFiles: Drive .txt நேரடி வாசிப்பு (Google conversion bypass — loss இல்லை) + arStmtRebuildIds='none'; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -867,18 +867,40 @@ function arStmtRebuild() {
   // StmtRaw-ல் பழைய file: rows நீக்கு
   var rdata = raw.getDataRange().getValues();
   for (var rr = rdata.length - 1; rr >= 1; rr--) {
-    if (String(rdata[rr][0]).indexOf('file:') === 0) raw.deleteRow(rr + 1);
+    if (String(rdata[rr][0]).indexOf('file:') === 0 || String(rdata[rr][0]).indexOf('txt:') === 0) raw.deleteRow(rr + 1);
   }
   // ===== படி 1: எல்லா PDF-ஐயும் parse + INTEGRITY GATE (clear செய்யாமல்!) =====
+  // v5.9: Google PDF→Doc conversion-ல் tail/middle pages இழப்பு உறுதி செய்யப்பட்டது (எந்த PDF copy-லும் அதே loss) →
+  // arStmtTextFiles = 'txtFileId1,txtFileId2' (Drive-ல் .txt ஆக upload செய்த statement text) → நேரடியாக blob படிப்பு, conversion இல்லை
+  var TXTF = String(PropertiesService.getScriptProperties().getProperty('arStmtTextFiles') || '').replace(/\s/g, '');
+  var SRCS = [];
+  if (TXTF) {
+    var TL = TXTF.split(',');
+    for (var ti2 = 0; ti2 < TL.length; ti2++) {
+      var tx = TL[ti2].replace(/[^a-zA-Z0-9_\-]/g, '');
+      if (tx) { SRCS.push({ id: tx, isText: true }); Logger.log('text source added: ' + tx); }
+    }
+  }
+  if (OVS === 'none') {
+    Logger.log('arStmtRebuildIds=none → Drive PDF sources skip (text-only rebuild)');
+  } else {
+    for (var tsJ = 0; tsJ < IDS.length; tsJ++) SRCS.push({ id: IDS[tsJ], isText: false });
+  }
   var parsed = [], allPass = true, notes = [];
-  for (var k = 0; k < IDS.length; k++) {
-    var fid = IDS[k];
+  for (var k = 0; k < SRCS.length; k++) {
+    var fid = SRCS[k].id;
     try {
-      var blob = DriveApp.getFileById(fid).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
-      var text = arStmtDocText_(docFile.id);
-      try { Drive.Files.remove(docFile.id); } catch (e2) {}
-      raw.appendRow(['file:' + fid, 'statement ' + (k + 1) + ' (FULL ' + String(text).length + ' chars)', String(text).slice(0, 300000)]);
+      var text;
+      if (SRCS[k].isText) {
+        text = DriveApp.getFileById(fid).getBlob().getDataAsString('UTF-8');
+        Logger.log('text source ' + fid + ': ' + String(text).length + ' chars (conversion bypass)');
+      } else {
+        var blob = DriveApp.getFileById(fid).getBlob();
+        var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
+        text = arStmtDocText_(docFile.id);
+        try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      }
+      raw.appendRow([(SRCS[k].isText ? 'txt:' : 'file:') + fid, 'statement ' + (k + 1) + ' (FULL ' + String(text).length + ' chars)', String(text).slice(0, 300000)]);
       var res = arStmtParseText_(text);
       parsed.push({ fid: fid, k: k, res: res });
       var st = res.stats || {};

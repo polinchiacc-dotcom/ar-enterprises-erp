@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v5.9 — arStmtTextFiles: Drive .txt நேரடி வாசிப்பு (Google conversion bypass — loss இல்லை) + arStmtRebuildIds='none'; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v5.9b — arStmtTextFiles (.txt bypass) + வேற-account guard + arStmtMailToDrive (mail PDF → Drive share); v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -633,6 +633,12 @@ function arStmtParseCUBIL_(text) {
 }
 
 function arStmtParseText_(text) {
+  // v5.9b: வேற account-ன் statement எனில் கட்டாய நிராகரிப்பு (எ.க. Deposit_Statement acct ...4750 — பிரதான tab-ஐ pollute செய்யக்கூடாது)
+  var mA0 = String(text || '').match(/Account No[^\d\n]{0,20}(\d{9,18})/);
+  if (mA0 && mA0[1] !== '510909010201712') {
+    Logger.log('OTHER ACCOUNT ' + mA0[1] + ' — skip (main 510909010201712 மட்டும்)');
+    return { rows: [], unparsed: [], stats: { rows: 0, credits: 0, debits: 0, opening: 0, closing: NaN, pass: false, pages: 0, pgAnchored: 0, pgBlind: 0, pgInterleaved: 0, pgSkipped: 0, ordMis: 0, blockRows: 0, ilKept: 0, ilDropped: 0, totals: 'OTHER-ACCOUNT ' + mA0[1] } };
+  }
   var res = arStmtParseCUB_(text);
   // v5.8: legacy fallback (undefined arStmtParseLegacy_ crash) நீக்கம் — block=0 எனில் IL-only merge-walk தொடரும்
   // ---- INTEGRITY GATE: opening/closing/மொத்தக் கணக்கு சரிபார்ப்பு ----
@@ -1009,6 +1015,37 @@ function arStmtImportPdf() {
   var msg = filesOk + ' files parsed, ' + added + ' NEW rows appended — ' + notes.join(' | ');
   Logger.log(msg);
   return msg;
+}
+
+// v5.9b: mail PDF attachments → Drive (anyone-with-link) — run ஒருமுறை, Execution log-ல் fileId lines copy செய்யவும்
+function arStmtMailToDrive(ids) {
+  if (!ids || !ids.length) ids = ['1a100a2e5e4b1342', '1a0f65d1fc9994a2', '1a0e79e6d868aa6b'];
+  var out = [];
+  for (var i = 0; i < ids.length; i++) {
+    var mid = ids[i];
+    try {
+      var msg = GmailApp.getMessageById(mid);
+      var atts = msg.getAttachments();
+      var got = 0;
+      for (var a = 0; a < atts.length; a++) {
+        var ab = atts[a];
+        var nm = ab.getName() || ('attach_' + a);
+        var data = ab.getData();
+        if (ab.getContentType() !== 'application/pdf' && !/\.pdf$/i.test(nm)) continue;
+        var file = DriveApp.createFile(Utilities.newBlob(data, 'application/pdf', mid + '_' + nm));
+        try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (eS) {}
+        var line = mid + ' | ' + nm + ' (' + Math.round(data.length / 1024) + ' KB) → fileId=' + file.getId();
+        out.push(line);
+        Logger.log(line);
+        got++;
+      }
+      if (!got) Logger.log(mid + ' | PDF attachment இல்லை | ' + msg.getSubject() + ' | ' + msg.getDate());
+    } catch (e) {
+      Logger.log(mid + ' | ERROR ' + String(e).slice(0, 120));
+    }
+  }
+  if (!out.length) Logger.log('எந்த PDF-உம் கிடைக்கவில்லை');
+  return out.join('\n');
 }
 
 // மணிக்கு ஒரு முறை புதிய PDF statement mails-ஐ தானாக parse (ஒரே முறை run செய்யவும்)

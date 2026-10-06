@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v6.0 — arStmtRebuildMails: MailInbox attachment links + StmtText1 → per-file gates → ONE global chain walk → all-pass rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v6.1 — நம்ம PDF extractor (arStmtPdfText_/arStmtPdfToText_): Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -366,11 +366,7 @@ function arStmtParseMails() {
       }
       try {
         var blob = pdf.copyBlob();
-        var docFile = Drive.Files.insert({
-          title: 'STMT_' + mid,
-          mimeType: 'application/vnd.google-apps.document'
-        }, blob, { convert: true });
-        var text = arStmtDocText_(docFile.id);
+        var text = arStmtPdfToText_(blob, 'mail:' + mid); // v6.1: direct extraction → convert fallback
         var res = arStmtParseText_(text);
         if (res.stats && !res.stats.pass) {
           failed++;
@@ -412,6 +408,137 @@ function arStmtParseMails() {
 }
 
 // v4.3: Doc text via Drive export (documents scope தேவையே இல்லை)
+// ==================================================================
+// v6.1 — நம்ம சொந்த PDF text extractor (plain-ASCII content streams — CUB statements)
+// Google PDF→Doc conversion bypass: pages loss + Bad Request இரண்டும் இல்லாம
+// ==================================================================
+function arStmtBytesToStr_(bytes) {
+  var out = [];
+  for (var i = 0; i < bytes.length; i += 32768) {
+    out.push(String.fromCharCode.apply(null, bytes.slice(i, Math.min(i + 32768, bytes.length))));
+  }
+  return out.join('');
+}
+function arStmtStrToBytes_(str) {
+  var b = new Array(str.length);
+  for (var i = 0; i < str.length; i++) b[i] = str.charCodeAt(i) & 0xff;
+  return b;
+}
+function arStmtContentText_(s) {
+  var items = [], stack = [];
+  var tx = 0, ty = 0, lmx = 0, lmy = 0;
+  var i = 0, n = s.length;
+  while (i < n) {
+    var c = s.charAt(i);
+    if (c === '(') {
+      var depth = 1, j = i + 1, str = '';
+      while (j < n && depth > 0) {
+        var ch = s.charAt(j);
+        if (ch === '\\') {
+          var nx = s.charAt(j + 1);
+          if (nx === 'n') str += '\n'; else if (nx === 'r') str += '\r'; else if (nx === 't') str += '\t';
+          else if (nx >= '0' && nx <= '7') { var oct = s.substr(j + 1, 3).match(/^[0-7]{1,3}/); if (oct) { str += String.fromCharCode(parseInt(oct[0], 8)); j += oct[0].length; } else j++; }
+          else str += nx;
+          j += 2;
+        } else if (ch === '(') { depth++; str += ch; j++; }
+        else if (ch === ')') { depth--; if (depth > 0) str += ch; j++; }
+        else { str += ch; j++; }
+      }
+      stack.push({ s: str }); i = j; continue;
+    }
+    if (c === '<' && s.charAt(i + 1) !== '<') {
+      var j2 = s.indexOf('>', i);
+      if (j2 < 0) { i++; continue; }
+      var hex = s.substring(i + 1, j2).replace(/[^0-9A-Fa-f]/g, '');
+      var st2 = '';
+      for (var h = 0; h + 1 < hex.length; h += 2) st2 += String.fromCharCode(parseInt(hex.substr(h, 2), 16));
+      stack.push({ s: st2 }); i = j2 + 1; continue;
+    }
+    if (' \t\r\n[]<>/'.indexOf(c) >= 0) { i++; continue; }
+    var nm = /^[-+]?[0-9]*\.?[0-9]+/.exec(s.slice(i, i + 24));
+    if (nm && /^[.0-9+-]$/.test(nm[0].charAt(0))) { stack.push({ n: parseFloat(nm[0]) }); i += nm[0].length; continue; }
+    var om = /^[A-Za-z'"*][A-Za-z0-9'"*]*/.exec(s.slice(i, i + 12));
+    if (!om) { i++; continue; }
+    var op = om[0]; i += op.length;
+    if (op === 'Tm' && stack.length >= 6) { var e6 = stack.splice(stack.length - 6, 6); lmx = e6[4].n || 0; lmy = e6[5].n || 0; tx = lmx; ty = lmy; }
+    else if (op === 'Td' && stack.length >= 2) { var e2 = stack.splice(stack.length - 2, 2); lmx += e2[0].n || 0; lmy += e2[1].n || 0; tx = lmx; ty = lmy; }
+    else if (op === 'TD' && stack.length >= 2) { var e2b = stack.splice(stack.length - 2, 2); lmy -= e2b[1].n || 0; tx = lmx; ty = lmy; }
+    else if (op === 'T*' || op === "'" || op === '"') { tx = lmx; ty = lmy; if (op !== 'T*' && stack.length) { var so = stack[stack.length - 1]; if (so.s !== undefined && so.s !== '') items.push({ x: tx, y: ty, s: so.s }); stack = []; } }
+    else if (op === 'Tj') { if (stack.length) { var so2 = stack[stack.length - 1]; if (so2.s !== undefined && so2.s !== '') items.push({ x: tx, y: ty, s: so2.s }); } }
+    else if (op === 'TJ') { var parts = ''; for (var si = stack.length - 1; si >= 0; si--) { if (stack[si].s !== undefined) parts = stack[si].s + parts; else break; } if (parts) items.push({ x: tx, y: ty, s: parts }); }
+    if (op !== 'Tm' && op !== 'Td' && op !== 'TD' && op !== 'TJ') stack = [];
+  }
+  items.sort(function (a, b) { return b.y - a.y || a.x - b.x; });
+  // v6.1 pass-1 chain-rule grouping (narration 1.4-6.6pt மேலே, continuation 3.7pt; அடுத்த txn ~10.3pt)
+  var lastY = null;
+  var groups = [], cur = [];
+  for (var ii = 0; ii < items.length; ii++) {
+    if (lastY === null || Math.abs(items[ii].y - lastY) > 7) { if (cur.length) groups.push(cur); cur = []; }
+    cur.push(items[ii]); lastY = items[ii].y;
+  }
+  if (cur.length) groups.push(cur);
+  // v6.1 pass-2: pure-numbers group (tall narration txns-ன் amount வேற y) → அருகில் உள்ள text group (≤20pt) உடன் இணை
+  var gInfo = groups.map(function (g) {
+    var ys = g.map(function (o) { return o.y; });
+    var txt = g.slice().sort(function (a, b) { return a.x - b.x; }).map(function (o) { return o.s; }).join(' ');
+    return { g: g, y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys), txt: txt, pure: /[0-9]/.test(txt) && !/[A-Za-z]/.test(txt), dead: false };
+  });
+  for (var pi = 0; pi < gInfo.length; pi++) {
+    if (!gInfo[pi].pure || gInfo[pi].dead) continue;
+    var best = -1, bestGap = 21;
+    for (var qi = 0; qi < gInfo.length; qi++) {
+      if (qi === pi || gInfo[qi].dead || gInfo[qi].pure) continue;
+      var gap = Math.max(gInfo[pi].y0 - gInfo[qi].y1, gInfo[qi].y0 - gInfo[pi].y1, 0);
+      if (gap < bestGap) { bestGap = gap; best = qi; }
+    }
+    if (best >= 0) {
+      gInfo[best].g = gInfo[best].g.concat(gInfo[pi].g);
+      gInfo[best].y0 = Math.min(gInfo[best].y0, gInfo[pi].y0);
+      gInfo[best].y1 = Math.max(gInfo[best].y1, gInfo[pi].y1);
+      gInfo[pi].dead = true;
+    }
+  }
+  return gInfo.filter(function (G) { return !G.dead; }).map(function (G) { return G.g.slice().sort(function (a, b) { return a.x - b.x; }).map(function (o) { return o.s; }).join(' ').replace(/\s{2,}/g, ' ').trim(); })
+    .filter(function (l) { return l && !/[\u0000-\u0008\u000b-\u001f]/.test(l); }).join('\n');
+}
+function arStmtPdfText_(bytes) {
+  var bin = arStmtBytesToStr_(bytes);
+  var pages = [], pos = 0;
+  while (true) {
+    var si = bin.indexOf('stream', pos);
+    if (si < 0) break;
+    if (bin.substr(si - 3, 3) === 'end') { pos = si + 6; continue; }
+    var ds = si + 6;
+    if (bin.charAt(ds) === '\r') ds++;
+    if (bin.charAt(ds) === '\n') ds++;
+    var e = bin.indexOf('endstream', ds);
+    if (e < 0) break;
+    var seg = bin.substring(ds, e);
+    try {
+      var inf = Utilities.inflate(arStmtStrToBytes_(seg));
+      var t = arStmtContentText_(arStmtBytesToStr_(inf));
+      if (t) pages.push(t);
+    } catch (eI) { }
+    pos = e + 9;
+  }
+  return pages.join('\n');
+}
+// PDF blob → text: நேரடி extraction (loss-இல்லை) → தோற்றால் மட்டும் Google convert fallback
+function arStmtPdfToText_(blob, tag) {
+  var txt = '';
+  try {
+    txt = arStmtPdfText_(blob.getBytes());
+    Logger.log(tag + ' direct-extract: ' + txt.length + ' chars');
+  } catch (eD) { Logger.log(tag + ' direct-extract FAIL: ' + String(eD).slice(0, 90)); }
+  if (String(txt).length < 2000) {
+    var docFile = Drive.Files.insert({ title: 'STMT_CONV_' + tag.replace(/[^A-Za-z0-9]/g, '').slice(0, 40), mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
+    txt = arStmtDocText_(docFile.id);
+    try { Drive.Files.remove(docFile.id); } catch (e2) { }
+    Logger.log(tag + ' convert-fallback: ' + String(txt).length + ' chars');
+  }
+  return txt;
+}
+
 function arStmtDocText_(docId) {
   var errs = [];
   // வழி 1: Drive v2 REST export (UrlFetchApp)
@@ -606,7 +733,13 @@ function arStmtParseCUBIL_(text) {
         var narrIdx = seg.search(/\b(TO|BY)\b/);
         var firstAmtIdx = seg.indexOf(am[0]);
         if (narrIdx < 0 || (firstAmtIdx >= 0 && firstAmtIdx < narrIdx)) {
-          pairs.push([aL2, a0]); // balance முதலில் (date பின்), amount கடைசியில் — CUB interleaved TO-format
+          // v6.1: எழுத்து amounts-க்கு முன் இருந்தால் (NACH/TRF: "date NACH_DR... 50,540.00 1,85,39,954.18") = (date, AMOUNT, balance) → [a0,a1] முதலில்;
+          // pure-numbers / amounts-பின்-எழுத்து (PDF3 interleaved bal-first) → [aL2,a0] முதலில். எதிர் order fallback (chain தான் தீர்வு).
+          var segNd2 = seg.replace(/\d{2}-[A-Z]{3}-\d{4}/g, ' '); // date-ல "SEP" எழுத்து letIdx-ஐ கெடுக்கும் — date strip பண்ணி மட்டும் பார்
+          var letIdx = segNd2.search(/[A-Za-z]/); var faNd = segNd2.indexOf(am[0]);
+          var letFirst = (letIdx >= 0 && (faNd < 0 || letIdx < faNd));
+          if (letFirst) { pairs.push([a0, a1]); pairs.push([aL2, a0]); }
+          else { pairs.push([aL2, a0]); pairs.push([a0, a1]); }
         } else {
           pairs.push([a0, a1]); // narration பின் (amt, bal) — BY-format
         }
@@ -903,10 +1036,7 @@ function arStmtRebuild() {
         text = DriveApp.getFileById(fid).getBlob().getDataAsString('UTF-8');
         Logger.log('text source ' + fid + ': ' + String(text).length + ' chars (conversion bypass)');
       } else {
-        var blob = DriveApp.getFileById(fid).getBlob();
-        var docFile = Drive.Files.insert({ title: 'STMT_RB_' + fid, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
-        text = arStmtDocText_(docFile.id);
-        try { Drive.Files.remove(docFile.id); } catch (e2) {}
+        text = arStmtPdfToText_(DriveApp.getFileById(fid).getBlob(), 'file:' + fid); // v6.1
       }
       raw.appendRow([(SRCS[k].isText ? 'txt:' : 'file:') + fid, 'statement ' + (k + 1) + ' (FULL ' + String(text).length + ' chars)', String(text).slice(0, 300000)]);
       var res = arStmtParseText_(text);
@@ -982,10 +1112,7 @@ function arStmtImportPdf() {
   for (var i = 0; i < files.length; i++) {
     var fname = files[i].title || '';
     try {
-      var blob = DriveApp.getFileById(files[i].id).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_DRV_' + files[i].id, mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });
-      var text = arStmtDocText_(docFile.id);
-      try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      var text = arStmtPdfToText_(DriveApp.getFileById(files[i].id).getBlob(), 'drive:' + files[i].id); // v6.1
       var res = arStmtParseText_(text);
       if (res.stats && !res.stats.pass) {
         var st = res.stats;
@@ -1104,10 +1231,7 @@ function arStmtRebuildMails() {
   for (var f = 0; f < ids.length && converted < 60; f++) {
     var F = ids[f];
     try {
-      var blob = DriveApp.getFileById(F.id).getBlob();
-      var docFile = Drive.Files.insert({ title: 'STMT_MAIL_' + F.id }, blob, { convert: true });
-      var text = arStmtDocText_(docFile.id);
-      try { Drive.Files.remove(docFile.id); } catch (e2) {}
+      var text = arStmtPdfToText_(DriveApp.getFileById(F.id).getBlob(), 'mail:' + F.id); // v6.1: conversion bypass
       converted++;
       var hkey = String(text).length + ':' + String(text).slice(0, 150);
       if (convSeen[hkey]) { Logger.log('dupe text skip: ' + F.subj.slice(0, 40)); continue; }

@@ -287,7 +287,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v6.1 — நம்ம PDF extractor (arStmtPdfText_/arStmtPdfToText_): Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v6.2 — PDF extractor + சொந்த JS zlib inflate (arStmtZlibInflate_, Utilities.inflate தோற்றாலும் direct extraction வேலை செய்யும்) + stream diagnostics; v6.1 — Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -424,6 +424,110 @@ function arStmtStrToBytes_(str) {
   for (var i = 0; i < str.length; i++) b[i] = str.charCodeAt(i) & 0xff;
   return b;
 }
+
+// v6.2 — pure-JS zlib/DEFLATE inflater (puff-style, RFC 1950/1951): Utilities.inflate தோற்றால் இது தான் நம்பிக்கத்தக்க வழி
+function arStmtZlibInflate_(data) {
+  var lbase = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+  var lext = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+  var dbase = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+  var dext = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+  var order = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+  var out = [], pos = 0, bitbuf = 0, bitcnt = 0;
+  if (data.length < 2) throw new Error('inflate: input < 2 bytes');
+  var cmf = data[0], flg = data[1];
+  if (((cmf & 0x0f) === 8) && ((((cmf << 8) + flg) % 31) === 0)) pos = 2; // zlib wrapper இருந்தால் skip; இல்லை raw deflate
+  function bits(need) {
+    while (bitcnt < need) {
+      if (pos >= data.length) throw new Error('inflate: out of input @' + pos);
+      bitbuf |= (data[pos++] & 0xff) << bitcnt;
+      bitcnt += 8;
+    }
+    var v = bitbuf & ((1 << need) - 1);
+    bitbuf >>>= need; bitcnt -= need;
+    return v;
+  }
+  function buildHuff(lengths) {
+    var count = [], i;
+    for (i = 0; i <= 15; i++) count[i] = 0;
+    for (i = 0; i < lengths.length; i++) count[lengths[i]]++;
+    count[0] = 0;
+    var offs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (i = 1; i <= 15; i++) offs[i + 1] = offs[i] + count[i];
+    var symbol = new Array(lengths.length);
+    for (i = 0; i < lengths.length; i++) if (lengths[i]) { symbol[offs[lengths[i]]] = i; offs[lengths[i]]++; }
+    return { count: count, symbol: symbol };
+  }
+  function decodeSym(h) {
+    var code = 0, first = 0, index = 0, len;
+    for (len = 1; len <= 15; len++) {
+      code |= bits(1);
+      var cnt = h.count[len];
+      if (code - first < cnt) return h.symbol[index + (code - first)];
+      index += cnt; first = (first + cnt) << 1; code <<= 1;
+    }
+    throw new Error('inflate: bad huffman code');
+  }
+  var FL = new Array(288), i;
+  for (i = 0; i < 144; i++) FL[i] = 8;
+  for (i = 144; i < 256; i++) FL[i] = 9;
+  for (i = 256; i < 280; i++) FL[i] = 7;
+  for (i = 280; i < 288; i++) FL[i] = 8;
+  var FD = new Array(30);
+  for (i = 0; i < 30; i++) FD[i] = 5;
+  var FIXEDL = buildHuff(FL), FIXEDD = buildHuff(FD);
+  var last;
+  do {
+    last = bits(1);
+    var btype = bits(2);
+    if (btype === 0) {
+      bitbuf = 0; bitcnt = 0; // byte-align
+      if (pos + 4 > data.length) throw new Error('inflate: stored hdr oob');
+      var sl = data[pos] | (data[pos + 1] << 8);
+      var sn = data[pos + 2] | (data[pos + 3] << 8);
+      if (((sl ^ 0xffff) & 0xffff) !== sn) throw new Error('inflate: stored len mismatch');
+      pos += 4;
+      if (pos + sl > data.length) throw new Error('inflate: stored oob');
+      for (var q = 0; q < sl; q++) out.push(data[pos++]);
+    } else if (btype === 1 || btype === 2) {
+      var lh, dh;
+      if (btype === 1) { lh = FIXEDL; dh = FIXEDD; }
+      else {
+        var hlit = bits(5) + 257, hdist = bits(5) + 1, hclen = bits(4) + 4;
+        var clens = [];
+        for (i = 0; i < 19; i++) clens[i] = 0;
+        for (i = 0; i < hclen; i++) clens[order[i]] = bits(3);
+        var ch = buildHuff(clens);
+        var lens = [], n = 0;
+        while (n < hlit + hdist) {
+          var sym = decodeSym(ch);
+          if (sym < 16) { lens[n++] = sym; }
+          else if (sym === 16) { var pv = lens[n - 1]; var rep = 3 + bits(2); while (rep-- > 0) lens[n++] = pv; }
+          else if (sym === 17) { var z = 3 + bits(3); while (z-- > 0) lens[n++] = 0; }
+          else { var z2 = 11 + bits(7); while (z2-- > 0) lens[n++] = 0; }
+        }
+        lh = buildHuff(lens.slice(0, hlit));
+        dh = buildHuff(lens.slice(hlit));
+      }
+      while (true) {
+        var s2 = decodeSym(lh);
+        if (s2 < 256) out.push(s2);
+        else if (s2 === 256) break;
+        else {
+          s2 -= 257;
+          if (s2 >= 29) throw new Error('inflate: bad len sym ' + (s2 + 257));
+          var L = lbase[s2] + (lext[s2] ? bits(lext[s2]) : 0);
+          var d1 = decodeSym(dh);
+          if (d1 >= 30) throw new Error('inflate: bad dist sym ' + d1);
+          var D = dbase[d1] + (dext[d1] ? bits(dext[d1]) : 0);
+          var from = out.length - D;
+          if (from < 0) throw new Error('inflate: dist too far');
+          for (var r = 0; r < L; r++) out.push(out[from++]);
+        }
+      }
+    } else throw new Error('inflate: bad btype ' + btype);
+  } while (!last);
+  return out;
+}
 function arStmtContentText_(s) {
   var items = [], stack = [];
   var tx = 0, ty = 0, lmx = 0, lmy = 0;
@@ -504,6 +608,7 @@ function arStmtContentText_(s) {
 function arStmtPdfText_(bytes) {
   var bin = arStmtBytesToStr_(bytes);
   var pages = [], pos = 0;
+  var diag = { streams: 0, uOk: 0, jsOk: 0, err: 0, lastErr: '' };
   while (true) {
     var si = bin.indexOf('stream', pos);
     if (si < 0) break;
@@ -514,21 +619,33 @@ function arStmtPdfText_(bytes) {
     var e = bin.indexOf('endstream', ds);
     if (e < 0) break;
     var seg = bin.substring(ds, e);
-    try {
-      var inf = Utilities.inflate(arStmtStrToBytes_(seg));
+    var raw = arStmtStrToBytes_(seg);
+    while (raw.length && (raw[raw.length - 1] === 10 || raw[raw.length - 1] === 13 || raw[raw.length - 1] === 32 || raw[raw.length - 1] === 9)) raw.pop(); // endstream-க்கு முன் EOL strip
+    diag.streams++;
+    var inf = null;
+    try { inf = Utilities.inflate(raw); } catch (eU) { inf = null; }
+    if (inf && inf.length) { diag.uOk++; }
+    else {
+      try { inf = arStmtZlibInflate_(raw); diag.jsOk++; } catch (eJ) { diag.err++; if (!diag.lastErr) diag.lastErr = String(eJ).slice(0, 110); inf = null; }
+    }
+    if (inf && inf.length) {
       var t = arStmtContentText_(arStmtBytesToStr_(inf));
       if (t) pages.push(t);
-    } catch (eI) { }
+    }
     pos = e + 9;
   }
+  arStmtPdfText_.diag = diag;
   return pages.join('\n');
 }
 // PDF blob → text: நேரடி extraction (loss-இல்லை) → தோற்றால் மட்டும் Google convert fallback
 function arStmtPdfToText_(blob, tag) {
   var txt = '';
   try {
-    txt = arStmtPdfText_(blob.getBytes());
-    Logger.log(tag + ' direct-extract: ' + txt.length + ' chars');
+    var pb = blob.getBytes();
+    txt = arStmtPdfText_(pb);
+    var dg = arStmtPdfText_.diag || {};
+    var hdr = (pb.length >= 4 && pb[0] === 37 && pb[1] === 80 && pb[2] === 68 && pb[3] === 70) ? '%PDF' : 'BAD[' + pb.slice(0, 4).join(',') + ']';
+    Logger.log(tag + ' direct-extract: ' + txt.length + ' chars (bytes=' + pb.length + ' hdr=' + hdr + ' streams=' + (dg.streams || 0) + ' uOk=' + (dg.uOk || 0) + ' jsOk=' + (dg.jsOk || 0) + ' err=' + (dg.err || 0) + (dg.lastErr ? ' lastErr=' + dg.lastErr : '') + ')');
   } catch (eD) { Logger.log(tag + ' direct-extract FAIL: ' + String(eD).slice(0, 90)); }
   if (String(txt).length < 2000) {
     var docFile = Drive.Files.insert({ title: 'STMT_CONV_' + tag.replace(/[^A-Za-z0-9]/g, '').slice(0, 40), mimeType: 'application/vnd.google-apps.document' }, blob, { convert: true });

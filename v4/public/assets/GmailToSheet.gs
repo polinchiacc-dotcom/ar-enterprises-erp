@@ -319,7 +319,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v6.3 — செக் நம்பர்: IL chq capture 1-6 இலக்கம் (குட்டைய chq 5/6/7/11) + rebuild-ல் Description Details (col J) balKey+snoKey keyed காப்பு/மீட்டல்; v6.2 — PDF extractor + சொந்த JS zlib inflate (arStmtZlibInflate_, Utilities.inflate தோற்றாலும் direct extraction வேலை செய்யும்) + stream diagnostics; v6.1 — Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v6.4 — செக் நம்பர் website-ல் தெரிய: col D '@' TEXT format (gviz header label காக்க); v6.3 — IL chq capture 1-6 இலக்கம் (குட்டைய chq 5/6/7/11) + rebuild-ல் Description Details (col J) balKey+snoKey keyed காப்பு/மீட்டல்; v6.2 — PDF extractor + சொந்த JS zlib inflate (arStmtZlibInflate_, Utilities.inflate தோற்றாலும் direct extraction வேலை செய்யும்) + stream diagnostics; v6.1 — Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -1060,6 +1060,8 @@ function arStmtAppendRows_(sh, newRows, skipDedupe) {
   if (out.length) {
     var need = sh.getLastRow() + out.length;
     if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows() + 50);
+    // v6.4: col D (Ref / Cheque No) TEXT format '@' முதலில் — இல்லைனா Sheets "5"-ஐ number ஆக மாத்தி, gviz header label-ஐ null பண்ணி website column-ஐ மறைக்கும்
+    sh.getRange(sh.getLastRow() + 1, 4, out.length, 1).setNumberFormat('@');
     sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
   }
   return out.length;

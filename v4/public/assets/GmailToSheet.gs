@@ -216,6 +216,38 @@ function arStmtToken() {
   return tk;
 }
 
+// v6.3: rebuild-க்கு முன் Description Details (col J) காப்பு — balKey(H)+snoKey(A) keyed; rebuild-க்குப் பின் திரும்ப எழுது
+function arStmtCaptureJ_(sh) {
+  try {
+    var vr = sh.getDataRange().getValues(), out = {}, hdr = 0;
+    for (var h = 0; h < Math.min(vr.length, 25); h++) if (String(vr[h][2]).indexOf('Description') >= 0) hdr = h;
+    for (var i = hdr + 1; i < vr.length; i++) {
+      var jv = String(vr[i][9] || '').trim();
+      if (!jv) continue;
+      var bv = parseFloat(String(vr[i][7]).replace(/[^0-9.\-]/g, ''));
+      if (isNaN(bv)) continue;
+      var sv = String(vr[i][0]).replace(/[^0-9.\-]/g, '');
+      out[bv.toFixed(2) + '|' + sv] = jv;
+    }
+    return out;
+  } catch (e) { return {}; }
+}
+function arStmtRestoreJ_(sh, cap) {
+  try {
+    if (!cap) return 0;
+    var n = 0, lr = sh.getLastRow();
+    if (lr <= 7) return 0;
+    var vr = sh.getRange(7, 1, lr - 6, 10).getValues();
+    for (var i = 0; i < vr.length; i++) {
+      var bv = parseFloat(String(vr[i][7]).replace(/[^0-9.\-]/g, ''));
+      if (isNaN(bv)) continue;
+      var k = bv.toFixed(2) + '|' + String(vr[i][0]).replace(/[^0-9.\-]/g, '');
+      if (cap[k]) { sh.getRange(7 + i, 10).setValue(cap[k]); n++; }
+    }
+    return n;
+  } catch (e) { return 0; }
+}
+
 // ---- Website edit → Sheet write (Web App POST) ----
 function doPost(e) {
   var out = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
@@ -287,7 +319,7 @@ function arMailSetup() {
 // ==================================================================
 
 // ==================================================================
-// v6.2 — PDF extractor + சொந்த JS zlib inflate (arStmtZlibInflate_, Utilities.inflate தோற்றாலும் direct extraction வேலை செய்யும்) + stream diagnostics; v6.1 — Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
+// v6.3 — செக் நம்பர்: IL chq capture 1-6 இலக்கம் (குட்டைய chq 5/6/7/11) + rebuild-ல் Description Details (col J) balKey+snoKey keyed காப்பு/மீட்டல்; v6.2 — PDF extractor + சொந்த JS zlib inflate (arStmtZlibInflate_, Utilities.inflate தோற்றாலும் direct extraction வேலை செய்யும்) + stream diagnostics; v6.1 — Google conversion bypass; v6.0 — arStmtRebuildMails MailInbox-driven rebuild; v5.9b — வேற-account guard + arStmtMailToDrive; v5.8 — netbanking balance-first PDF ஆதரவு: IL parser glue-split + next-line amount pairing + printed-Total gate + legacy-crash fix; v5.7 — queue-based D/C from bank's own columns + per-page chain-mis counters; extra PDF ids via ScriptProperties arStmtExtraPdf
 // Run செய்து Execution log-ல் வருவதை முழுவதும் copy செய்யவும்
 // ==================================================================
 function arStmtDiag() {
@@ -872,9 +904,13 @@ function arStmtParseCUBIL_(text) {
         }
       }
       dsc = dsc.replace(/\s{2,}/g, ' ').trim();
-      var chq = '';
-      var mc = dsc.match(/\b(\d{3,6})\b\s*$/);
-      if (mc && mc[1] !== '00060') { chq = mc[1]; dsc = dsc.replace(/\b\d{3,6}\b\s*$/, '').trim(); }
+      // v6.3 chq capture: 1-6 இலக்க cheque no (5, 6, 7, 11 மாதிரி குட்டையவையும்) — எழுத்து/எண் + SPACE-க்குப் பின் வந்தால் மட்டும்
+      // (":99999" glue = narration பகுதி; "- 00" skip; '00060' = branch code; all-zero skip; பிடிபடாட்டால் பழைய 3-6 boundary rule)
+      var chq = '', chqV = null;
+      var mc = dsc.match(/[A-Za-z0-9.,)]\s+(\d{1,6})\s*$/); // v6.3: space-க்குப் பின் 1-6 இலக்க = chq (5, 6, 7, 11, 739, 1865)
+      // colon-glue (":99999", ":00121", ":0012") = narration code — chq இல்லை (x-coord verify: 99999 Particulars column-ல் தான்)
+      chqV = mc ? mc[1] : null;
+      if (chqV && chqV !== '00060' && !/^0+$/.test(chqV)) { chq = chqV; dsc = dsc.replace(/\s+\d{1,6}\s*$/, '').trim(); }
       if (!dsc) dsc = '(narration வரி மாறுபட்டது)';
       cands.push({ dt: dtx, dsc: dsc, chq: chq, pairs: pairs });
     }
@@ -1179,6 +1215,7 @@ function arStmtRebuild() {
     Logger.log(msg);
     return msg;
   }
+  var capJ = arStmtCaptureJ_(sh); // v6.3: Description Details காப்பு
   sh.getRange(5, 1, 2, 26).clearContent();
   sh.getRange(1, 10, 6, 1).clearContent();
   var mr = sh.getMaxRows();
@@ -1187,7 +1224,7 @@ function arStmtRebuild() {
   sh.getRange(7, 1, 1, 10).setValues([['S.No', 'Date', 'Description', 'Ref / Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance', 'Notes', 'Description Details']]);
   sh.getRange(7, 1, 1, 10).setFontWeight('bold');
   SpreadsheetApp.flush();
-  Logger.log('ALL PASS — old rows deleted structurally, fresh header at row 7, importing...');
+  Logger.log('ALL PASS — old rows deleted structurally, fresh header at row 7, importing... (J-saved: ' + Object.keys(capJ).length + ')');
   var total = 0, seen = {};
   var numvI = function (x) { var v = parseFloat(String(x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? 0 : v; };
   for (var k2 = 0; k2 < parsed.length; k2++) {
@@ -1210,6 +1247,8 @@ function arStmtRebuild() {
     }
   }
   try { arStmtFinalize_(sh); } catch (eS) { Logger.log('finalize: ' + String(eS)); }
+  var rJ = arStmtRestoreJ_(sh, capJ); // v6.3: Description Details மீட்டல்
+  Logger.log('Description Details restored: ' + rJ + '/' + Object.keys(capJ).length);
   var msg2 = '✅ REBUILD முடிந்தது: ' + total + ' rows (integrity-verified) — ' + notes.join(' | ');
   Logger.log(msg2);
   return msg2;
@@ -1466,6 +1505,7 @@ function arStmtRebuildMails() {
     return m1;
   }
   // ---- ALL PASS → clear + import (பழைய rebuild அதே முறை) ----
+  var capJ = arStmtCaptureJ_(sh); // v6.3: Description Details காப்பு
   sh.getRange(5, 1, 2, 26).clearContent();
   sh.getRange(1, 10, 6, 1).clearContent();
   var mr = sh.getMaxRows();
@@ -1479,6 +1519,8 @@ function arStmtRebuildMails() {
   var totalN = 0;
   try { totalN = arStmtAppendRows_(sh, rowsOut, true); } catch (eI) { Logger.log('import ERROR: ' + eI); }
   try { arStmtFinalize_(sh); } catch (eF) { Logger.log('finalize: ' + eF); }
+  var rJ = arStmtRestoreJ_(sh, capJ); // v6.3: Description Details மீட்டல்
+  Logger.log('Description Details restored: ' + rJ + '/' + Object.keys(capJ).length);
   var m2 = '✅ REBUILD முடிந்தது: ' + totalN + ' rows | sources=' + parsed.length + ' | chain start=' + openOfMin + ' → end=' + prevU + ' | last=' + lastD.toISOString().slice(0, 10) + ' | orphans=0 (integrity-verified)';
   log.appendRow([new Date(), 'rebuildMails', 'REBUILD OK', m2]);
   Logger.log(m2);

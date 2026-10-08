@@ -2106,7 +2106,8 @@ function gviz(src,cb,tryN){tryN=tryN||0;
   function cl(){try{delete window[fn]}catch(e){window[fn]=void 0}var t=document.getElementById(fn);if(t&&t.parentNode)t.parentNode.removeChild(t)}
   function retry(msg){if(fired)return;fired=true;cl();if(tryN<1)gviz(src,cb,tryN+1);else cb(msg+' (retry முடிந்தது)')}
   var sc=document.createElement('script');sc.id=fn;sc.onerror=function(){retry('gviz load fail')};
-  sc.src=src+'&responseHandler:'+fn+'&cb='+Date.now();document.head.appendChild(sc);
+  // v3 FIX: responseHandler tqx-க்குள் (semicolon) — தனி &param-ஆ கொடுத்தால் Google default handler-ஐ call பண்ணும், நம்மது ஒருபோதும் fire ஆகாது
+  sc.src=src.replace('tqx=out:json','tqx=out:json;responseHandler:'+fn)+'&cb='+Date.now();document.head.appendChild(sc);
   setTimeout(function(){if(!fired)retry('gviz timeout')},40000)}
 function cellV(c){if(!c)return'';if(c.v==null)return c.f!=null?String(c.f):'';if(typeof c.v==='object'&&c.v&&c.v.y!=null)return d10(c.v);return String(c.v)}
 function cfgJ(k){try{return JSON.parse(localStorage.getItem(k)||'{}')}catch(e){return{}}}

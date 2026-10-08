@@ -987,6 +987,7 @@ function AuditorGstr2bPageFn({user:c}){
             n.jsx("button",{className:"ui-btn "+(orientation==="portrait"?"ui-btn-primary":"ui-btn-ghost"),style:{padding:"4px 10px",fontSize:12,height:32},onClick:function(){setOrientation("portrait")},children:"📄 Portrait"}),
             n.jsx("button",{className:"ui-btn "+(orientation==="landscape"?"ui-btn-primary":"ui-btn-ghost"),style:{padding:"4px 10px",fontSize:12,height:32},onClick:function(){setOrientation("landscape")},children:"📃 Landscape"})
           ]}),
+          n.jsx(L,{kind:"ghost",onClick:function(){if(window.__arTri&&window.__arTri.coverage)window.__arTri.coverage()},children:AT(f,"🔎 Supplier Coverage","🔎 Supplier Coverage")}),
           n.jsx(L,{kind:"soft",onClick:dlCsv,children:"📊 Excel (CSV)"}),
           n.jsx(L,{kind:"primary",onClick:doPrint,children:AT(f,"🖨️ A4 அச்சு","🖨️ A4 Print")}),
           n.jsx(L,{kind:"ghost",small:!0,onClick:function(){setShowCfg(!showCfg)},title:"Sheet settings",children:"⚙️"})
@@ -2337,6 +2338,113 @@ function openDrawer(raw){cur={sd:seedFrom(raw)};
   panel.querySelector('#arxCl').addEventListener('click',function(){panel.style.display='none'});
   panel.style.display='block';
   loadStaged()}
-window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null}};
+/* ================= P3: Supplier Coverage Report — 2B bills vs bank payments + 180-day ITC (Rule 37) ================= */
+function buildCoverage(asOn){
+  var b2b=C.b2b,bank=C.bank;if(!b2b||!b2b.rows||!b2b.rows.length||!bank||!bank.length)return null;
+  var aOn=d10(asOn)||d10(new Date());if(!aOn)aOn=d10(new Date());
+  var aT=Date.UTC(+aOn.slice(0,4),+aOn.slice(5,7)-1,+aOn.slice(8,10));
+  var pays=[],i,j;for(i=0;i<bank.length;i++)if(bank[i].dr>0&&bank[i].d)pays.push(bank[i]);
+  var used={},bills=[],paidN=0,unpaidN=0;
+  for(i=0;i<b2b.rows.length;i++){var w=b2b.rows[i];
+    var b={sup:w.sup,gstin:w.gstin,invNo:w.invNo,d:w.d,inv:w.inv,tax:w.tax,gst:w.gst,pay:null,pdiff:-1};
+    if(w.inv>0&&w.d){var best=-1,bd=1e18;
+      for(j=0;j<pays.length;j++){if(used[j])continue;var p=pays[j],dv=dd(p.d,w.d);
+        if(dv<0||dv>180)continue;var df=Math.abs(p.dr-w.inv);
+        if(df<=Math.max(1,0.005*w.inv)&&df<bd){bd=df;best=j}}
+      if(best>=0){used[best]=1;b.pay=pays[best];b.pdiff=bd}}
+    if(b.pay)paidN++;else unpaidN++;
+    bills.push(b)}
+  var S={},ord=[],k,b;
+  for(i=0;i<bills.length;i++){b=bills[i];k=b.gstin||('\u00a4'+b.sup);
+    if(!S[k]){S[k]={gstin:b.gstin,sup:b.sup,n:0,inv:0,tax:0,gst:0,paid:0,paidN:0,iGst:0};ord.push(k)}
+    var s=S[k];s.n++;s.inv+=b.inv;s.tax+=b.tax;s.gst+=b.gst;if(b.pay){s.paid+=b.inv;s.paidN++}}
+  var itc=[],iGst=0,iInv=0,iTaxTot=0;
+  for(i=0;i<bills.length;i++){b=bills[i];if(b.pay||!b.d)continue;
+    var bT=Date.UTC(+b.d.slice(0,4),+b.d.slice(5,7)-1,+b.d.slice(8,10));
+    var age=Math.round((aT-bT)/864e5);
+    if(age>180){itc.push({sup:b.sup,gstin:b.gstin,invNo:b.invNo,d:b.d,inv:b.inv,tax:b.tax,gst:b.gst,age:age});
+      iGst+=b.gst;iInv+=b.inv;iTaxTot+=b.tax;var ik=b.gstin||('\u00a4'+b.sup);if(S[ik])S[ik].iGst+=b.gst}}
+  itc.sort(function(a,b2){return a.d<b2.d?-1:a.d>b2.d?1:0});
+  var sups=ord.map(function(k2){var s2=S[k2];s2.out=s2.inv-s2.paid;s2.cov=s2.inv>0?s2.paid/s2.inv*100:0;return s2});
+  sups.sort(function(a,b2){return b2.out-a.out});
+  var tot={sup:sups.length,bills:bills.length,inv:0,paid:0,out:0,gst:0,paidN:paidN,unpaidN:unpaidN};
+  for(i=0;i<sups.length;i++){tot.inv+=sups[i].inv;tot.paid+=sups[i].paid;tot.out+=sups[i].out;tot.gst+=sups[i].gst}
+  tot.cov=tot.inv>0?tot.paid/tot.inv*100:0;
+  return {asOn:aOn,sups:sups,itc:itc,iGst:iGst,iInv:iInv,iTaxTot:iTaxTot,tot:tot};
+}
+function covChip(t,label){var st=t==='ok'?'background:#dcfce7;color:#166534;border:1px solid #86efac':t==='fail'?'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5':'background:#fef9c3;color:#854d0e;border:1px solid #fde047';
+  return '<span style="'+st+';border-radius:12px;padding:2px 10px;font-size:11.5px;font-weight:700">'+(t==='ok'?'\u2713 ':t==='fail'?'\u2715 ':'\u23f3 ')+label+'</span>'}
+function coverageOpen(){
+  if(typeof document==='undefined')return;
+  var prev=document.getElementById('arSupOv');if(prev&&prev.parentNode)prev.parentNode.removeChild(prev);
+  var st={bank:'load',b2b:'load'},errs={},doneN=0,loaded={bank:false,b2b:false};
+  var ov=document.createElement('div');ov.id='arSupOv';
+  ov.innerHTML='<style>\n#arSupOv{position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,.55);padding:18px;overflow:auto;font-family:inherit}\n#arSupOv .supCard{max-width:1240px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);overflow:hidden}\n#arSupOv .supHead{background:#1f3864;color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}\n#arSupOv .supStats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0}\n#arSupOv .supStat{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px}\n#arSupOv .supStat .l{font-size:11px;color:#64748b;font-weight:600}\n#arSupOv .supStat .v{font-size:16px;font-weight:800;color:#0f172a}\n#arSupOv table{width:100%;border-collapse:collapse;font-size:11px}\n#arSupOv th{background:#1f3864;color:#fff;padding:5px 7px;text-align:left;position:sticky;top:0}\n#arSupOv th.r,#arSupOv td.r{text-align:right}\n#arSupOv td{padding:4px 7px;border-bottom:1px solid #e2e8f0;white-space:nowrap}\n#arSupOv tr:nth-child(even) td{background:#f8fafc}\n#arSupOv .supNote{font-size:11px;color:#475569;padding:10px 16px;background:#fefce8;border-top:1px solid #fde047;line-height:1.5}\n#arSupOv .supWait{padding:34px;text-align:center;font-size:14px;color:#334155;font-weight:600}\n@media print{\n body>*:not(#arSupOv){display:none!important}\n #arSupOv{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}\n #arSupOv .supCard{box-shadow:none!important;max-width:100%!important;border-radius:0!important}\n #arSupOv .no-print{display:none!important}\n #arSupOv th{position:static!important;background:#1f3864!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}\n #arSupOv .supWait{display:none!important}\n @page{size:A4 landscape;margin:8mm 6mm}\n}\n</style>'+
+    '<div class="supCard"><div class="supHead"><div style="font-size:15px;font-weight:800">\u{1F526} Supplier Coverage \u2014 2B \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD vs Bank \u0B95\u0B9F\u0BCD\u0B9F\u0BA3\u0B99\u0BCD\u0B95\u0BB3\u0BCD <span style="font-weight:400;font-size:11.5px;opacity:.85">(Rule 37: 180-\u0BA8\u0BBE\u0BB3\u0BCD ITC)</span></div>'+
+    '<div class="no-print" style="display:flex;gap:6px;align-items:center">'+
+    '<label style="font-size:11.5px">\u{1F4C5} As-on <input type="date" id="supOn" style="border:1px solid #94a3b8;border-radius:5px;padding:2px 5px;font-size:11.5px"></label>'+
+    '<button id="supRe" title="cache \u0BA8\u0BC0\u0B95\u0BCD\u0B95\u0BBF fresh load" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:5px;padding:3px 9px;font-size:12px;cursor:pointer">\u{1F504}</button>'+
+    '<button id="supPr" title="A4 \u0B85\u0B9A\u0BCD\u0B9A\u0BC1" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:5px;padding:3px 9px;font-size:12px;cursor:pointer">\u{1F5A8}\uFE0F</button>'+
+    '<button id="supCl" style="border:1px solid #94a3b8;background:#fee2e2;border-radius:5px;padding:3px 10px;font-size:12px;cursor:pointer;font-weight:700">\u2715</button></div></div>'+
+    '<div id="supChips" style="display:flex;gap:8px;padding:9px 16px;background:#eef2f7;border-bottom:1px solid #e2e8f0;flex-wrap:wrap"></div>'+
+    '<div id="supBody"><div class="supWait">\u23F3 Bank + GSTR-2B \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026 (gviz, \u0B9A\u0BC1\u0BB1\u0BC1\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BCD\u0B9F query)</div></div></div>';
+  document.body.appendChild(ov);
+  function chips(){var h=covChip(st.bank,'\u{1F3E6} Bank Statement')+' '+covChip(st.b2b,'\u{1F9FE} GSTR-2B \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD');
+    var el=ov.querySelector('#supChips');if(el)el.innerHTML=h}
+  chips();
+  ov.querySelector('#supCl').addEventListener('click',function(){if(ov.parentNode)ov.parentNode.removeChild(ov)});
+  ov.querySelector('#supPr').addEventListener('click',function(){window.print()});
+  ov.querySelector('#supRe').addEventListener('click',function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=null;st={bank:'load',b2b:'load'};errs={};doneN=0;loaded={bank:false,b2b:false};chips();start()});
+  function rerender(){
+    var on=ov.querySelector('#supOn'),asOn=on&&on.value||'';
+    var cv=buildCoverage(asOn);
+    var body=ov.querySelector('#supBody');if(!body)return;
+    if(!cv){body.innerHTML='<div class="supWait">\u2715 \u0BA4\u0BB0\u0BB5\u0BC1 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8 \u2014 Bank \u0BAE\u0BB1\u0BCD\u0BB1\u0BC1\u0BAE\u0BCD GSTR-2B \u0B87\u0BB0\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD \u0BA4\u0BC7\u0BB5\u0BC8</div>';return}
+    var h='<div class="supStats">'+
+      '<div class="supStat"><div class="l">\u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BCD\u0B95\u0BB3\u0BCD</div><div class="v">'+fmt0(cv.tot.sup)+'</div></div>'+
+      '<div class="supStat"><div class="l">2B \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD (\u0B95\u0B9F\u0BCD\u0B9F\u0BBF\u0BAF\u0BA4\u0BC1 '+fmt0(cv.tot.paidN)+'/'+fmt0(cv.tot.bills)+')</div><div class="v">'+fmt0(cv.tot.bills)+'</div></div>'+
+      '<div class="supStat"><div class="l">Invoice \u0BAE\u0BCA\u0BA4\u0BCD\u0BA4\u0BAE\u0BCD</div><div class="v">'+fmt(cv.tot.inv)+'</div></div>'+
+      '<div class="supStat"><div class="l">Bank-\u0BB2\u0BCD \u0B95\u0B9F\u0BCD\u0B9F\u0BA4\u0BC1</div><div class="v" style="color:#059669">'+fmt(cv.tot.paid)+'</div></div>'+
+      '<div class="supStat"><div class="l">\u0BA8\u0BBF\u0BB2\u0BC1\u0BB5\u0BC8</div><div class="v" style="color:#dc2626">'+fmt(cv.tot.out)+'</div></div>'+
+      '<div class="supStat"><div class="l">\u26A0\uFE0F 180-\u0BA8\u0BBE\u0BB3\u0BCD ITC \u0B9F\u0DCA\u0BB0\u0BBF\u0BAA\u0BCD ('+fmt0(cv.itc.length)+' \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD)</div><div class="v" style="color:#b45309">'+fmt(cv.iGst)+'</div></div>'+
+      '</div>';
+    h+='<div style="padding:10px 16px 4px;font-size:13px;font-weight:800;color:#1f3864">\u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BCD-\u0BB5\u0BBE\u0BB0\u0BC0 Coverage (\u0BA8\u0BBF\u0BB2\u0BC1\u0BB5\u0BC8 \u0B85\u0BA4\u0BBF\u0B95 \u0B85\u0BB0\u0BC1\u0B95\u0BCD\u0B95\u0BC1 \u0BAE\u0BC1\u0BA4\u0BB2\u0BCD)</div>';
+    h+='<div style="max-height:46vh;overflow:auto;border:1px solid #e2e8f0"><table><thead><tr><th>#</th><th>GSTIN</th><th>\u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BCD</th><th class="r">\u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD</th><th class="r">\u0B95\u0B9F\u0BCD\u0B9F\u0BBF\u0BAF\u0BA4\u0BC1</th><th class="r">Invoice \u20B9</th><th class="r">\u0B95\u0B9F\u0BCD\u0B9F\u0BBF\u0BAF\u0BA4\u0BC1 \u20B9</th><th class="r">\u0BA8\u0BBF\u0BB2\u0BC1\u0BB5\u0BC8 \u20B9</th><th class="r">Coverage %</th><th class="r">\u26A0\uFE0F ITC \u20B9</th></tr></thead><tbody>';
+    var i2,s;
+    for(i2=0;i2<cv.sups.length;i2++){s=cv.sups[i2];
+      var col=s.cov>=95?'#059669':s.cov>=50?'#b45309':'#dc2626';
+      h+='<tr><td>'+(i2+1)+'</td><td>'+esc(s.gstin||'\u2014')+'</td><td>'+esc(s.sup)+'</td><td class="r">'+fmt0(s.n)+'</td><td class="r">'+fmt0(s.paidN)+'</td><td class="r">'+fmt(s.inv)+'</td><td class="r" style="color:#059669">'+(s.paid>0?fmt(s.paid):'\u2014')+'</td><td class="r" style="color:'+(s.out>0.005?'#dc2626':'#059669')+'">'+fmt(s.out)+'</td><td class="r" style="font-weight:700;color:'+col+'">'+s.cov.toFixed(1)+'%</td><td class="r">'+(s.iGst>0?'<span style="color:#b45309;font-weight:700">'+fmt(s.iGst)+'</span>':'\u2014')+'</td></tr>'}
+    h+='<tr style="font-weight:800;background:#e2e8f0"><td colspan="3">\u0BAE\u0BCA\u0BA4\u0BCD\u0BA4\u0BAE\u0BCD ('+fmt0(cv.tot.sup)+' \u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BCD\u0B95\u0BB3\u0BCD)</td><td class="r">'+fmt0(cv.tot.bills)+'</td><td class="r">'+fmt0(cv.tot.paidN)+'</td><td class="r">'+fmt(cv.tot.inv)+'</td><td class="r">'+fmt(cv.tot.paid)+'</td><td class="r">'+fmt(cv.tot.out)+'</td><td class="r">'+cv.tot.cov.toFixed(1)+'%</td><td class="r">'+(cv.iGst>0?fmt(cv.iGst):'\u2014')+'</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div style="padding:12px 16px 4px;font-size:13px;font-weight:800;color:#b45309">\u26A0\uFE0F 180 \u0BA8\u0BBE\u0BB3\u0BCD \u0B95\u0B9F\u0BA8\u0BCD\u0BA4 \u0B95\u0B9F\u0BCD\u0B9F\u0BBE\u0BA4 \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD \u2014 ITC \u0BA4\u0BBF\u0BB0\u0BC1\u0BAE\u0BCD\u0BAA\u0BAA\u0BCD \u0BAA\u0BC6\u0BB1\u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BBF\u0BAF \u0BAA\u0B9F\u0BCD\u0B9F\u0BBF\u0BAF\u0BB2\u0BCD (Rule 37, CGST) \u2014 '+fmt0(cv.itc.length)+' \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD, ITC '+fmt(cv.iGst)+'</div>';
+    if(cv.itc.length){
+      h+='<div style="max-height:40vh;overflow:auto;border:1px solid #fde047;margin:0 16px"><table><thead><tr style="background:#92400e"><th>#</th><th>GSTIN</th><th>\u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BCD</th><th>Invoice No</th><th>\u0BAA\u0BBF\u0BB2\u0BCD \u0BA4\u0BC7\u0BA4\u0BBF</th><th class="r">\u0BB5\u0BAF\u0BA4\u0BC1 (\u0BA8\u0BBE\u0BB3\u0BCD)</th><th class="r">Invoice \u20B9</th><th class="r">Taxable \u20B9</th><th class="r">ITC \u20B9</th></tr></thead><tbody>';
+      for(i2=0;i2<cv.itc.length;i2++){var w2=cv.itc[i2];
+        h+='<tr><td>'+(i2+1)+'</td><td>'+esc(w2.gstin||'\u2014')+'</td><td>'+esc(w2.sup)+'</td><td>'+esc(w2.invNo||'\u2014')+'</td><td>'+esc(w2.d)+'</td><td class="r">'+fmt0(w2.age)+'</td><td class="r">'+fmt(w2.inv)+'</td><td class="r">'+fmt(w2.tax)+'</td><td class="r" style="font-weight:700;color:#b45309">'+fmt(w2.gst)+'</td></tr>'}
+      h+='<tr style="font-weight:800;background:#fef3c7"><td colspan="6">\u0BAE\u0BCA\u0BA4\u0BCD\u0BA4\u0BAE\u0BCD ('+fmt0(cv.itc.length)+' \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD, as-on '+esc(cv.asOn)+')</td><td class="r">'+fmt(cv.iInv)+'</td><td class="r">'+fmt(cv.iTaxTot||'')+'</td><td class="r">'+fmt(cv.iGst)+'</td></tr>';
+      h+='</tbody></table></div>'}
+    else h+='<div style="padding:8px 16px;font-size:12px;color:#059669;font-weight:600">\u2713 180 \u0BA8\u0BBE\u0BB3\u0BCD \u0B95\u0B9F\u0BA8\u0BCD\u0BA4 \u0B95\u0B9F\u0BCD\u0B9F\u0BBE\u0BA4 \u0BAA\u0BBF\u0BB2\u0BCD \u0B87\u0BB2\u0BCD\u0BB2\u0BC8 \u2014 ITC reversal \u0BA4\u0BC7\u0BB5\u0BC8 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8</div>';
+    h+='<div class="supNote">\u{1F4D8} <b>Method:</b> Payment match = Bank debit \u2248 invoice value (\u22640.5% \u0BB5\u0BBF\u0BA4\u0BCD\u0BA4\u0BBF\u0BAF\u0BBE\u0B9A\u0BAE\u0BCD), \u0BAA\u0BBF\u0BB2\u0BCD \u0BA4\u0BC7\u0BA4\u0BBF\u0B95\u0BCD\u0B95\u0BC1\u0BAA\u0BCD \u0BAA\u0BBF\u0BA9\u0BCD 0\u2013180 \u0BA8\u0BBE\u0BB3\u0BC1\u0B95\u0BCD\u0B95\u0BC1\u0BB3\u0BCD \u2014 \u0B92\u0BB5\u0BCD\u0BB5\u0BCA\u0BB0\u0BC1 payment \u0B92\u0BB0\u0BC1 \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BCD\u0B95\u0BC1 \u0BAE\u0B9F\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD; partial/advance \u0B95\u0B9F\u0BCD\u0B9F\u0BA3\u0BAE\u0BCD \u0B87\u0BA4\u0BBF\u0BB2\u0BCD \u0B87\u0BB2\u0BCD\u0BB2\u0BC8. <b>Rule 37:</b> \u0BAA\u0BBF\u0BB2\u0BCD \u0BA4\u0BC7\u0BA4\u0BBF\u0BAF\u0BBF\u0BB2\u0BBF\u0BB0\u0BC1\u0BA8\u0BCD\u0BA4\u0BC1 180 \u0BA8\u0BBE\u0BB3\u0BC1\u0B95\u0BCD\u0B95\u0BC1\u0BB3\u0BCD \u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BC1\u0B95\u0BCD\u0B95\u0BC1 \u0B95\u0B9F\u0BCD\u0B9F\u0BBE\u0BB5\u0BBF\u0B9F\u0BCD\u0B9F\u0BBE\u0BB2\u0BCD \u0B85\u0BA8\u0BCD\u0BA4 \u0BAA\u0BBF\u0BB2\u0BCD\u0BA9\u0BCD ITC (\u0B95\u0B9F\u0BB5\u0BC1) \u0BA4\u0BBF\u0BB0\u0BC1\u0BAE\u0BCD\u0BAA\u0BAA\u0BCD \u0BAA\u0BC6\u0BB1\u0BCD\u0BB1\u0BC1 \u0B95\u0B9F\u0BCD\u0B9F\u0BA3\u0BBF\u0BAF\u0BC1\u0B9F\u0BA9\u0BCD \u0B9A\u0BC7\u0BB2\u0BC1\u0BA4\u0BCD\u0BA4 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD. As-on: <b>'+esc(cv.asOn)+'</b></div>';
+    body.innerHTML=h}
+  function settle(e,which){
+    st[which]=e?'fail':'ok';errs[which]=e||'';loaded[which]=!e;doneN++;chips();
+    if(doneN>=2){
+      var body=ov.querySelector('#supBody');
+      if(!loaded.bank||!loaded.b2b){var msg=[];
+        if(!loaded.bank)msg.push('\u{1F3E6} Bank: '+errs.bank);
+        if(!loaded.b2b)msg.push('\u{1F9FE} 2B: '+errs.b2b);
+        if(body)body.innerHTML='<div class="supWait" style="color:#991b1b">\u2715 '+esc(msg.join(' \u2014 '))+'<br><br><button id="supRetry" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:700">\u{1F504} \u0BAE\u0BC0\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD \u0BAE\u0BC1\u0BAF\u0BB1\u0BCD\u0B9A\u0BBF</button></div>';
+        var rb=ov.querySelector('#supRetry');if(rb)rb.addEventListener('click',function(){try{sessionStorage.removeItem('arXrayCache')}catch(e2){}C.bank=C.b2b=null;st={bank:'load',b2b:'load'};errs={};doneN=0;loaded={bank:false,b2b:false};chips();start()});
+        return}
+      var on=ov.querySelector('#supOn');if(on&&!on.value)on.value=d10(new Date());
+      rerender()}}
+  function start(){
+    var body=ov.querySelector('#supBody');if(body)body.innerHTML='<div class="supWait">\u23F3 Bank + GSTR-2B \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026 (gviz, \u0B9A\u0BC1\u0BB1\u0BC1\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0B9F\u0BCD\u0B9F query)</div>';
+    loadBank(function(e){settle(e,'bank')});
+    loadB2B(function(e){settle(e,'b2b')})}
+  var onEl=ov.querySelector('#supOn');if(onEl)onEl.addEventListener('change',rerender);
+  start()}
+
+window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage};
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */

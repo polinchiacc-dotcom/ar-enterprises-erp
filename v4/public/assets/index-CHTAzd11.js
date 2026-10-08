@@ -2071,9 +2071,10 @@ n.jsx("button",{className:"ui-btn ui-btn-primary",onClick:function(){window.loca
 window.__arShare=function(o2){o2=o2||{};var Ls=window.__arShareLines||[];var txt=(o2.title||"AR Enterprises ERP")+(Ls.length?"\n"+Ls.join("\n"):"")+"\n"+window.location.href;try{if(navigator.share){navigator.share({title:"AR Enterprises ERP",text:txt}).catch(function(){});return}}catch(e2){}window.open("https://wa.me/?text="+encodeURIComponent(txt),"_blank")};
 Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{children:n.jsx(Rx,{children:n.jsx(d0,{})})}));
 
-/* ================= AR Audit Triangle X-Ray v1 (P1 click + P2 date lens) =================
-   🏦 Bank Statement ↔ 🔄 Contract Works ↔ 🧾 GSTR-2B — click ஒரு row → மற்ற pages match;
-   date lens → ஒரு தேதியில் மூன்று pages-ன் data. Self-contained; gviz + /api/bank.liveRecon. */
+/* ================= AR Audit Triangle X-Ray v2 (staged+cache+slim gviz) =================
+   🏦 Bank Statement ↔ 🔄 Contract Works ↔ 🧾 GSTR-2B — row click → cross-match; Date Lens.
+   v2: gviz 40s+retry, slim column select (payload ~85% குறைவு), staged render (recon முதல்ல),
+   per-source status chips, sessionStorage cache 10min (bank/2B). */
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
@@ -2085,92 +2086,105 @@ function d10(v){
   if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+pad2(v.getMonth()+1)+'-'+pad2(v.getDate());
   if(typeof v==='object'&&v.y!=null)return v.y+'-'+pad2((v.m||0)+1)+'-'+pad2(v.d||1);
   var m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];
-  var m3=String(v).match(/^Date\((\d+),(\d+),(\d+)\)/);if(m3)return (+m3[1])+'-'+pad2(+m3[2]+1)+'-'+pad2(+m3[3]); // gviz JSONP "Date(y,m,d)"
-  var m2=String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m2)return m2[3]+'-'+pad2(+m2[2])+'-'+pad2(+m2[1]); // DD/MM/YYYY (GSTR-2B)
+  var m3=String(v).match(/^Date\((\d+),(\d+),(\d+)\)/);if(m3)return (+m3[1])+'-'+pad2(+m3[2]+1)+'-'+pad2(+m3[3]);
+  var m2=String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m2)return m2[3]+'-'+pad2(+m2[2])+'-'+pad2(+m2[1]);
   var d=new Date(v);return isNaN(d)?'':d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
 function dd(a,b){var x=Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10)),y=Date.UTC(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10));return Math.round((x-y)/864e5)}
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function fmt(v){return '₹'+num(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmt0(v){return num(v).toLocaleString('en-IN')}
-var STOP={THE:1,AND:1,SRI:1,MS:1,LTD:1,LIMITED:1,PVT:1,PRIVATE:1,COMPANY:1,TRADERS:1,CONSTRUCTION:1,CONSTRUCTIONS:1,CONTRACTOR:1,ENTERPRISES:1,HARDWARES:1,AGENCIES:1,STORES:1,TRADERS:1,MURUGAN:1,AND:1,CO:1};
+var STOP={THE:1,AND:1,SRI:1,MS:1,LTD:1,LIMITED:1,PVT:1,PRIVATE:1,COMPANY:1,TRADERS:1,CONSTRUCTION:1,CONSTRUCTIONS:1,CONTRACTOR:1,ENTERPRISES:1,HARDWARES:1,AGENCIES:1,STORES:1,MURUGAN:1,CO:1};
 function toks(x){return String(x||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(/\s+/).filter(function(t){return t.length>=4&&!STOP[t]})}
 function partyHit(a,b){var ta=toks(a),tb=toks(b),i,j;if(!ta.length||!tb.length)return 0;
   for(i=0;i<ta.length;i++)for(j=0;j<tb.length;j++)if(ta[i]===tb[j])return 1;return 0}
-function gviz(src,cb){var fn='__arX'+Date.now();window[fn]=function(d){cl();cb(null,d)};
+function cacheGet(k){try{var c=JSON.parse(sessionStorage.getItem('arXrayCache')||'null');if(!c||Date.now()-(c.t||0)>600000)return null;return c[k]||null}catch(e){return null}}
+function cachePut(k,v){try{var c=JSON.parse(sessionStorage.getItem('arXrayCache')||'null')||{t:Date.now()};c.t=Date.now();c[k]=v;sessionStorage.setItem('arXrayCache',JSON.stringify(c))}catch(e){}}
+function gviz(src,cb,tryN){tryN=tryN||0;
+  var fn='__arX'+Date.now()+'_'+tryN+'_'+Math.floor(Math.random()*1e5);window[fn]=function(d){if(fired)return;fired=true;cl();cb(null,d)};
+  var fired=false;
   function cl(){try{delete window[fn]}catch(e){window[fn]=void 0}var t=document.getElementById(fn);if(t&&t.parentNode)t.parentNode.removeChild(t)}
-  var sc=document.createElement('script');sc.id=fn;sc.onerror=function(){cl();cb('gviz load fail — sheet share "Anyone with link → Viewer" சரிபார்க்க')};
+  function retry(msg){if(fired)return;fired=true;cl();if(tryN<1)gviz(src,cb,tryN+1);else cb(msg+' (retry முடிந்தது)')}
+  var sc=document.createElement('script');sc.id=fn;sc.onerror=function(){retry('gviz load fail')};
   sc.src=src+'&responseHandler:'+fn+'&cb='+Date.now();document.head.appendChild(sc);
-  setTimeout(function(){if(window[fn]){cl();cb('gviz timeout')}},15000)}
+  setTimeout(function(){if(!fired)retry('gviz timeout')},40000)}
 function cellV(c){if(!c)return'';if(c.v==null)return c.f!=null?String(c.f):'';if(typeof c.v==='object'&&c.v&&c.v.y!=null)return d10(c.v);return String(c.v)}
 function cfgJ(k){try{return JSON.parse(localStorage.getItem(k)||'{}')}catch(e){return{}}}
 function sheetIdOf(cfg,dflt){var m=String(cfg&&cfg.sheetId||'').match(/\/d\/([a-zA-Z0-9_\-]{20,})/);return m?m[1]:(String(cfg&&cfg.sheetId||'').match(/^[a-zA-Z0-9_\-]{20,}$/)?cfg.sheetId:dflt)}
+/* ---- BANK: slim select B,C,D,F,G,H (date,desc,chq,debit,credit,balance) → full fallback ---- */
 function loadBank(cb){if(C.bank)return cb(null,C.bank);
+  var cached=cacheGet('bank');if(cached&&cached.length){C.bank=cached;return cb(null,C.bank)}
   var cfg=cfgJ('arAuditorStmtCfg'),id=sheetIdOf(cfg,WB);
   var tab=/^gid:/.test(cfg.tab||'')?'&gid='+String(cfg.tab).slice(4):'&gid=2024650928';
-  gviz('https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json'+tab+'&headers=0',function(e,d){
-    if(e)return cb(e);
-    try{var rows=(d.table&&d.table.rows)||[],hI=-1,i,j;
-      for(i=0;i<Math.min(rows.length,25);i++){var cc=rows[i]&&rows[i].c;if(cc&&cc[2]&&String(cc[2].v||'').indexOf('Description')>=0){hI=i;break}}
-      if(hI<0)return cb('Bank tab header கிடைக்கவில்லை');
-      var out=[];
-      for(j=hI+1;j<rows.length;j++){var c=rows[j]&&rows[j].c;if(!c)continue;
-        var dte=d10(c[1]&&c[1].v!=null?c[1].v:(cellV(c[1]))),de=cellV(c[2]).trim(),dr=num(cellV(c[5])),cr=num(cellV(c[6])),bal=num(cellV(c[7]));
-        if(!de&&!dr&&!cr&&!bal)continue;
-        out.push({i:j,d:dte,desc:de,chq:cellV(c[3]).trim(),dr:dr,cr:cr,bal:bal})}
-      C.bank=out;cb(null,out)}catch(e2){cb(String(e2))}})}
+  var base='https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json'+tab;
+  function parse(d,slim){var rows=(d.table&&d.table.rows)||[],hI=-1,i,j;
+    var P=slim?{d:0,de:1,ch:2,dr:3,cr:4,ba:5}:{d:1,de:2,ch:3,dr:5,cr:6,ba:7};
+    for(i=0;i<Math.min(rows.length,25);i++){var cc=rows[i]&&rows[i].c;if(cc&&cc[P.de]&&String(cc[P.de].v||'').indexOf('Description')>=0){hI=i;break}}
+    if(hI<0)return null;
+    var out=[];
+    for(j=hI+1;j<rows.length;j++){var c=rows[j]&&rows[j].c;if(!c)continue;
+      var dte=d10(c[P.d]&&c[P.d].v!=null?c[P.d].v:(cellV(c[P.d]))),de=cellV(c[P.de]).trim(),dr=num(cellV(c[P.dr])),cr=num(cellV(c[P.cr])),bal=num(cellV(c[P.ba]));
+      if(!de&&!dr&&!cr&&!bal)continue;
+      out.push({i:j,d:dte,desc:de,chq:cellV(c[P.ch]).trim(),dr:dr,cr:cr,bal:bal})}
+    return out}
+  gviz(base+'&tq='+encodeURIComponent('select B,C,D,F,G,H')+'&headers=0',function(e,d){
+    var out=null;try{out=e?null:parse(d,true)}catch(e2){out=null}
+    if(out&&out.length){C.bank=out;cachePut('bank',out);cb(null,out);return}
+    gviz(base+'&headers=0',function(e2,d2){
+      if(e2)return cb(e2);
+      try{var out2=parse(d2,false);if(!out2)return cb('Bank header (Description) கிடைக்கவில்லை');C.bank=out2;cachePut('bank',out2);cb(null,out2)}catch(e3){cb(String(e3))}})})}
+/* ---- 2B: slim select E,F,G,I,J,N,O,P,Q → full fallback; header-row + content detection ---- */
 function loadB2B(cb){if(C.b2b)return cb(null,C.b2b);
+  var cached=cacheGet('b2b');if(cached&&cached.rows&&cached.rows.length){C.b2b=cached;return cb(null,C.b2b)}
   var cfg=cfgJ('arAuditor2bCfg'),id=sheetIdOf(cfg,WB);
   var tab=cfg.tab&&!/^gid:/.test(cfg.tab)?'&sheet='+encodeURIComponent(cfg.tab):'&sheet=GSTR2B';
-  gviz('https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json'+tab+'&headers=0',function(e,d){
-    if(e)return cb(e);
-    try{var rows=(d.table&&d.table.rows)||[],hI=-1,hTxt=[];
-      for(var i=0;i<Math.min(rows.length,12);i++){var cc=(rows[i]&&rows[i].c)||[],tx=cc.map(cellV),gi=-1,ti=-1;
-        for(var k2=0;k2<tx.length;k2++){if(/gstin/i.test(tx[k2]))gi=k2;if(/trade|legal|supplier\s*name/i.test(tx[k2]))ti=k2}
-        if(gi>=0&&ti>=0){hI=i;hTxt=tx;break}}
-      if(hI<0)return cb('GSTR2B header row (GSTIN/Trade) கிடைக்கவில்லை');
-      var fIdx=function(ress,skip){for(var k=0;k<hTxt.length;k++){if(k===skip)continue;for(var r=0;r<ress.length;r++)if(ress[r].test(hTxt[k]))return k}return -1};
-      var ix={sup:fIdx([/trade|legal|supplier\s*name/i]),gstin:fIdx([/gstin/i]),inv:fIdx([/invoice\s*value|total\s*invoice/i]),dt:fIdx([/invoice\s*date|^date$/i]),dtAny:fIdx([/date/i]),tax:fIdx([/taxable/i]),no:fIdx([/invoice\s*(no|number)|^invoice\s*no/i]),gst1:fIdx([/igst/i]),gst2:fIdx([/cgst/i]),gst3:fIdx([/sgst/i])};
-      // v2: amount/date headers சில வரிசையில் இல்லை (2-row portal header) → content-based fallback (sample 40 rows)
-      if(ix.dt<0||ix.inv<0||ix.tax<0){
-        var sample=[],i2,k3;
-        for(var s2=hI+1;s2<Math.min(rows.length,hI+41);s2++){var rc=(rows[s2]&&rows[s2].c)||[];sample.push(rc.map(cellV))}
-        var NC=[],DC=[];
-        for(k3=0;k3<((sample[0]||[]).length);k3++){var nn=0,nz=0,dtc=0,dset={},tot=0,cnt=0;
-          for(i2=0;i2<sample.length;i2++){var vx=sample[i2][k3]||'';
-            if(/^Date\(/.test(vx)){dtc++;var mm=vx.match(/^Date\((\d+),(\d+),(\d+)\)/);if(mm)dset[(+mm[1])+'-'+(+mm[2]+1)+'-'+(+mm[3])]=1}
-            if(/^\s*[\d,]+(?:\.\d+)?\s*$/.test(vx)){var pv=num(vx);nn++;if(pv>0){nz++;tot+=pv;cnt++}}}
-          if(sample.length&&dtc/sample.length>=0.5)DC.push({k:k3,dist:Object.keys(dset).length});
-          else if(sample.length&&nn/sample.length>=0.5&&nz/Math.max(1,sample.length)>=0.2)NC.push({k:k3,avg:tot/Math.max(1,cnt)})}
-        DC.sort(function(a,b){return b.dist-a.dist});
-        if(ix.dt<0&&DC.length)ix.dt=DC[0].k;
-        NC.sort(function(a,b){return b.avg-a.avg});
-        if(ix.inv<0&&NC.length>0)ix.inv=NC[0].k;
-        if(ix.tax<0&&NC.length>1)ix.tax=NC[1].k;
-        // GSTR-2B portal order: Taxable-க்கு அப்புறம் [IGST, CGST, SGST] consecutive (எந்த மாதத்திலும் IGST 0 ஆக இருக்கலாம் — avg வேலை செய்யாது)
-        var isNumCol=function(k3){var nn2=0;if(!sample.length||k3<0||k3>=(sample[0]||[]).length)return false;
-          for(var q2=0;q2<sample.length;q2++)if(/^\s*[\d,]+(?:\.\d+)?\s*$/.test(sample[q2][k3]||''))nn2++;
-          return nn2/sample.length>=0.5};
-        if(ix.tax>=0){if(ix.gst1<0&&isNumCol(ix.tax+1))ix.gst1=ix.tax+1;if(ix.gst2<0&&isNumCol(ix.tax+2))ix.gst2=ix.tax+2;if(ix.gst3<0&&isNumCol(ix.tax+3))ix.gst3=ix.tax+3}
-        if(ix.gst1<0&&NC.length>2)ix.gst1=NC[2].k;
-        if(ix.gst2<0&&NC.length>3)ix.gst2=NC[3].k;
-        if(ix.gst3<0&&NC.length>4)ix.gst3=NC[4].k;
-      }
-      var out=[];
-      for(var j=hI+1;j<rows.length;j++){var r=rows[j];if(!r||!r.c)continue;var g=function(k){return k>=0&&k<r.c.length?cellV(r.c[k]).trim():''};
-        var sup=ix.sup>=0?g(ix.sup):'';if(!sup)continue;
-        out.push({i:j,sup:sup,gstin:ix.gstin>=0?g(ix.gstin):'',invNo:ix.no>=0?g(ix.no):'',d:d10(ix.dt>=0?g(ix.dt):g(ix.dtAny)),inv:num(ix.inv>=0?g(ix.inv):0)||num(ix.tax>=0?g(ix.tax):0)*1.18,tax:num(ix.tax>=0?g(ix.tax):0),gst:num(ix.gst1>=0?g(ix.gst1):0)+num(ix.gst2>=0?g(ix.gst2):0)+num(ix.gst3>=0?g(ix.gst3):0),vals:r.c.map(cellV)})}
-      if(!out.length)return cb('GSTR2B tab-ல் bills இல்லை');
-      C.b2b={labels:hTxt,ix:ix,rows:out};cb(null,C.b2b)}catch(e2){cb(String(e2))}})}
+  var base='https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json'+tab;
+  function parse2b(d){var rows=(d.table&&d.table.rows)||[],hI=-1,hTxt=[];
+    for(var i=0;i<Math.min(rows.length,12);i++){var cc=(rows[i]&&rows[i].c)||[],tx=cc.map(cellV),gi=-1,ti=-1;
+      for(var k2=0;k2<tx.length;k2++){if(/gstin/i.test(tx[k2]))gi=k2;if(/trade|legal|supplier\s*name/i.test(tx[k2]))ti=k2}
+      if(gi>=0&&ti>=0){hI=i;hTxt=tx;break}}
+    if(hI<0)return null;
+    var fIdx=function(ress){for(var k=0;k<hTxt.length;k++){for(var r=0;r<ress.length;r++)if(ress[r].test(hTxt[k]))return k}return -1};
+    var ix={sup:fIdx([/trade|legal|supplier\s*name/i]),gstin:fIdx([/gstin/i]),inv:fIdx([/invoice\s*value|total\s*invoice/i]),dt:fIdx([/invoice\s*date|^date$/i]),tax:fIdx([/taxable/i]),no:fIdx([/invoice\s*(no|number)|^invoice\s*no/i]),gst1:fIdx([/igst/i]),gst2:fIdx([/cgst/i]),gst3:fIdx([/sgst/i])};
+    if(ix.dt<0||ix.inv<0||ix.tax<0){
+      var sample=[],i3,k4;
+      for(var s3=hI+1;s3<Math.min(rows.length,hI+41);s3++){var rc=(rows[s3]&&rows[s3].c)||[];sample.push(rc.map(cellV))}
+      var NC=[],DC=[];
+      for(k4=0;k4<((sample[0]||[]).length);k4++){var nn=0,nz=0,dtc=0,dset={},tot=0,cnt=0;
+        for(i3=0;i3<sample.length;i3++){var vx=sample[i3][k4]||'';
+          if(/^Date\(/.test(vx)){dtc++;var mm=vx.match(/^Date\((\d+),(\d+),(\d+)\)/);if(mm)dset[(+mm[1])+'-'+(+mm[2]+1)+'-'+(+mm[3])]=1}
+          if(/^\s*[\d,]+(?:\.\d+)?\s*$/.test(vx)){var pv=num(vx);nn++;if(pv>0){nz++;tot+=pv;cnt++}}}
+        if(sample.length&&dtc/sample.length>=0.5)DC.push({k:k4,dist:Object.keys(dset).length});
+        else if(sample.length&&nn/sample.length>=0.5&&nz/Math.max(1,sample.length)>=0.2)NC.push({k:k4,avg:tot/Math.max(1,cnt)})}
+      DC.sort(function(a,b){return b.dist-a.dist});
+      if(ix.dt<0&&DC.length)ix.dt=DC[0].k;
+      NC.sort(function(a,b){return b.avg-a.avg});
+      if(ix.inv<0&&NC.length>0)ix.inv=NC[0].k;
+      if(ix.tax<0&&NC.length>1)ix.tax=NC[1].k;
+      var isNumCol=function(k5){var nn2=0;if(!sample.length||k5<0||k5>=(sample[0]||[]).length)return false;
+        for(var q3=0;q3<sample.length;q3++)if(/^\s*[\d,]+(?:\.\d+)?\s*$/.test(sample[q3][k5]||''))nn2++;
+        return nn2/sample.length>=0.5};
+      if(ix.tax>=0){if(ix.gst1<0&&isNumCol(ix.tax+1))ix.gst1=ix.tax+1;if(ix.gst2<0&&isNumCol(ix.tax+2))ix.gst2=ix.tax+2;if(ix.gst3<0&&isNumCol(ix.tax+3))ix.gst3=ix.tax+3}
+      if(ix.gst1<0&&NC.length>2)ix.gst1=NC[2].k;
+      if(ix.gst2<0&&NC.length>3)ix.gst2=NC[3].k;
+      if(ix.gst3<0&&NC.length>4)ix.gst3=NC[4].k}
+    var out=[];
+    for(var j=hI+1;j<rows.length;j++){var r=rows[j];if(!r||!r.c)continue;var g=function(k){return k>=0&&k<r.c.length?cellV(r.c[k]).trim():''};
+      var sup=ix.sup>=0?g(ix.sup):'';if(!sup)continue;
+      out.push({i:j,sup:sup,gstin:ix.gstin>=0?g(ix.gstin):'',invNo:ix.no>=0?g(ix.no):'',d:d10(ix.dt>=0?g(ix.dt):''),inv:num(ix.inv>=0?g(ix.inv):0)||num(ix.tax>=0?g(ix.tax):0)*1.18,tax:num(ix.tax>=0?g(ix.tax):0),gst:num(ix.gst1>=0?g(ix.gst1):0)+num(ix.gst2>=0?g(ix.gst2):0)+num(ix.gst3>=0?g(ix.gst3):0),vals:r.c.map(cellV)})}
+    if(!out.length)return null;
+    return {labels:hTxt,ix:ix,rows:out}}
+  gviz(base+'&tq='+encodeURIComponent('select E,F,G,I,J,N,O,P,Q')+'&headers=0',function(e,d){
+    var r=null;try{r=e?null:parse2b(d)}catch(e2){r=null}
+    if(r){C.b2b=r;cachePut('b2b',r);cb(null,r);return}
+    gviz(base+'&headers=0',function(e3,d3){
+      if(e3)return cb(e3);
+      try{var r2=parse2b(d3);if(!r2)return cb('GSTR2B header (GSTIN/Trade) கிடைக்கவில்லை');C.b2b=r2;cachePut('b2b',r2);cb(null,r2)}catch(e4){cb(String(e4))}})})}
 function loadRecon(cb){if(C.recon)return cb(null,C.recon);
   var tk='';try{tk=sessionStorage.getItem('ar4.token')||''}catch(e){}
   fetch('/api/bank.liveRecon',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:'{}'}).then(function(r){return r.json()}).then(function(j){
     if(j&&j.ok&&j.data){C.recon=j.data;cb(null,j.data)}else cb((j&&j.error&&j.error.code)==='AUTH_REQUIRED'?'🔒 login வேண்டும் (admin/auditor)':'recon API fail')}).catch(function(e){cb('recon network fail')})}
-function ensureAll(cb){var res={},left=3;
-  ['bank','b2b','recon'].forEach(function(k){
-    var f=k==='bank'?loadBank:k==='b2b'?loadB2B:loadRecon;
-    f(function(e,d){res[k]=e?{err:e}:d;if(--left===0)cb(res)})})}
-/* ---- matching engine ---- */
+/* ---- matching engine (unchanged logic) ---- */
 function matchBankSeed(sd){var con=[],b2b=[],i,c,b,bd,am,ddv;
   var amt=sd.cr>0?sd.cr:sd.dr,hasAmt=amt>0;
   if(C.recon&&C.recon.combined){for(i=0;i<C.recon.combined.length;i++){c=C.recon.combined[i];b=c.bank;
@@ -2217,53 +2231,60 @@ function lens(date,win){var out={bank:[],con:[],b2b:[]},i;
   out.bank.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0});
   out.b2b.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0});
   return out}
-function seedFrom(raw){if(!raw||raw.kind==='datelens')return{kind:'datelens',date:'',win:0};
-  if(raw.kind==='bank'&&raw.vals)return{kind:'bank',d:d10(raw.vals[1]),desc:String(raw.vals[2]||''),chq:String(raw.vals[3]||''),dr:num(raw.vals[5]),cr:num(raw.vals[6]),bal:num(raw.vals[7])};
-  if(raw.kind==='contract')return{kind:'contract',d:d10(raw.date),amt:num(raw.amt),party:raw.party||'',work:raw.work||'',sNo:raw.sNo||'',mType:raw.mType||''};
-  if(raw.kind==='b2b')return{kind:'b2b',vals:raw.vals};
-  return{kind:'datelens',date:'',win:0}}
+function seedFrom(raw){if(!raw||raw.kind==='datelens')return{kind:'datelens',date:'',win:0,stat:{bank:'load',b2b:'load',recon:'load'}};
+  if(raw.kind==='bank'&&raw.vals)return{kind:'bank',d:d10(raw.vals[1]),desc:String(raw.vals[2]||''),chq:String(raw.vals[3]||''),dr:num(raw.vals[5]),cr:num(raw.vals[6]),bal:num(raw.vals[7]),stat:{bank:'load',b2b:'load',recon:'load'}};
+  if(raw.kind==='contract')return{kind:'contract',d:d10(raw.date),amt:num(raw.amt),party:raw.party||'',work:raw.work||'',sNo:raw.sNo||'',mType:raw.mType||'',stat:{bank:'load',b2b:'load',recon:'load'}};
+  if(raw.kind==='b2b')return{kind:'b2b',vals:raw.vals,stat:{bank:'load',b2b:'load',recon:'load'}};
+  return{kind:'datelens',date:'',win:0,stat:{bank:'load',b2b:'load',recon:'load'}}}
 /* ---- drawer UI ---- */
 var panel=null,date=d10(new Date()),win=0,cur=null;
-var CSS='@media print{body>*:not(.arx-panel){display:none!important}.arx-panel{position:static!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;height:auto!important;max-height:none!important}@page{size:A4 landscape;margin:8mm 6mm}}';
+var CSS='@media print{body>*:not(.arx-panel){display:none!important}.arx-panel{position:static!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;height:auto!important;max-height:none!important}@page{size:A4 landscape;margin:8mm 6mm}}@keyframes arxspin{to{transform:rotate(360deg)}}';
 function badge(why){if(!why)return'<span style="background:#fee2e2;color:#991b1b;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">—</span>';
   var c=/EXACT|PAID-EXACT/.test(why)?'#dcfce7,#166534':/NEAR|PAID-NEAR/.test(why)?'#fef3c7,#92400e':/KEYWORD/.test(why)?'#e0e7ff,#3730a3':'#f1f5f9,#334155';
   return '<span style="background:'+c.split(',')[0]+';color:'+c.split(',')[1]+';border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+esc(why)+'</span>'}
+function chips(){var st=(cur&&cur.sd.stat)||{};function one(k,lb){var v=st[k]||'load';
+  if(v==='load')return '<span style="background:#e2e8f0;color:#334155;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+lb+' ⏳</span>';
+  if(v==='ok')return '<span style="background:#dcfce7;color:#166534;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+lb+' ✓</span>';
+  return '<span style="background:#fee2e2;color:#991b1b;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700" title="'+esc(v)+'">'+lb+' ✕</span>'}
+  return '<div style="display:flex;gap:6px;margin:2px 0 8px;flex-wrap:wrap">'+one('bank','🏦 Bank')+one('recon','🔄 Recon')+one('b2b','🧾 2B')+'</div>'}
 function tbl(head,rowsHtml){return '<div style="overflow:auto;border:1px solid #c9d3e6;border-radius:6px;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+head.map(function(h){return '<th style="background:#1f3864;color:#fff;padding:4px 7px;text-align:left;font-weight:700;white-space:nowrap">'+h+'</th>'}).join('')+'</tr></thead><tbody>'+rowsHtml.join('')+'</tbody></table></div>'}
 function td(x,extra){return '<td style="border:1px solid #e2e8f0;padding:3px 7px;'+(extra||'')+'">'+x+'</td>'}
-function sec(title,inner,badgeN){return '<div class="arx-sechead" style="border-left:5px solid #1f3864;background:#e9eff9;padding:6px 10px;margin:14px 0 6px;font-size:13px;font-weight:800;color:#1f3864;border-radius:2px">'+title+(badgeN!=null?' <span style="float:right">'+badgeN+'</span>':'')+'</div>'+inner}
-function render(){if(!panel)return;
-  if(!cur)return;
-  var sd=cur.sd,h='';
-  if(sd.err)h+='<div style="background:#fef3c7;padding:6px 9px;border-radius:6px;color:#92400e;font-size:11px;margin-bottom:6px">⚠️ '+esc(sd.err)+' — கிடைத்த sources மட்டும் காட்டப்படும்</div>';
-  var i,x;
-  if(sd.kind==='bank'){var m=matchBankSeed(sd);
-    h+=sec('🖱️ இந்த Bank entry — <b>Contract Works match</b>','' ,m.con.length||null);
-    h+=tbl(['S.No','Work','Place','Party','Receipt Date','Receipt Amt','BRS','Match'],m.con.slice(0,20).map(function(x){var c=x.c.contract;return '<tr>'+td(esc(c.sNo))+td(esc((c.workName||'').slice(0,42)))+td(esc(c.workPlace||'—'))+td(esc((c.party||'—').slice(0,20)))+td(esc(d10(c.receiptDate)))+td('<b>'+fmt(c.receiptAmount)+'</b>','text-align:right')+td(esc(c.fy||''))+td(badge(x.why))+'</tr>'}));
-    if(!m.con.length)h+='<div style="color:#991b1b;font-size:11px;margin:-8px 0 8px">match இல்லை — இந்த credit contract receipt இல்லை</div>';
-    var b2=m.b2b;
-    h+=sec('🧾 GSTR-2B bills match', '', b2.length||null);
-    h+=tbl(['Date','Supplier','Invoice No','Invoice Value','Taxable','GST','Match'],b2.slice(0,20).map(function(x){var w=x.w;return '<tr>'+td(esc(w.d||'—'))+td(esc(w.sup.slice(0,36)))+td(esc((w.invNo||'—').slice(0,18)))+td('<b>'+fmt(w.inv)+'</b>','text-align:right')+td(fmt(w.tax),'text-align:right')+td(fmt(w.gst),'text-align:right')+td(badge(x.why))+'</tr>'}));
-    if(!b2.length)h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">2B bill match இல்லை'+(sd.dr>0?' — இந்த debit supplier payment-ஆ இருந்தால் bill book ஆகவில்லை (⚠️ சரிபார்க்க)':' (credit — bills பொருத்தம் இல்லை)')+'</div>'}
-  else if(sd.kind==='contract'){var m2=matchContractSeed(sd);
-    h+=sec('🏦 Bank Statement match', '', m2.bank.length||null);
-    h+=tbl(['Date','Description','Chq','Debit','Credit','Balance','Match'],m2.bank.slice(0,20).map(function(x){var r=x.r;return '<tr>'+td(esc(r.d))+td(esc(r.desc.slice(0,52)))+td(esc(r.chq||'—'))+td(r.dr?fmt(r.dr):'—','text-align:right')+td(r.cr?'<b>'+fmt(r.cr)+'</b>':'—','text-align:right')+td(fmt(r.bal),'text-align:right')+td(badge(x.why))+'</tr>'}));
-    if(!m2.bank.length)h+='<div style="color:#991b1b;font-size:11px;margin:-8px 0 8px">bank match இல்லை — BRS Pending-ஆ இருக்கலாம்</div>';
-    h+=sec('🧾 இந்த work party-ன் GSTR-2B bills', '', m2.b2b.length||null);
-    var tInv=0,tGst=0;m2.b2b.forEach(function(x){tInv+=x.w.inv;tGst+=x.w.gst});
-    h+=tbl(['Date','Supplier','GSTIN','Invoice No','Invoice Value','GST'],m2.b2b.slice(0,25).map(function(x){var w=x.w;return '<tr>'+td(esc(w.d||'—'))+td(esc(w.sup.slice(0,36)))+td(esc(w.gstin||'—'))+td(esc((w.invNo||'—').slice(0,18)))+td(fmt(w.inv),'text-align:right')+td(fmt(w.gst),'text-align:right')+'</tr>'}));
-    if(m2.b2b.length)h+='<div style="font-size:11px;margin:-8px 0 8px"><b>Party bills மொத்தம்: '+fmt(tInv)+' + GST '+fmt(tGst)+'</b> (காட்சியில் '+Math.min(25,m2.b2b.length)+'/'+m2.b2b.length+')</div>';
-    else h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">இந்த party-க்கு 2B bill இல்லை</div>'}
+function sec(title,inner,badgeN){return '<div style="border-left:5px solid #1f3864;background:#e9eff9;padding:6px 10px;margin:14px 0 6px;font-size:13px;font-weight:800;color:#1f3864;border-radius:2px">'+title+(badgeN!=null?' <span style="float:right">'+badgeN+'</span>':'')+'</div>'+inner}
+function wait(k,lb){return '<div style="background:#eef2ff;color:#3730a3;font-size:11px;padding:5px 9px;border-radius:6px;margin:-4px 0 10px">⏳ '+lb+' load ஆகுது… சிறிது நேரத்தில் இங்கே தோன்றும்</div>'}
+function render(){if(!panel||!cur)return;
+  var sd=cur.sd,h=chips(),i,x;
+  if(sd.kind==='bank'){var m=C.recon?matchBankSeed(sd):{con:[],b2b:[]};
+    h+=sec('🖱️ இந்த Bank entry — <b>Contract Works match</b>','',C.recon?(m.con.length||null):null);
+    if(!C.recon)h+=wait('recon','Recon (contract) data');
+    else{h+=tbl(['S.No','Work','Place','Party','Receipt Date','Receipt Amt','BRS','Match'],m.con.slice(0,20).map(function(x){var c=x.c.contract;return '<tr>'+td(esc(c.sNo))+td(esc((c.workName||'').slice(0,42)))+td(esc(c.workPlace||'—'))+td(esc((c.party||'—').slice(0,20)))+td(esc(d10(c.receiptDate)))+td('<b>'+fmt(c.receiptAmount)+'</b>','text-align:right')+td(esc(c.fy||''))+td(badge(x.why))+'</tr>'}));
+      if(!m.con.length)h+='<div style="color:#991b1b;font-size:11px;margin:-8px 0 8px">match இல்லை — இந்த credit contract receipt இல்லை</div>'}
+    h+=sec('🧾 GSTR-2B bills match','',C.b2b?(m.b2b.length||null):null);
+    if(!C.b2b)h+=wait('b2b','GSTR-2B bills');
+    else{h+=tbl(['Date','Supplier','Invoice No','Invoice Value','Taxable','GST','Match'],m.b2b.slice(0,20).map(function(x){var w=x.w;return '<tr>'+td(esc(w.d||'—'))+td(esc(w.sup.slice(0,36)))+td(esc((w.invNo||'—').slice(0,18)))+td('<b>'+fmt(w.inv)+'</b>','text-align:right')+td(fmt(w.tax),'text-align:right')+td(fmt(w.gst),'text-align:right')+td(badge(x.why))+'</tr>'}));
+      if(!m.b2b.length)h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">2B bill match இல்லை'+(sd.dr>0?' — இந்த debit supplier payment-ஆ இருந்தால் bill book ஆகவில்லை (⚠️ சரிபார்க்க)':' (credit — bills பொருத்தம் இல்லை)')+'</div>'}}
+  else if(sd.kind==='contract'){var m2=C.bank||C.b2b?matchContractSeed(sd):{bank:[],b2b:[]};
+    h+=sec('🏦 Bank Statement match','',C.bank?(m2.bank.length||null):null);
+    if(!C.bank)h+=wait('bank','Bank Statement (2655 rows)');
+    else{h+=tbl(['Date','Description','Chq','Debit','Credit','Balance','Match'],m2.bank.slice(0,20).map(function(x){var r=x.r;return '<tr>'+td(esc(r.d))+td(esc(r.desc.slice(0,52)))+td(esc(r.chq||'—'))+td(r.dr?fmt(r.dr):'—','text-align:right')+td(r.cr?'<b>'+fmt(r.cr)+'</b>':'—','text-align:right')+td(fmt(r.bal),'text-align:right')+td(badge(x.why))+'</tr>'}));
+      if(!m2.bank.length)h+='<div style="color:#991b1b;font-size:11px;margin:-8px 0 8px">bank match இல்லை — BRS Pending-ஆ இருக்கலாம்</div>'}
+    h+=sec('🧾 இந்த work party-ன் GSTR-2B bills','',C.b2b?(m2.b2b.length||null):null);
+    if(!C.b2b)h+=wait('b2b','GSTR-2B bills');
+    else{var tInv=0,tGst=0;m2.b2b.forEach(function(x){tInv+=x.w.inv;tGst+=x.w.gst});
+      h+=tbl(['Date','Supplier','GSTIN','Invoice No','Invoice Value','GST'],m2.b2b.slice(0,25).map(function(x){var w=x.w;return '<tr>'+td(esc(w.d||'—'))+td(esc(w.sup.slice(0,36)))+td(esc(w.gstin||'—'))+td(esc((w.invNo||'—').slice(0,18)))+td(fmt(w.inv),'text-align:right')+td(fmt(w.gst),'text-align:right')+'</tr>'}));
+      if(m2.b2b.length)h+='<div style="font-size:11px;margin:-8px 0 8px"><b>Party bills மொத்தம்: '+fmt(tInv)+' + GST '+fmt(tGst)+'</b> (காட்சியில் '+Math.min(25,m2.b2b.length)+'/'+m2.b2b.length+')</div>';
+      else h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">இந்த party-க்கு 2B bill இல்லை</div>'}}
   else if(sd.kind==='b2b'){var sd2={sup:'',gstin:'',inv:0,d:''};
     if(C.b2b){var ix=C.b2b.ix,g=function(k){return k>=0&&k<sd.vals.length?String(sd.vals[k]==null?'':sd.vals[k]).trim():''};
-      sd2.sup=ix.sup>=0?g(ix.sup):'';sd2.gstin=ix.gstin>=0?g(ix.gstin):'';sd2.inv=num(ix.inv>=0?g(ix.inv):0);sd2.d=d10(ix.dt>=0?g(ix.dt):(ix.dtAny>=0?g(ix.dtAny):''));sd2.invNo=ix.no>=0?g(ix.no):''}
-    var m3=matchB2BSeed(sd2);
-    h+=sec('🏦 Bank payment match (இந்த bill-க்கு)', '', m3.bank.length||null);
-    h+=tbl(['Date','Description','Debit','Match'],m3.bank.slice(0,15).map(function(x){var r=x.r;return '<tr>'+td(esc(r.d))+td(esc(r.desc.slice(0,56)))+td('<b>'+fmt(r.dr)+'</b>','text-align:right')+td(badge(x.why))+'</tr>'}));
-    if(!m3.bank.length)h+='<div style="background:#fef3c7;padding:6px 9px;border-radius:6px;font-size:11px;color:#92400e;margin:-6px 0 10px">⚠️ Payment கிடைக்கவில்லை — bill தேதியிலிருந்து 180 நாள் முடிந்தால் <b>ITC reversal ஆபத்து</b>!</div>';
-    h+=sec('🔄 தொடர்புள்ள Contract Works', '', m3.con.length||null);
-    h+=tbl(['S.No','Work','Place','Party','Receipt Date','Receipt Amt','BRS'],m3.con.slice(0,15).map(function(x){var c=x.c.contract;return '<tr>'+td(esc(c.sNo))+td(esc((c.workName||'').slice(0,42)))+td(esc(c.workPlace||'—'))+td(esc((c.party||'—').slice(0,20)))+td(esc(d10(c.receiptDate)))+td(fmt(c.receiptAmount),'text-align:right')+td(esc(x.c.matchType))+'</tr>'}));
-    if(!m3.con.length)h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">இந்த supplier contract work party இல்லை (material supplier ஆக இருக்கலாம்)</div>'}
-  /* P2 date lens — எப்போதும் கீழே */
+      sd2.sup=ix.sup>=0?g(ix.sup):'';sd2.gstin=ix.gstin>=0?g(ix.gstin):'';sd2.inv=num(ix.inv>=0?g(ix.inv):0);sd2.d=d10(ix.dt>=0?g(ix.dt):'');sd2.invNo=ix.no>=0?g(ix.no):''}
+    var m3=C.bank?matchB2BSeed(sd2):{bank:[],con:[]};
+    h+=sec('🏦 Bank payment match (இந்த bill-க்கு)','',C.bank?(m3.bank.length||null):null);
+    if(!C.bank)h+=wait('bank','Bank Statement (2655 rows)');
+    else{h+=tbl(['Date','Description','Debit','Match'],m3.bank.slice(0,15).map(function(x){var r=x.r;return '<tr>'+td(esc(r.d))+td(esc(r.desc.slice(0,56)))+td('<b>'+fmt(r.dr)+'</b>','text-align:right')+td(badge(x.why))+'</tr>'}));
+      if(!m3.bank.length)h+='<div style="background:#fef3c7;padding:6px 9px;border-radius:6px;font-size:11px;color:#92400e;margin:-6px 0 10px">⚠️ Payment கிடைக்கவில்லை — bill தேதியிலிருந்து 180 நாள் முடிந்தால் <b>ITC reversal ஆபத்து</b>!</div>'}
+    h+=sec('🔄 தொடர்புள்ள Contract Works','',C.recon?(m3.con.length||null):null);
+    if(!C.recon)h+=wait('recon','Recon (contract) data');
+    else{h+=tbl(['S.No','Work','Place','Party','Receipt Date','Receipt Amt','BRS'],m3.con.slice(0,15).map(function(x){var c=x.c.contract;return '<tr>'+td(esc(c.sNo))+td(esc((c.workName||'').slice(0,42)))+td(esc(c.workPlace||'—'))+td(esc((c.party||'—').slice(0,20)))+td(esc(d10(c.receiptDate)))+td(fmt(c.receiptAmount),'text-align:right')+td(esc(x.c.matchType))+'</tr>'}));
+      if(!m3.con.length)h+='<div style="color:#64748b;font-size:11px;margin:-8px 0 8px">இந்த supplier contract work party இல்லை (material supplier ஆக இருக்கலாம்)</div>'}}
   var L=lens(date,win);
   h+=sec('📅 Date Lens — <b>'+esc(date)+'</b>'+(win?' (±'+win+' நாள்)':'')+' — மூன்று pages முழு பார்வை','',(L.bank.length+L.con.length+L.b2b.length)||null);
   h+='<div style="font-size:11px;color:#475569;margin:-4px 0 6px">🏦 '+L.bank.length+' bank entries • 🔄 '+L.con.length+' contract receipts • 🧾 '+L.b2b.length+' bills</div>';
@@ -2271,14 +2292,13 @@ function render(){if(!panel)return;
   h+=tbl(['🔄 Receipt Date','S.No','Work','Party','Receipt Amt','BRS'],L.con.slice(0,40).map(function(c){var k=c.contract;return '<tr>'+td(esc(d10(k.receiptDate)))+td(esc(k.sNo))+td(esc((k.workName||'').slice(0,40)))+td(esc((k.party||'—').slice(0,18)))+td(fmt(k.receiptAmount),'text-align:right')+td(esc(c.matchType))+'</tr>'}));
   h+=tbl(['🧾 Bill Date','Supplier','Invoice No','Invoice Value','GST'],L.b2b.slice(0,40).map(function(w){return '<tr>'+td(esc(w.d||'—'))+td(esc(w.sup.slice(0,36)))+td(esc((w.invNo||'—').slice(0,16)))+td(fmt(w.inv),'text-align:right')+td(fmt(w.gst),'text-align:right')+'</tr>'}));
   panel.querySelector('#arxBody').innerHTML=h}
-function loadAndRender(){var b=panel.querySelector('#arxBody');
-  b.innerHTML='<div style="padding:26px;text-align:center;color:#1f3864"><span style="display:inline-block;width:26px;height:26px;border:3px solid #c7d5ef;border-top-color:#1f3864;border-radius:50%;animation:arxspin 0.9s linear infinite"></span><div style="margin-top:9px;font-size:12px">மூன்று pages data load ஆகுது… (bank + 2B + recon)</div></div>';
-  var st=document.getElementById('arxStyle')||(function(){var e=document.createElement('style');e.id='arxStyle';e.textContent='@keyframes arxspin{to{transform:rotate(360deg)}}'+CSS;document.head.appendChild(e);return e})();
-  ensureAll(function(res){var errs=[];
-    ['bank','b2b','recon'].forEach(function(k){if(res[k]&&res[k].err)errs.push(k+': '+res[k].err)});
-    if(!cur)return;
-    cur.sd.err=errs.length?('சில source fail: '+errs.join(' | ')):null;
-    render()})}
+function stat(k){return function(e){if(cur&&cur.sd.stat)cur.sd.stat[k]=e?('err: '+String(e).slice(0,70)):'ok';render()}}
+function loadStaged(){var b=panel.querySelector('#arxBody');
+  b.innerHTML=chips()+'<div style="padding:16px;text-align:center;color:#1f3864;font-size:12px"><span style="display:inline-block;width:24px;height:24px;border:3px solid #c7d5ef;border-top-color:#1f3864;border-radius:50%;animation:arxspin 0.9s linear infinite"></span><div style="margin-top:8px">sources load ஆகுது… (Recon → Bank → 2B ஒவ்வொன்றா)</div></div>';
+  if(!document.getElementById('arxStyle')){var e=document.createElement('style');e.id='arxStyle';e.textContent=CSS;document.head.appendChild(e)}
+  loadRecon(stat('recon'));
+  loadBank(stat('bank'));
+  loadB2B(stat('b2b'))}
 function openDrawer(raw){cur={sd:seedFrom(raw)};
   if(cur.sd.kind==='datelens'){date=d10(new Date());win=0}
   else if(cur.sd.d)date=cur.sd.d;
@@ -2289,18 +2309,18 @@ function openDrawer(raw){cur={sd:seedFrom(raw)};
     '<div style="font-size:15px;font-weight:800;color:#1f3864;flex:1">🔍 Audit Triangle X-Ray</div>'+
     '<label style="font-size:11px;color:#334155">📅 <input type="date" id="arxDate" value="'+date+'" style="border:1px solid #94a3b8;border-radius:5px;padding:2px 5px;font-size:11px"></label>'+
     '<select id="arxWin" style="border:1px solid #94a3b8;border-radius:5px;padding:2px 4px;font-size:11px"><option value="0"'+(win===0?' selected':'')+'>அதே நாள்</option><option value="3"'+(win===3?' selected':'')+'>±3 நாள்</option><option value="7"'+(win===7?' selected':'')+'>±7 நாள்</option><option value="30"'+(win===30?' selected':'')+'>±30 நாள்</option></select>'+
-    '<button id="arxRe" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">🔄</button>'+
+    '<button id="arxRe" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer" title="cache-ஐ நீக்கி fresh load">🔄</button>'+
     '<button id="arxPr" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">🖨️</button>'+
     '<button id="arxCl" style="border:1px solid #94a3b8;background:#fee2e2;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;font-weight:700">✕</button></div>'+
     (cur.sd.kind!=='datelens'?'<div style="background:#eef3fa;border:1px solid #c9d3e6;border-radius:6px;padding:7px 10px;font-size:12px;margin-bottom:4px">'+(cur.sd.kind==='bank'?'🏦 <b>Bank entry</b>: '+(cur.sd.d||'')+' • '+(cur.sd.cr>0?'Credit ':'Debit ')+fmt(cur.sd.cr>0?cur.sd.cr:cur.sd.dr)+' • '+esc((cur.sd.desc||'').slice(0,60)):cur.sd.kind==='contract'?'🔄 <b>Contract Work</b> S.No '+esc(cur.sd.sNo)+' • '+esc((cur.sd.work||'').slice(0,40))+' • '+esc(cur.sd.d)+' • '+fmt(cur.sd.amt)+' • BRS: '+esc(cur.sd.mType):'🧾 <b>GSTR-2B bill</b> click')+'</div>':'')+
     '<div id="arxBody"></div>';
   panel.querySelector('#arxDate').addEventListener('change',function(e){date=e.target.value||d10(new Date());render()});
   panel.querySelector('#arxWin').addEventListener('change',function(e){win=+e.target.value;render()});
-  panel.querySelector('#arxRe').addEventListener('click',function(){C.bank=C.b2b=C.recon=null;loadAndRender()});
+  panel.querySelector('#arxRe').addEventListener('click',function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null;if(cur&&cur.sd.stat){cur.sd.stat={bank:'load',b2b:'load',recon:'load'}}loadStaged()});
   panel.querySelector('#arxPr').addEventListener('click',function(){window.print()});
   panel.querySelector('#arxCl').addEventListener('click',function(){panel.style.display='none'});
   panel.style.display='block';
-  loadAndRender()}
-window.__arTri={open:openDrawer,refresh:function(){C.bank=C.b2b=C.recon=null}};
+  loadStaged()}
+window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null}};
 })();
-/* ================= /AR Audit Triangle X-Ray ================= */
+/* ================= /AR Audit Triangle X-Ray v2 ================= */

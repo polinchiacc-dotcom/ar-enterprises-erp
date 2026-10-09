@@ -2196,10 +2196,10 @@ function loadRecon(cb){if(C.recon)return cb(null,C.recon);
     var j=null;try{j=t?JSON.parse(t):null}catch(e3){}
     if(j&&j.ok&&j.data){C.recon=j.data;cb(null,j.data);return}
     if(j&&j.error&&j.error.code==='AUTH_REQUIRED'){cb('🔒 login வேண்டும் (admin/auditor)');return}
-    if(att<2){setTimeout(function(){once(att+1)},900*(att+1));return}
+    if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
     cb('recon API fail (HTTP '+(j?200:'?')+' — Malformed)')}).catch(function(){
-    if(att<2){setTimeout(function(){once(att+1)},900*(att+1));return}
-    cb('recon network fail')})}
+    if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
+    cb('recon network fail — backend cold-start; கொஞ்சம் வைத்து 🔄 அடிக்கவும்')})}
   once(0)}
 /* ---- matching engine (unchanged logic) ---- */
 function matchBankSeed(sd){var con=[],b2b=[],i,c,b,bd,am,ddv;
@@ -2702,9 +2702,8 @@ function anomaliesOpen(){
     body.innerHTML=h}
   function start(){
     var body=ov.querySelector('#anBody');if(body)body.innerHTML='<div class="anWait">\u23F3 Bank + GSTR-2B + Recon \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026</div>';
-    loadBank(function(e){settle(e,'bank')});
-    loadB2B(function(e){settle(e,'b2b')});
-    loadRecon(function(e){settle(e,'recon')})}
+    loadRecon(function(e){settle(e,'recon')});
+    setTimeout(function(){loadBank(function(e){settle(e,'bank')});loadB2B(function(e){settle(e,'b2b')})},1200)}
   start()}
 
 window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage,works:worksOpen,_works:buildWorksData,anomalies:anomaliesOpen,_anom:buildAnomalies};

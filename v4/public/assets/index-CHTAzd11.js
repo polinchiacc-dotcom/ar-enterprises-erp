@@ -2087,7 +2087,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081m';
+var ARXV='202610081n';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2751,7 +2751,7 @@ function anomaliesOpen(){
       '<div class="anStat"><div class="l">\u0BAE\u0BCA\u0BB4\u0BC1 \u0BAA\u0BC1\u0BB3\u0BCD\u0BB3\u0BBF\u0B95\u0BB3\u0BCD</div><div class="v">'+fmt0(A.counts.total)+'</div></div>'+
       '<div class="anStat"><div class="l">\u0BB0\u0BC2\u0BB2\u0BCD\u0B95\u0BB3\u0BCD</div><div class="v" style="font-size:13px;line-height:1.4;padding-top:3px">'+fmt0(A.rules.length)+' \u0BB5\u0B95\u0BC8\u0B95\u0BB3\u0BCD</div></div>'+
       '</div>';
-    var i2,r;
+    var i2,r,j;
     for(i2=0;i2<A.rules.length;i2++){r=A.rules[i2];
       var sv=ANSEV[r.sev];
       h+='<div class="anRule" style="border-color:'+sv.bd+'"><div class="anRuleH" style="background:'+sv.bg+';border-color:'+sv.bd+'">'+

@@ -2087,7 +2087,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081l';
+var ARXV='202610081m';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2458,7 +2458,7 @@ function coverageOpen(){
   ov.querySelector('#supRe').addEventListener('click',function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=null;st={bank:'load',b2b:'load'};errs={};doneN=0;loaded={bank:false,b2b:false};chips();start()});
   function rerender(){
     var on=ov.querySelector('#supOn'),asOn=on&&on.value||'';
-    var cv=buildCoverage(asOn);
+    var cv=null;try{cv=buildCoverage(asOn)}catch(e1){var body=ov.querySelector('#supBody');if(body)body.innerHTML='<div class="supWait" style="color:#991b1b">\u2715 Coverage build fail: '+esc(String(e1&&e1.message||e1))+' [b:'+ARXV+']</div>';return}
     var body=ov.querySelector('#supBody');if(!body)return;
     if(!cv){body.innerHTML='<div class="supWait">\u2715 \u0BA4\u0BB0\u0BB5\u0BC1 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8 \u2014 Bank \u0BAE\u0BB1\u0BCD\u0BB1\u0BC1\u0BAE\u0BCD GSTR-2B \u0B87\u0BB0\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD \u0BA4\u0BC7\u0BB5\u0BC8</div>';return}
     var h='<div class="supStats">'+
@@ -2555,7 +2555,9 @@ function worksOpen(){
   ov.querySelector('#wkPr').addEventListener('click',function(){window.print()});
   ov.querySelector('#wkRe').addEventListener('click',function(){window.__arTri&&window.__arTri.refresh();st={recon:'load'};chips();start()});
   function render(){
-    var D=buildWorksData();if(!D){var b0=ov.querySelector('#wkBody');if(b0)b0.innerHTML='<div class="wkWait" style="color:#991b1b">\u2715 Recon \u0BA4\u0BB0\u0BB5\u0BC1 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8</div>';return}
+    var D=null;
+    try{D=buildWorksData()}catch(e1){var b0=ov.querySelector('#wkBody');if(b0)b0.innerHTML='<div class="wkWait" style="color:#991b1b">\u2715 Works build fail: '+esc(String(e1&&e1.message||e1))+' [b:'+ARXV+']</div>';return}
+    if(!D){var b0=ov.querySelector('#wkBody');if(b0)b0.innerHTML='<div class="wkWait" style="color:#991b1b">\u2715 Recon \u0BA4\u0BB0\u0BB5\u0BC1 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8</div>';return}
     var T=D.tot,fs='';
     var i,g;
     for(i=0;i<D.fys.length;i++){g=D.fys[i];
@@ -2625,7 +2627,8 @@ function buildAnomalies(){
     rules.push({id:id,sev:sev,s:s,title:title,desc:desc,cols:cols,rows:rows});
     if(sev==='high')T.high+=rows.length;else if(sev==='med')T.med+=rows.length;else T.low+=rows.length;T.total+=rows.length}
   var today=d10(new Date());
-  if(C.bank&&C.bank.length){
+  var AERR=[];
+  if(C.bank&&C.bank.length){try{
     var g1={},g2=[],g3={};
     for(i=0;i<C.bank.length;i++){var b=C.bank[i];
       if(b.dr>=10000&&b.d){k=b.d+'|'+b.dr.toFixed(2);(g1[k]=g1[k]||[]).push(b)}
@@ -2654,14 +2657,17 @@ function buildAnomalies(){
     var creds=[];
     for(i=0;i<C.bank.length;i++)if(C.bank[i].cr>=50000&&C.bank[i].d)creds.push(C.bank[i]);
     var pt=[];
+    var lo=0;
     for(i=0;i<C.bank.length;i++){var b4=C.bank[i];if(b4.dr<50000||!b4.d)continue;
-      for(j=0;j<creds.length;j++){var c4=creds[j],dv=dd(c4.d,b4.d);
-        if(dv<-3)continue;if(dv>3)break;
+      while(lo<creds.length&&dd(creds[lo].d,b4.d)<-3)lo++;
+      for(j=lo;j<creds.length;j++){var c4=creds[j],dv=dd(c4.d,b4.d);
+        if(dv>3)break;
         if(Math.abs(c4.cr-b4.dr)<=Math.max(1,0.005*c4.cr)){pt.push({d:b4.d,dr:b4.dr,cd:c4.d,cr:c4.cr,dv:dv});break}}}
     pt.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:b.dr-a.dr});
     var ptX=pt.map(function(x){return {d:x.d+' ('+(x.dv>0?'+':'')+x.dv+'d)',desc:'debit ₹'+fmt0(x.dr)+' → அதே மாதிரி credit '+x.cd,amt:x.dr}});
-    push('passthru','low','Cash pass-through pattern (±3d, ±0.5%)','பெரிய debit-க்கு சில நாளில் அதே தொகை credit — வணிக ரீதியான cash நடைமுறையாக இருக்கலாம்; ஆனாலும் ஒருமுறை பார்க்கவும்.',[{k:'d',l:'Debit தேதி'},{k:'desc',l:'விவரம்'},{k:'amt',l:'தொகை ₹',num:1}],ptX.slice(0,80))}
-  if(C.b2b&&C.b2b.rows){
+    push('passthru','low','Cash pass-through pattern (±3d, ±0.5%)','பெரிய debit-க்கு சில நாளில் அதே தொகை credit — வணிக ரீதியான cash நடைமுறையாக இருக்கலாம்; ஆனாலும் ஒருமுறை பார்க்கவும்.',[{k:'d',l:'Debit தேதி'},{k:'desc',l:'விவரம்'},{k:'amt',l:'தொகை ₹',num:1}],ptX.slice(0,80))
+  }catch(eB){AERR.push('bank: '+(eB&&eB.message||eB))}}
+  if(C.b2b&&C.b2b.rows){try{
     var s5={},d5=[],mx=[],dq=[];
     var ix=C.b2b.ix||{};
     for(i=0;i<C.b2b.rows.length;i++){var w=C.b2b.rows[i];
@@ -2675,8 +2681,9 @@ function buildAnomalies(){
     mx.sort(function(a,b){return b.igst-a.igst});
     push('mixtax','med','IGST + CGST/SGST கலந்த பில்','ஒரே பில்லில் IGST-ஓட CGST/SGST-ம் இருக்கு — inter+intra கலந்துட்டா wrongly charged; input credit பாதிக்கப்படலாம்.',[{k:'gstin',l:'GSTIN'},{k:'sup',l:'சப்ளையர்'},{k:'invNo',l:'Invoice No'},{k:'d',l:'தேதி'},{k:'inv',l:'Invoice ₹',num:1},{k:'igst',l:'IGST ₹',num:1},{k:'cgst',l:'CGST ₹',num:1},{k:'sgst',l:'SGST ₹',num:1}],mx);
     dq.sort(function(a,b){return a.d<b.d?-1:1});
-    push('dateq','low','2B தேதி quality (எதிர்காலம் / 2022-க்கு முன்)','பில் தேதி எதிர்காலத்திலோ அல்லது FY 22-23-க்கு முன்னோ இருக்கு — data-entry பிழை இருக்கலாம்.',[{k:'gstin',l:'GSTIN'},{k:'sup',l:'சப்ளையர்'},{k:'invNo',l:'Invoice No'},{k:'d',l:'தேதி'},{k:'inv',l:'Invoice ₹',num:1},{k:'why',l:'காரணம்'}],dq)}
-  if(C.recon&&C.recon.contractRows){
+    push('dateq','low','2B தேதி quality (எதிர்காலம் / 2022-க்கு முன்)','பில் தேதி எதிர்காலத்திலோ அல்லது FY 22-23-க்கு முன்னோ இருக்கு — data-entry பிழை இருக்கலாம்.',[{k:'gstin',l:'GSTIN'},{k:'sup',l:'சப்ளையர்'},{k:'invNo',l:'Invoice No'},{k:'d',l:'தேதி'},{k:'inv',l:'Invoice ₹',num:1},{k:'why',l:'காரணம்'}],dq)
+  }catch(e2b){AERR.push('2B: '+(e2b&&e2b.message||e2b))}}
+  if(C.recon&&C.recon.contractRows){try{
     var ex=[],nb=[];
     var mm={};var cb=C.recon.combined||[];
     for(i=0;i<cb.length;i++)if(cb[i]&&cb[i].contract)mm[cb[i].contract.id]={m:cb[i].matchType||''};
@@ -2691,9 +2698,10 @@ function buildAnomalies(){
     push('excess','med','நிலுவையை விட அதிகமா வந்த வேலைகள்','Receipt > net receivable — EMD refund / interest / தவறான அளவு; ஒவ்வொன்றும் ஏன் என உறுதி செய்யவும்.',[{k:'sNo',l:'S.No'},{k:'fy',l:'FY'},{k:'name',l:'வேலை'},{k:'rec',l:'நிலுவை ₹',num:1},{k:'got',l:'கிடைத்தது ₹',num:1},{k:'diff',l:'அதிகம் ₹',num:1},{k:'date',l:'தேதி'}],ex);
     nb.sort(function(a,b){return b.rec-a.rec});
     var nbX=nb.map(function(x){x.diff=null;return x});
-    push('nobank','high','Bank சான்று இல்லாத வேலை ரசீதுகள்','கிடைட்டோம் அளவு receipt-க்கு அதே தேதி+தொகை bank credit கிடைக்கவில்லை — cash/வேற account/தவறான தேதி இருக்கலாம்.',[{k:'sNo',l:'S.No'},{k:'fy',l:'FY'},{k:'name',l:'வேலை'},{k:'rec',l:'கிடைத்தது ₹',num:1},{k:'date',l:'தேதி'}],nbX)}
+    push('nobank','high','Bank சான்று இல்லாத வேலை ரசீதுகள்','கிடைட்டோம் அளவு receipt-க்கு அதே தேதி+தொகை bank credit கிடைக்கவில்லை — cash/வேற account/தவறான தேதி இருக்கலாம்.',[{k:'sNo',l:'S.No'},{k:'fy',l:'FY'},{k:'name',l:'வேலை'},{k:'rec',l:'கிடைத்தது ₹',num:1},{k:'date',l:'தேதி'}],nbX)
+  }catch(eR){AERR.push('recon: '+(eR&&eR.message||eR))}}
   rules.sort(function(a,b){return a.s-b.s});
-  return {rules:rules,counts:T,today:today,srcs:{bank:!!(C.bank&&C.bank.length),b2b:!!(C.b2b&&C.b2b.rows),recon:!!(C.recon&&C.recon.contractRows)}}}
+  return {rules:rules,counts:T,today:today,srcs:{bank:!!(C.bank&&C.bank.length),b2b:!!(C.b2b&&C.b2b.rows),recon:!!(C.recon&&C.recon.contractRows)},errs:AERR}}
 var ANSEV={high:{l:'HIGH',c:'#dc2626',bg:'#fef2f2',bd:'#fca5a5'},med:{l:'MEDIUM',c:'#b45309',bg:'#fffbeb',bd:'#fde047'},low:{l:'LOW',c:'#1d4ed8',bg:'#eff6ff',bd:'#93c5fd'}};
 function anomaliesOpen(){
   if(typeof document==='undefined')return;
@@ -2730,9 +2738,13 @@ function anomaliesOpen(){
         return}
       render()}}
   function render(){
-    var A=buildAnomalies();
     var body=ov.querySelector('#anBody');if(!body)return;
-    var h='<div class="anStats">'+
+    var A=null;
+    try{A=buildAnomalies()}catch(e1){body.innerHTML='<div class="anWait" style="color:#991b1b">\u2715 Anomaly build fail: '+esc(String(e1&&e1.message||e1))+' [b:'+ARXV+']</div>';return}
+    try{renderBody(A)}catch(e2){body.innerHTML='<div class="anWait" style="color:#991b1b">\u2715 Anomaly render fail: '+esc(String(e2&&e2.message||e2))+' [b:'+ARXV+']</div>'}}
+  function renderBody(A){
+    var body=ov.querySelector('#anBody');if(!body)return;
+    var h=(A.errs&&A.errs.length?'<div style="margin:10px 16px 0;background:#ffedd5;border:1px solid #fdba74;border-radius:6px;padding:6px 10px;font-size:11.5px;color:#9a3412">⚠ பகுதி பிழை: '+esc(A.errs.join(' | '))+'</div>':'')+'<div class="anStats">'+
       '<div class="anStat"><div class="l" style="color:#dc2626">\u{1F6A8} HIGH</div><div class="v" style="color:#dc2626">'+fmt0(A.counts.high)+'</div></div>'+
       '<div class="anStat"><div class="l" style="color:#b45309">\u26A0\uFE0F MEDIUM</div><div class="v" style="color:#b45309">'+fmt0(A.counts.med)+'</div></div>'+
       '<div class="anStat"><div class="l" style="color:#1d4ed8">\u2139\uFE0F LOW</div><div class="v" style="color:#1d4ed8">'+fmt0(A.counts.low)+'</div></div>'+
@@ -2766,7 +2778,10 @@ function anomaliesOpen(){
   function start(){
     var body=ov.querySelector('#anBody');if(body)body.innerHTML='<div class="anWait">\u23F3 Bank + GSTR-2B + Recon \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026</div>';
     loadRecon(function(e){settle(e,'recon')});
-    setTimeout(function(){loadBank(function(e){settle(e,'bank')});loadB2B(function(e){settle(e,'b2b')})},1200)}
+    setTimeout(function(){loadBank(function(e){settle(e,'bank')});loadB2B(function(e){settle(e,'b2b')})},1200);
+    setTimeout(function(){var b=ov.querySelector('#anBody');if(b&&/ஏற்றுகிறது/.test(b.innerHTML)&&!/anRule/.test(b.innerHTML)){
+      b.innerHTML='<div class="anWait" style="color:#991b1b">\u2715 45s timeout — render ஆகவில்லை [b:'+ARXV+']<br><br><button id="anWd" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:700">\u{1F504} மீண்டும் முயற்சி</button></div>';
+      var wb=ov.querySelector('#anWd');if(wb)wb.addEventListener('click',reset)}},45000)}
   start()}
 
 window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage,works:worksOpen,_works:buildWorksData,anomalies:anomaliesOpen,_anom:buildAnomalies,_fbrecon:buildReconFromSheets};

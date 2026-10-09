@@ -2097,6 +2097,7 @@ function d10(v){
   var m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];
   var m3=String(v).match(/^Date\((\d+),(\d+),(\d+)\)/);if(m3)return (+m3[1])+'-'+pad2(+m3[2]+1)+'-'+pad2(+m3[3]);
   var m2=String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m2)return m2[3]+'-'+pad2(+m2[2])+'-'+pad2(+m2[1]);
+  var m4=String(v).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);if(m4){var MO={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};var mi=MO[m4[2]];if(mi!=null){var yr=+m4[3];if(yr<100)yr+=yr>60?1900:2000;return yr+'-'+pad2(mi+1)+'-'+pad2(+m4[1])}}
   var d=new Date(v);return isNaN(d)?'':d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
 function dd(a,b){var x=Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10)),y=Date.UTC(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10));return Math.round((x-y)/864e5)}
@@ -2190,6 +2191,59 @@ function loadB2B(cb){if(C.b2b)return cb(null,C.b2b);
     gviz(base+'&headers=0',function(e3,d3){
       if(e3)return cb(e3);
       try{var r2=parse2b(d3);if(!r2)return cb('GSTR2B header (GSTIN/Trade) கிடைக்கவில்லை');C.b2b=r2;cachePut('b2b',r2);cb(null,r2)}catch(e4){cb(String(e4))}})})}
+/* ---- client-side fallback recon: contract tabs via gviz (backend /api unreachable-க்கு) ---- */
+var CTABS=[
+ {gid:'1882690159',split:3,fyA:'FY 22-23',fyB:'FY 23-24',m:{p:1,n:2,pl:5,ty:6,tax:8,gst:10,inv:11,tds:12,gd:13,wh:15,em:16,ot:17,rc:18,dt:19,got:4}},
+ {gid:'1782489685',fy:'Contract work FY 24-25',m:{p:1,n:2,pl:5,ty:6,tax:8,gst:10,inv:11,tds:12,gd:13,wh:15,em:16,ot:17,rc:18,dt:19,got:4}},
+ {gid:'790298656',fy:'Contract work FY 25-26',m:{tax:8,gst:10,inv:11,tds:12,gd:13,wh:15,em:16,ot:17,rc:18,dt:19,got:21}},
+ {gid:'1200513245',fy:'Malaiyappan Contractor GSTR 2B',mal:1,m:{sNo:0,p:1,n:2,inv:4,tax:5}}];
+function buildReconFromSheets(done){
+  var left=CTABS.length,failed=null,all=[];
+  CTABS.forEach(function(t){
+    gviz('https://docs.google.com/spreadsheets/d/'+WB+'/gviz/tq?tqx=out:json&gid='+t.gid+'&headers=0',function(e,d){
+      if(failed)return;
+      if(e){failed=e||'gviz fail';done(failed);return}
+      try{
+        var rows=(d.table&&d.table.rows)||[];
+        for(var i=1;i<rows.length;i++){var cc=rows[i]&&rows[i].c;if(!cc||!cc.length)continue;
+          var g=function(k){return k>=0&&k<cc.length?cellV(cc[k]).trim():''};
+          var m=t.m,w,sn;
+          if(t.mal){
+            sn=g(m.sNo);var pn=g(m.p);if(!sn&&!pn)continue;
+            var mv=num(g(m.inv))||num(g(m.tax));if(!mv&&!pn)continue;
+            w={id:'C'+t.gid+'_'+(i+1),sNo:sn,party:pn,workName:g(m.n),workPlace:'',workType:'',engName:'',taxableValue:num(g(m.tax)),gst:0,invoiceValue:mv,tds:0,gstTds:0,withHeld:0,emd:0,otherDeduction:0,receivableAmount:0,receiptAmount:mv,receiptDate:'',department:'',fy:t.fy,sheetGid:t.gid,rowIndex:i+1}}
+          else{
+            sn=g(0).replace(/\.0$/,'').trim();if(!sn)continue;
+            var fy=t.fy||(t.split&&parseInt(sn,10)<=t.split?t.fyA:t.fyB);
+            w={id:'C'+t.gid+'_'+(i+1),sNo:sn,party:g(m.p),workName:g(m.n),workPlace:g(m.pl),workType:g(m.ty),engName:'',taxableValue:num(g(m.tax)),gst:num(g(m.gst)),invoiceValue:num(g(m.inv)),tds:num(g(m.tds)),gstTds:num(g(m.gd)),withHeld:num(g(m.wh)),emd:num(g(m.em)),otherDeduction:num(g(m.ot)),receivableAmount:num(g(m.rc)),receiptAmount:num(g(m.got)),receiptDate:d10(g(m.dt)),department:'',fy:fy,sheetGid:t.gid,rowIndex:i+1}}
+          all.push(w)}
+      }catch(pe){failed=String(pe);done(failed);return}
+      if(--left===0){
+        var used={},comb=[],se={exact:0,partial:0,near:0,unmatched:0},k2;
+        for(k2=0;k2<all.length;k2++){var w2=all[k2],best=null,bestI=-1,bm='';
+          var amt=w2.receiptAmount>0?w2.receiptAmount:w2.invoiceValue,dte=w2.receiptDate;
+          if(amt>0&&dte&&C.bank&&C.bank.length){
+            var j2;
+            for(j2=0;j2<C.bank.length;j2++){var bk=C.bank[j2];
+              if(used[j2]||bk.cr<=0||!bk.d)continue;
+              if(dd(bk.d,dte)===0&&Math.abs(bk.cr-amt)<0.01){best=bk;bestI=j2;bm='exact';break}}
+            if(!best)for(j2=0;j2<C.bank.length;j2++){var pk=C.bank[j2];
+              if(used[j2]||pk.cr<=0||!pk.d)continue;
+              if(dd(pk.d,dte)===0&&pk.cr<amt-0.01){best=pk;bestI=j2;bm='partial';break}}
+            if(!best)for(j2=0;j2<C.bank.length;j2++){var b2=C.bank[j2];
+              if(used[j2]||b2.cr<=0||!b2.d)continue;
+              var dv=dd(b2.d,dte);
+              if(Math.abs(dv)<=3&&Math.abs(b2.cr-amt)<=Math.max(1,0.05*amt)){best=b2;bestI=j2;bm='near';break}}
+            if(best)used[bestI]=1}
+          var entry={contract:w2,bank:null,matchType:bm||'unmatched',amountDiff:best?Math.abs(best.cr-amt):null,dateDiff:best?dd(best.d,dte):null};
+          if(best)entry.bank={date:best.d,description:best.desc,credit:best.cr,debit:best.dr,balance:best.bal,type:'bank',isCredit:true};
+          se[entry.matchType]++;comb.push(entry)}
+        C.recon={contractRows:all,combined:comb,bankRows:C.bank||[],lastSync:'client-fallback '+new Date().toISOString().slice(0,16).replace('T',' '),stats:{total:all.length,exact:se.exact,near:se.near,unmatched:se.unmatched}};
+        C.reconSrc='client';
+        done(null,C.recon)}
+    })})
+}
+
 function loadRecon(cb){if(C.recon)return cb(null,C.recon);
   var tk='';try{tk=sessionStorage.getItem('ar4.token')||''}catch(e){}
   function once(att){fetch('/api/bank.liveRecon',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:'{}'}).then(function(r){return r.text()}).then(function(t){
@@ -2197,9 +2251,14 @@ function loadRecon(cb){if(C.recon)return cb(null,C.recon);
     if(j&&j.ok&&j.data){C.recon=j.data;cb(null,j.data);return}
     if(j&&j.error&&j.error.code==='AUTH_REQUIRED'){cb('🔒 login வேண்டும் (admin/auditor)');return}
     if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
-    cb('recon API fail (HTTP '+(j?200:'?')+' — Malformed)')}).catch(function(){
+    startFallback('recon API fail (HTTP '+(j?200:'?')+' — Malformed)')}).catch(function(){
     if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
-    cb('recon network fail — backend cold-start; கொஞ்சம் வைத்து 🔄 அடிக்கவும்')})}
+    startFallback('recon network fail — backend cold-start')})}
+  function startFallback(origErr){
+    if(C.recon)return cb(null,C.recon);
+    loadBank(function(be){
+      if(be)return cb(origErr+' | fallback முடியவில்லை: '+be);
+      buildReconFromSheets(function(fe){if(fe)return cb(origErr+' | fallback: '+fe);cb(null,C.recon)})})}
   once(0)}
 /* ---- matching engine (unchanged logic) ---- */
 function matchBankSeed(sd){var con=[],b2b=[],i,c,b,bd,am,ddv;
@@ -2372,8 +2431,8 @@ function buildCoverage(asOn){
   tot.cov=tot.inv>0?tot.paid/tot.inv*100:0;
   return {asOn:aOn,sups:sups,itc:itc,iGst:iGst,iInv:iInv,iTaxTot:iTaxTot,tot:tot};
 }
-function covChip(t,label){var st=t==='ok'?'background:#dcfce7;color:#166534;border:1px solid #86efac':t==='fail'?'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5':'background:#fef9c3;color:#854d0e;border:1px solid #fde047';
-  return '<span style="'+st+';border-radius:12px;padding:2px 10px;font-size:11.5px;font-weight:700">'+(t==='ok'?'\u2713 ':t==='fail'?'\u2715 ':'\u23f3 ')+label+'</span>'}
+function covChip(t,label){var st=t==='ok'?'background:#dcfce7;color:#166534;border:1px solid #86efac':t==='fail'?'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5':t==='warn'?'background:#ffedd5;color:#9a3412;border:1px solid #fdba74':'background:#fef9c3;color:#854d0e;border:1px solid #fde047';
+  return '<span style="'+st+';border-radius:12px;padding:2px 10px;font-size:11.5px;font-weight:700">'+(t==='ok'?'\u2713 ':t==='fail'?'\u2715 ':t==='warn'?'\u26a0 ':'\u23f3 ')+label+'</span>'}
 function coverageOpen(){
   if(typeof document==='undefined')return;
   var prev=document.getElementById('arSupOv');if(prev&&prev.parentNode)prev.parentNode.removeChild(prev);
@@ -2427,7 +2486,7 @@ function coverageOpen(){
     h+='<div class="supNote">\u{1F4D8} <b>Method:</b> Payment match = Bank debit \u2248 invoice value (\u22640.5% \u0BB5\u0BBF\u0BA4\u0BCD\u0BA4\u0BBF\u0BAF\u0BBE\u0B9A\u0BAE\u0BCD), \u0BAA\u0BBF\u0BB2\u0BCD \u0BA4\u0BC7\u0BA4\u0BBF\u0B95\u0BCD\u0B95\u0BC1\u0BAA\u0BCD \u0BAA\u0BBF\u0BA9\u0BCD 0\u2013180 \u0BA8\u0BBE\u0BB3\u0BC1\u0B95\u0BCD\u0B95\u0BC1\u0BB3\u0BCD \u2014 \u0B92\u0BB5\u0BCD\u0BB5\u0BCA\u0BB0\u0BC1 payment \u0B92\u0BB0\u0BC1 \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BCD\u0B95\u0BC1 \u0BAE\u0B9F\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD; partial/advance \u0B95\u0B9F\u0BCD\u0B9F\u0BA3\u0BAE\u0BCD \u0B87\u0BA4\u0BBF\u0BB2\u0BCD \u0B87\u0BB2\u0BCD\u0BB2\u0BC8. <b>Rule 37:</b> \u0BAA\u0BBF\u0BB2\u0BCD \u0BA4\u0BC7\u0BA4\u0BBF\u0BAF\u0BBF\u0BB2\u0BBF\u0BB0\u0BC1\u0BA8\u0BCD\u0BA4\u0BC1 180 \u0BA8\u0BBE\u0BB3\u0BC1\u0B95\u0BCD\u0B95\u0BC1\u0BB3\u0BCD \u0B9A\u0BAA\u0BCD\u0BB3\u0BC8\u0BAF\u0BB0\u0BC1\u0B95\u0BCD\u0B95\u0BC1 \u0B95\u0B9F\u0BCD\u0B9F\u0BBE\u0BB5\u0BBF\u0B9F\u0BCD\u0B9F\u0BBE\u0BB2\u0BCD \u0B85\u0BA8\u0BCD\u0BA4 \u0BAA\u0BBF\u0BB2\u0BCD\u0BA9\u0BCD ITC (\u0B95\u0B9F\u0BB5\u0BC1) \u0BA4\u0BBF\u0BB0\u0BC1\u0BAE\u0BCD\u0BAA\u0BAA\u0BCD \u0BAA\u0BC6\u0BB1\u0BCD\u0BB1\u0BC1 \u0B95\u0B9F\u0BCD\u0B9F\u0BA3\u0BBF\u0BAF\u0BC1\u0B9F\u0BA9\u0BCD \u0B9A\u0BC7\u0BB2\u0BC1\u0BA4\u0BCD\u0BA4 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD. As-on: <b>'+esc(cv.asOn)+'</b></div>';
     body.innerHTML=h}
   function settle(e,which){
-    st[which]=e?'fail':'ok';errs[which]=e||'';loaded[which]=!e;doneN++;chips();
+    st[which]=e?'fail':(which==='recon'&&C.reconSrc==='client'?'warn':'ok');errs[which]=e||'';loaded[which]=!e;doneN++;chips();
     if(doneN>=2){
       var body=ov.querySelector('#supBody');
       if(!loaded.bank||!loaded.b2b){var msg=[];
@@ -2543,7 +2602,7 @@ function worksOpen(){
     if(fyEl)fyEl.addEventListener('change',paint);
     if(srEl)srEl.addEventListener('input',paint);
     paint()}
-  function settle(e){st.recon=e?'fail':'ok';chips();
+  function settle(e){st.recon=e?'fail':(C.reconSrc==='client'?'warn':'ok');chips();
     var body=ov.querySelector('#wkBody');
     if(e){if(body)body.innerHTML='<div class="wkWait" style="color:#991b1b">\u2715 '+esc(String(e))+'<br><br><button id="wkRetry" style="border:1px solid #94a3b8;background:#f1f5f9;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:700">\u{1F504} \u0BAE\u0BC0\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD \u0BAE\u0BC1\u0BAF\u0BB1\u0BCD\u0B9A\u0BBF</button></div>';
       var rb=ov.querySelector('#wkRetry');if(rb)rb.addEventListener('click',function(){st={recon:'load'};chips();start()});return}
@@ -2654,7 +2713,7 @@ function anomaliesOpen(){
   function reset(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null;st={bank:'load',b2b:'load',recon:'load'};errs={};doneN=0;loaded={bank:false,b2b:false,recon:false};chips();start()}
   ov.querySelector('#anRe').addEventListener('click',reset);
   function settle(e,which){
-    st[which]=e?'fail':'ok';errs[which]=e||'';loaded[which]=!e;doneN++;chips();
+    st[which]=e?'fail':(which==='recon'&&C.reconSrc==='client'?'warn':'ok');errs[which]=e||'';loaded[which]=!e;doneN++;chips();
     if(doneN>=3){
       var body=ov.querySelector('#anBody');
       if(!loaded.bank||!loaded.b2b||!loaded.recon){
@@ -2706,6 +2765,6 @@ function anomaliesOpen(){
     setTimeout(function(){loadBank(function(e){settle(e,'bank')});loadB2B(function(e){settle(e,'b2b')})},1200)}
   start()}
 
-window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage,works:worksOpen,_works:buildWorksData,anomalies:anomaliesOpen,_anom:buildAnomalies};
+window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage,works:worksOpen,_works:buildWorksData,anomalies:anomaliesOpen,_anom:buildAnomalies,_fbrecon:buildReconFromSheets};
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */

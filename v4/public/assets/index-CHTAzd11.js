@@ -2087,6 +2087,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
+var ARXV='202610081l';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2250,15 +2251,15 @@ function loadRecon(cb){if(C.recon)return cb(null,C.recon);
     var j=null;try{j=t?JSON.parse(t):null}catch(e3){}
     if(j&&j.ok&&j.data){C.recon=j.data;cb(null,j.data);return}
     if(j&&j.error&&j.error.code==='AUTH_REQUIRED'){cb('🔒 login வேண்டும் (admin/auditor)');return}
-    if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
-    startFallback('recon API fail (HTTP '+(j?200:'?')+' — Malformed)')}).catch(function(){
-    if(att<4){setTimeout(function(){once(att+1)},1500*(att+1));return}
-    startFallback('recon network fail — backend cold-start')})}
+    if(att<2){setTimeout(function(){once(att+1)},1500*(att+1));return}
+    startFallback('recon API fail (Malformed) [b:'+ARXV+']')}).catch(function(){
+    if(att<2){setTimeout(function(){once(att+1)},1500*(att+1));return}
+    startFallback('recon network fail — backend cold-start [b:'+ARXV+']')})}
   function startFallback(origErr){
     if(C.recon)return cb(null,C.recon);
     loadBank(function(be){
       if(be)return cb(origErr+' | fallback முடியவில்லை: '+be);
-      buildReconFromSheets(function(fe){if(fe)return cb(origErr+' | fallback: '+fe);cb(null,C.recon)})})}
+      buildReconFromSheets(function(fe){if(fe)return cb(origErr+' | fallback தோல்வி: '+fe);cb(null,C.recon)})})}
   once(0)}
 /* ---- matching engine (unchanged logic) ---- */
 function matchBankSeed(sd){var con=[],b2b=[],i,c,b,bd,am,ddv;
@@ -2448,6 +2449,7 @@ function coverageOpen(){
     '<div id="supChips" style="display:flex;gap:8px;padding:9px 16px;background:#eef2f7;border-bottom:1px solid #e2e8f0;flex-wrap:wrap"></div>'+
     '<div id="supBody"><div class="supWait">\u23F3 Bank + GSTR-2B \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026 (gviz, \u0B9A\u0BC1\u0BB1\u0BC1\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BCD\u0B9F query)</div></div></div>';
   document.body.appendChild(ov);
+  try{var hEl=ov.querySelector('.anHead')||ov.querySelector('.supHead')||ov.querySelector('.wkHead');var bv=document.createElement('span');bv.style.cssText='font-weight:400;font-size:10px;opacity:.75;margin-left:6px';bv.textContent='b:'+ARXV;if(hEl)hEl.appendChild(bv)}catch(e){}
   function chips(){var h=covChip(st.bank,'\u{1F3E6} Bank Statement')+' '+covChip(st.b2b,'\u{1F9FE} GSTR-2B \u0BAA\u0BBF\u0BB2\u0BCD\u0B95\u0BB3\u0BCD');
     var el=ov.querySelector('#supChips');if(el)el.innerHTML=h}
   chips();
@@ -2546,6 +2548,7 @@ function worksOpen(){
     '<div id="wkChips" style="display:flex;gap:8px;padding:9px 16px;background:#eef2f7;border-bottom:1px solid #e2e8f0;flex-wrap:wrap"></div>'+
     '<div id="wkBody"><div class="wkWait">\u23F3 Recon API \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026 (203 \u0BB5\u0BC7\u0BB2\u0BC8\u0B95\u0BB3\u0BCD + bank \u0B9A\u0BBE\u0BA9\u0BCD\u0BB1\u0BC1)</div></div></div>';
   document.body.appendChild(ov);
+  try{var hEl=ov.querySelector('.anHead')||ov.querySelector('.supHead')||ov.querySelector('.wkHead');var bv=document.createElement('span');bv.style.cssText='font-weight:400;font-size:10px;opacity:.75;margin-left:6px';bv.textContent='b:'+ARXV;if(hEl)hEl.appendChild(bv)}catch(e){}
   function chips(){var el=ov.querySelector('#wkChips');if(el)el.innerHTML=covChip(st.recon,'\u{1F504} Recon API (203 \u0BB5\u0BC7\u0BB2\u0BC8)')}
   chips();
   ov.querySelector('#wkCl').addEventListener('click',function(){if(ov.parentNode)ov.parentNode.removeChild(ov)});
@@ -2706,6 +2709,7 @@ function anomaliesOpen(){
     '<div id="anChips" style="display:flex;gap:8px;padding:9px 16px;background:#eef2f7;border-bottom:1px solid #e2e8f0;flex-wrap:wrap"></div>'+
     '<div id="anBody"><div class="anWait">\u23F3 Bank + GSTR-2B + Recon \u0B8F\u0BB1\u0BCD\u0BB1\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1\u2026</div></div></div>';
   document.body.appendChild(ov);
+  try{var hEl=ov.querySelector('.anHead')||ov.querySelector('.supHead')||ov.querySelector('.wkHead');var bv=document.createElement('span');bv.style.cssText='font-weight:400;font-size:10px;opacity:.75;margin-left:6px';bv.textContent='b:'+ARXV;if(hEl)hEl.appendChild(bv)}catch(e){}
   function chips(){var el=ov.querySelector('#anChips');if(el)el.innerHTML=covChip(st.bank,'\u{1F3E6} Bank Statement')+' '+covChip(st.b2b,'\u{1F9FE} GSTR-2B')+' '+covChip(st.recon,'\u{1F504} Recon (203 \u0BB5\u0BC7\u0BB2\u0BC8)')}
   chips();
   ov.querySelector('#anCl').addEventListener('click',function(){if(ov.parentNode)ov.parentNode.removeChild(ov)});

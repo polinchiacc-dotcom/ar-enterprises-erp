@@ -1,37 +1,42 @@
 /********************************************************************
- * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilings" tab
+ * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilingsAuto" tab  (v2)
  *
- * என்ன செய்யும்:
- *   GST portal (gst.gov.in) அனுப்பும் "filed successfully" மெயில்களை
- *   (GSTR-1 / GSTR-3B — ARN உடன்) Gmail-ல் தேடி, parse பண்ணி,
- *   workbook-ல் புது "GstFilings" tab-ல் சேர்க்கும்.
- *   Website GST Centre → Filings tab இந்த tab-ஐ தானாகக் காட்டும்.
+ * v2 (முக்கியம்): workbook-ல் பழைய "GstFilings" tab = GST follow-up tracker
+ *   (பயனரின் சொந்த data). அதை தொடாது — இப்போுது தனி tab "GstFilingsAuto".
+ *   cleanupGstFilingsTracker() — tracker-ல் தவறாகச் சேர்ந்த filing rows-ஐ
+ *   GstFilingsAuto-வுக்கு நகர்த்தும் (v1 run செய்திருந்தால் ஒரே முறை இதை run).
  *
  * setup (ஒரே தடவை):
- *   1. script.google.com → இருக்கும் ERP project → ➕ New file → Script
- *      → இந்த file-ன் முழு உள்ளடக்கம் paste → Save
- *   2. Run installGstTrigger → Authorize (Gmail + Sheets அனுமதி)
- *   3. Run syncGstFilings (ஒரே முறை — பழைய mails backfill)
- *   4. (விருப்பம்) மணிக்கு ஒருமுறை தானா ஓடும் (trigger ஏற்கனவே install)
- *
- * குறிப்பு: ARN இல்லாத mails சேராது (சுத்தமான data மட்டும்).
- * Duplicate தவிர்ப்பு: ARN key. Mail timeout window 1h overlap-ஓட safe.
+ *   1. Apps Script project-ல் பழைய GstFilingsSync.gs-ஐ முழுவதும் நீக்கி
+ *      இதை paste → Save
+ *   2. (v1-ஐ run செய்திருந்தால் மட்டும்) Run cleanupGstFilingsTracker
+ *   3. Run installGstTrigger → Authorize
+ *   4. Run syncGstFilings (பழைய mails backfill)
+ * இதற்குப் பிறகு மணிக்கு ஒருமுறை தானா sync.
  ********************************************************************/
 
 var GST_WB = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var GST_TAB = 'GstFilings';
-var GST_GSTIN = '33AEQFS3938D1ZU'; // body-ல GSTIN கிடைக்காட்டி fallback
+var GST_TAB = 'GstFilingsAuto';
+var GST_OLD_TAB = 'GstFilings'; // பயனரின் GST follow-up tracker — தொடக்கூடாது
+var GST_GSTIN = '33AEQFS3938D1ZU';
 var GST_MAX_THREADS = 60;
+var GST_HEADER = ['Filing Type', 'FY', 'Period', 'ARN', 'Filing Date', 'GSTIN', 'Status', 'Subject', 'Synced'];
 
 function gstFilerSheet_() {
   var ss = SpreadsheetApp.openById(GST_WB);
   var sh = ss.getSheetByName(GST_TAB);
-  if (!sh) {
-    sh = ss.insertSheet(GST_TAB);
-    sh.appendRow(['Filing Type', 'FY', 'Period', 'ARN', 'Filing Date', 'GSTIN', 'Status', 'Subject', 'Synced']);
-    sh.getRange(1, 1, 1, 9).setFontWeight('bold');
-    sh.setFrozenRows(1);
+  if (sh) {
+    var a1 = '';
+    try { a1 = String(sh.getRange(1, 1).getValue()); } catch (e) {}
+    if (a1 !== GST_HEADER[0]) {
+      throw new Error('"' + GST_TAB + '" tab-ல் வேற data இருக்கு (A1="' + a1 + '"). அந்த tab-க்கு வேற பெயர் கொடுங்க அல்லது நீக்குங்க, அப்புறம் மீண்டும் syncGstFilings run பண்ணவும்.');
+    }
+    return sh;
   }
+  sh = ss.insertSheet(GST_TAB);
+  sh.appendRow(GST_HEADER);
+  sh.getRange(1, 1, 1, GST_HEADER.length).setFontWeight('bold');
+  sh.setFrozenRows(1);
   return sh;
 }
 
@@ -82,7 +87,6 @@ function syncGstFilings() {
   var threads = GmailApp.search(q, 0, GST_MAX_THREADS);
   var rows = [], scanned = 0;
   var lastEpoch = 0;
-  var MN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   for (var t = 0; t < threads.length; t++) {
     var msgs = threads[t].getMessages();
@@ -113,15 +117,41 @@ function syncGstFilings() {
 
   if (rows.length) {
     rows.sort(function(a, b) { return String(a[4]) < String(b[4]) ? -1 : 1; });
-    sh.getRange(sh.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, GST_HEADER.length).setValues(rows);
   }
 
   if (lastEpoch) {
-    var nd = new Date(lastEpoch - 3600 * 1000); // 1h overlap (ARN dedupe safe)
+    var nd = new Date(lastEpoch - 3600 * 1000);
     props.setProperty('gstF_last', Utilities.formatDate(nd, 'GMT', 'yyyy/MM/dd'));
   }
 
-  Logger.log('GST filings sync: scanned=' + scanned + ' new=' + rows.length);
+  Logger.log('GST filings sync → "' + GST_TAB + '": scanned=' + scanned + ' new=' + rows.length);
+  return rows.length;
+}
+
+/* v1-ல் தவறாக பழைய "GstFilings" tracker tab-ல் சேர்ந்த filing rows-ஐ
+   GstFilingsAuto-வுக்கு நகர்த்தும். Tracker-ன் சொந்த rows தொடப்படாது.
+   அடையாளம்: col D = ARN pattern (10-20 எழுத்து எண்/எழுத்து, "Added by" போன்ற பெயர்கள் இல்லை)
+   மற்றும் col A = GSTR* / GST*. ஒரே முறை run பண்ணவும். */
+function cleanupGstFilingsTracker() {
+  var ss = SpreadsheetApp.openById(GST_WB);
+  var old = ss.getSheetByName(GST_OLD_TAB);
+  if (!old) { Logger.log('"' + GST_OLD_TAB + '" tab-லேயே இல்லை — சுத்தம், எதுவும் செய்ய வேண்டாம்'); return 0; }
+  var data = old.getDataRange().getValues();
+  var arnRe = /^[A-Z0-9]{10,20}$/;
+  var move = [];
+  for (var r = 1; r < data.length; r++) {
+    var a = String(data[r][0] || '').trim();
+    var d = String(data[r][3] || '').trim();
+    if (/^GSTR/i.test(a) && arnRe.test(d.replace(/\s/g, ''))) move.push(r);
+  }
+  if (!move.length) { Logger.log('Tracker சுத்தமா இருக்கு — filing rows சேரவில்லை. எதுவும் மாற்றவில்லை.'); return 0; }
+  var fresh = gstFilerSheet_();
+  var rows = move.map(function(r2) { return data[r2].slice(0, GST_HEADER.length); });
+  fresh.getRange(fresh.getLastRow() + 1, 1, rows.length, GST_HEADER.length).setValues(rows);
+  // கீழிருந்து நீக்கு (row indices shift-ஐ தவிர்க்க)
+  for (var i = move.length - 1; i >= 0; i--) old.deleteRow(move[i] + 1);
+  Logger.log('சுத்தம்: ' + rows.length + ' filing rows tracker-லிருந்து "' + GST_TAB + '"-க்கு நகர்த்தப்பட்டது. Tracker இப்போ பழையபடி.');
   return rows.length;
 }
 
@@ -131,5 +161,5 @@ function installGstTrigger() {
     if (all[i].getHandlerFunction() === 'syncGstFilings') ScriptApp.deleteTrigger(all[i]);
   }
   ScriptApp.newTrigger('syncGstFilings').timeBased().everyHours(1).create();
-  Logger.log('GST filings hourly trigger installed — syncGstFilings ஒவ்வொரு மணியும் ஓடும்');
+  Logger.log('GST filings hourly trigger installed → syncGstFilings ஒவ்வொரு மணியும் "' + GST_TAB + '"-ஐ புதுப்பிக்கும்');
 }

@@ -233,26 +233,28 @@ const AudPageDefs=[
 function extractSheetId(v){var m=String(v||"").match(/\/d\/([a-zA-Z0-9_-]{20,})/);return m?m[1]:String(v||"").trim()}
 function gvizFetch(id,tab,cb,tq){
   var fin=!1;function done(e2,d2){if(fin)return;fin=!0;cb(e2,d2)}
-  var _u="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json";
-  _u+=/^gid:/.test(tab||"")?"&gid="+String(tab).slice(4):"&sheet="+encodeURIComponent(tab||"Sheet1");
-  if(tq)_u+="&tq="+encodeURIComponent(tq);_u+="&headers=0";
+  var gid=/^gid:/.test(tab||"")?String(tab).slice(4):"",sh=gid?"":encodeURIComponent(tab||"Sheet1");
+  var gu="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json"+(gid?"&gid="+gid:"&sheet="+sh)+(tq?"&tq="+encodeURIComponent(tq):"")+"&headers=0";
+  var lu="/api/gsheet?id="+encodeURIComponent(id)+(gid?"&gid="+gid:"&sheet="+sh)+(tq?"&tq="+encodeURIComponent(tq):"");
+  function pjson(t2){var j3=t2.indexOf("("),k3=t2.lastIndexOf(")");return JSON.parse(j3>=0&&k3>j3?t2.slice(j3+1,k3):t2)}
   var ctl=null;try{ctl=new AbortController}catch(e0){}
-  var tm=setTimeout(function(){try{if(ctl)ctl.abort()}catch(e1){}jsonp()},10000);
-  fetch(_u,ctl?{credentials:"omit",signal:ctl.signal}:{credentials:"omit"}).then(function(r2){
-    if(!r2.ok){clearTimeout(tm);done("Sheet read முடியவில்லை (HTTP "+r2.status+") — Share → Anyone with link → Viewer ஆக மாற்றவும்");return}
-    return r2.text().then(function(t2){clearTimeout(tm);
-      var j3=t2.indexOf("("),k3=t2.lastIndexOf(")"),d3;
-      try{d3=JSON.parse(j3>=0&&k3>j3?t2.slice(j3+1,k3):t2)}catch(e5){done("Data format error — Refresh செய்யவும்");return}
-      done(null,d3)},function(){clearTimeout(tm);jsonp()})
-  },function(){clearTimeout(tm);jsonp()});
-  function jsonp(){
-    if(fin)return;
+  var tm=setTimeout(function(){try{if(ctl)ctl.abort()}catch(e1){}jp()},10000);
+  fetch(lu,{credentials:"omit"}).then(function(r2){
+    if(!r2.ok){gg();return}
+    return r2.text().then(function(t2){var d3;if(fin)return;try{d3=pjson(t2)}catch(e5){gg();return}clearTimeout(tm);done(null,d3)},function(){gg()})
+  },function(){gg()});
+  function gg(){if(fin)return;
+    fetch(gu,ctl?{credentials:"omit",signal:ctl.signal}:{credentials:"omit"}).then(function(r2){
+      if(!r2.ok){clearTimeout(tm);done("Sheet read முடியவில்லை (HTTP "+r2.status+") — Share → Anyone with link → Viewer ஆக மாற்றவும்");return}
+      return r2.text().then(function(t2){clearTimeout(tm);var d3;try{d3=pjson(t2)}catch(e5){done("Data format error — Refresh செய்யவும்");return}done(null,d3)},function(){clearTimeout(tm);jp()})
+    },function(){clearTimeout(tm);jp()})}
+  function jp(){if(fin)return;
     var fn="__arGviz"+(Date.now())+((Math.random()*1e6)|0);
-    window[fn]=function(d2){clean();done(null,d2)};
+    window[fn]=function(d2){clean();clearTimeout(tm);done(null,d2)};
     function clean(){try{delete window[fn]}catch(e2){window[fn]=void 0}var s2=document.getElementById(fn);if(s2&&s2.parentNode)s2.parentNode.removeChild(s2)}
     var sc=document.createElement("script");sc.id=fn;
     sc.onerror=function(){clean();done("Sheet-ஐ படிக்க முடியவில்லை — Share → Anyone with link → Viewer ஆக மாற்றவும்")};
-    sc.src=_u+"&tqx=out:json;responseHandler:"+fn+"&cb="+Date.now();
+    sc.src=gu+"&tqx=out:json;responseHandler:"+fn+"&cb="+Date.now();
     document.head.appendChild(sc);
     setTimeout(function(){if(window[fn]){clean();done("நேரம் முடிந்தது (timeout) — Sheet ID / tab பெயரை சரிபார்க்கவும்")}},12000)}
 }
@@ -2221,7 +2223,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081t';
+var ARXV='202610081u';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}

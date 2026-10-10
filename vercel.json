@@ -7,12 +7,12 @@
       "destination": "https://docs.google.com/spreadsheets/d/1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw/gviz/tq?tqx=out:json&headers=0"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    },
-    {
       "source": "/api/:path*",
       "destination": "https://polinchi-zgki.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

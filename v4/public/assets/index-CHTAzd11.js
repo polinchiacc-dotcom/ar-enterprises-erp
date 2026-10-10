@@ -232,7 +232,7 @@ const AudPageDefs=[
 ];
 function extractSheetId(v){var m=String(v||"").match(/\/d\/([a-zA-Z0-9_-]{20,})/);return m?m[1]:String(v||"").trim()}
 function gvizFetch(id,tab,cb,tq){
-  var fn="__arGviz"+(Date.now());
+  var fn="__arGviz"+(Date.now())+((Math.random()*1e6)|0);
   window[fn]=function(d2){clean();cb(null,d2)};
   function clean(){try{delete window[fn]}catch(e2){window[fn]=void 0}var s2=document.getElementById(fn);if(s2&&s2.parentNode)s2.parentNode.removeChild(s2)}
   var sc=document.createElement("script");sc.id=fn;
@@ -2206,7 +2206,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081r';
+var ARXV='202610081s';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}

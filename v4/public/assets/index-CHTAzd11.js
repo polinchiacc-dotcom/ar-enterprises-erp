@@ -235,7 +235,7 @@ function gvizFetch(id,tab,cb,tq){
   var fin=!1;function done(e2,d2){if(fin)return;fin=!0;cb(e2,d2)}
   var gid=/^gid:/.test(tab||"")?String(tab).slice(4):"",sh=gid?"":encodeURIComponent(tab||"Sheet1");
   var gu="https://docs.google.com/spreadsheets/d/"+id+"/gviz/tq?tqx=out:json"+(gid?"&gid="+gid:"&sheet="+sh)+(tq?"&tq="+encodeURIComponent(tq):"")+"&headers=0";
-  var lu="/api/gsheet?id="+encodeURIComponent(id)+(gid?"&gid="+gid:"&sheet="+sh)+(tq?"&tq="+encodeURIComponent(tq):"");
+  var lu="/api/gsheet?"+(gid?"gid="+gid:"sheet="+sh)+(tq?"&tq="+encodeURIComponent(tq):"");
   function pjson(t2){var j3=t2.indexOf("("),k3=t2.lastIndexOf(")");return JSON.parse(j3>=0&&k3>j3?t2.slice(j3+1,k3):t2)}
   var ctl=null;try{ctl=new AbortController}catch(e0){}
   var tm=setTimeout(function(){try{if(ctl)ctl.abort()}catch(e1){}jp()},10000);
@@ -2223,7 +2223,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081u';
+var ARXV='202610081v';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}

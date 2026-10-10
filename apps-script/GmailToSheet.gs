@@ -100,7 +100,8 @@ function arMailSync() {
   var lastEpoch = Number(props.getProperty('arMailLast') || 0);
   if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;
   var seen = arMailSeen_(sh);
-  var threads = GmailApp.search('after:' + Math.floor(lastEpoch), 0, 60);
+  var qDate = Utilities.formatDate(new Date(lastEpoch * 1000), 'GMT', 'yyyy/MM/dd'); // Gmail after: needs yyyy/MM/dd — epoch number gives 0 results!
+  var threads = GmailApp.search('after:' + qDate, 0, 80);
   var rows = [], newest = lastEpoch;
   for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {
     var msgs = threads[t].getMessages();
@@ -119,7 +120,7 @@ function arMailSync() {
   } else {
     props.setProperty('arMailLast', String(Math.floor(Date.now() / 1000)));
   }
-  return rows.length + ' mail(s) synced';
+  return rows.length + ' mail(s) synced (after:' + qDate + ')';
 }
 
 function arMailBackfillAll() {
@@ -311,6 +312,24 @@ function arMailSetup() {
   });
   ScriptApp.newTrigger('arMailSync').timeBased().everyMinutes(10).create();
   Logger.log('Setup OK — trigger 10 நிமிடம் ஒன்றுக்கு run ஆகும்.');
+}
+
+function arMailStatus() {
+  var out = [], props = PropertiesService.getScriptProperties();
+  var trs = ScriptApp.getProjectTriggers();
+  out.push('1) Triggers: ' + (trs.length ? trs.map(function (t) { return t.getHandlerFunction(); }).join(', ') : '*** இல்லை! arMailSetup run பண்ணுங்க ***'));
+  var le = props.getProperty('arMailLast');
+  out.push('2) arMailLast = ' + (le ? new Date(Number(le) * 1000).toISOString() : '(empty)'));
+  var sh = arMailSheet_();
+  var lr = sh.getLastRow();
+  out.push('3) Inbox tab rows = ' + (lr - 1));
+  if (lr > 1) out.push('4) கடைசி row தேதி = ' + sh.getRange(lr, 1).getValue());
+  out.push('5) Gmail கடந்த 9 நாள் threads = ' + GmailApp.search('newer_than:9d', 0, 5).length);
+  out.push('6) Live sync → ' + arMailSync());
+  out.push('7) sync பிறகு கடைசி row தேதி = ' + sh.getRange(sh.getLastRow(), 1).getValue());
+  var msg = out.join('\n');
+  Logger.log('\n' + msg);
+  return msg;
 }
 
 // ==================================================================

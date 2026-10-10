@@ -1,0 +1,70 @@
+// ==================================================================
+// v7 MAIL SYNC FIX — 2026-10-10
+// பிரச்சனை: Gmail search 'after:<epoch-எண்>' தவறு — Gmail 'after:'-க்கு
+// தேதி (yyyy/MM/dd) தான் எதிர்பார்க்கும். எண் கொடுத்தபோது 0 results வந்து,
+// புது mails எப்போதும் sync ஆகவே இல்லை (Oct-2-ல backfill மட்டும் நின்னுது).
+//
+// எப்படி பயன்படுத்துவது:
+//   Apps Script → GmailToSheet.gs → file-இன் மிகக் கடைசியில்
+//   இந்த முழு block-ஐயும் paste பண்ணுங்க → Save 💾
+//   (புது definition-கள் பழையதை override பண்ணும் — வேற எதுவும் தொட வேண்டாம்)
+//
+// பிறகு Editor-இல் function dropdown → arMailStatus → Run பண்ணுங்க.
+// Execution log-ல வரும் 7-line status-ஐ screenshot எடுத்து அனுப்புங்க.
+// ==================================================================
+
+function arMailSync() {
+  var sh = arMailSheet_();
+  var props = PropertiesService.getScriptProperties();
+  var lastEpoch = Number(props.getProperty('arMailLast') || 0);
+  if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;
+  var qDate = Utilities.formatDate(new Date(lastEpoch * 1000), 'GMT', 'yyyy/MM/dd'); // FIX: yyyy/MM/dd
+  var seen = arMailSeen_(sh);
+  var threads = GmailApp.search('after:' + qDate, 0, 80);
+  var rows = [], newest = lastEpoch;
+  for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {
+    var msgs = threads[t].getMessages();
+    for (var m = 0; m < msgs.length && rows.length < MAX_PER_RUN; m++) {
+      var msg = msgs[m];
+      if (seen[msg.getId()]) continue;
+      var epoch = Math.floor(msg.getDate().getTime() / 1000);
+      if (epoch <= lastEpoch) continue;
+      if (epoch > newest) newest = epoch;
+      rows.push(arMailRow_(msg, threads[t], SAVE_ATTACHMENTS));
+    }
+  }
+  if (rows.length) {
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
+    props.setProperty('arMailLast', String(newest));
+  } else {
+    props.setProperty('arMailLast', String(Math.floor(Date.now() / 1000)));
+  }
+  return rows.length + ' mail(s) synced (after:' + qDate + ')';
+}
+
+function arMailSetup() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'arMailSync') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('arMailSync').timeBased().everyMinutes(10).create();
+  Logger.log('Setup OK — arMailSync trigger 10 நிமிடத்துக்கு ஒருமுறை.');
+  return 'trigger OK';
+}
+
+function arMailStatus() {
+  var out = [], props = PropertiesService.getScriptProperties();
+  var trs = ScriptApp.getProjectTriggers();
+  out.push('1) Triggers: ' + (trs.length ? trs.map(function (t) { return t.getHandlerFunction(); }).join(', ') : '*** இல்லை! arMailSetup run பண்ணுங்க ***'));
+  var le = props.getProperty('arMailLast');
+  out.push('2) arMailLast = ' + (le ? new Date(Number(le) * 1000).toISOString() : '(empty)'));
+  var sh = arMailSheet_();
+  var lr = sh.getLastRow();
+  out.push('3) Inbox tab rows = ' + (lr - 1));
+  if (lr > 1) out.push('4) கடைசி row தேதி = ' + sh.getRange(lr, 1).getValue());
+  out.push('5) Gmail கடந்த 9 நாள் threads = ' + GmailApp.search('newer_than:9d', 0, 5).length);
+  out.push('6) Live sync → ' + arMailSync());
+  out.push('7) sync பிறகு கடைசி row தேதி = ' + sh.getRange(sh.getLastRow(), 1).getValue());
+  var msg = out.join('\n');
+  Logger.log('\n' + msg);
+  return msg;
+}

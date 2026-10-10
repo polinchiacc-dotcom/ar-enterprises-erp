@@ -1,5 +1,5 @@
 /********************************************************************
- * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilingsAuto" tab (v2.3, 2026-10-10)
+ * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilingsAuto" tab (v2.4, 2026-10-10)
  *
  * நிலைமை (உறுதி செய்யப்பட்டது):
  *   - உங்க GST follow-up tracker இப்போ "Reminder" tab-இல் — இந்த script அதை
@@ -56,15 +56,17 @@ function gstNormType_(t) {
 }
 
 function gstParseMail_(subj, body) {
-  var text = String(subj || '') + '\n' + String(body || '').slice(0, 3000);
+  var text = String(subj || '') + '\n' + String(body || '').slice(0, 8000);
   var out = { arn: '', type: '', fy: '', period: '', gstin: '' };
-  var mA = text.match(/ARN\s*[:#\-\s]*([A-Z0-9]{12,20})/i);
-  if (mA) out.arn = mA[1].toUpperCase();
+  var mA = text.match(/ARN[^A-Z0-9]{0,12}([A-Z0-9]{12,20})/i);
+  if (!mA) mA = text.match(/\b([A-Z]{2}\d{12,18}[A-Z]?)\b/); // நேரடி ARN-வடிவ எண்
+  if (mA) out.arn = (mA[1] || mA[0]).toUpperCase();
   var mT = String(subj || '').match(/GSTR-?\d[A-B]?(?:\s*\/\s*IFF)?|IFF/i);
   out.type = gstNormType_(mT ? mT[0] : '');
   var mFY = text.match(/FY\s*[:\s]*(\d{4})\s*-\s*(\d{2,4})/i);
   if (mFY) out.fy = mFY[1] + '-' + String(mFY[2]).slice(-2);
   var mP = text.match(/Period\s*[:\s]*([A-Za-z]{3,9})/i);
+  if (!mP) mP = text.match(/month of\s*:?\s*([A-Za-z]{3,9})/i) || text.match(/quarter of\s*:?\s*([A-Za-z]{3,9})/i);
   if (mP) out.period = mP[1].charAt(0).toUpperCase() + mP[1].slice(1).toLowerCase();
   var mG = text.match(/33[A-Z0-9]{13}/);
   if (mG) out.gstin = mG[0];
@@ -94,7 +96,7 @@ function syncGstFilings() {
       var subj = msg.getSubject() || '', body = '';
       try { body = msg.getPlainBody() || ''; } catch (e) { body = ''; }
       var probe = (subj + ' ' + body.slice(0, 600));
-      if (!/filed successfully|return\s+[a-z0-9\/\-]+\s+filed|\bARN\b/i.test(probe)) continue;
+      if (!/filed successfully|return\s+[a-z0-9\/\-]+\s+filed|\bARN\b|acknowledg/i.test(probe)) continue;
       var p = gstParseMail_(subj, body);
       if (!p.arn || seen[p.arn]) continue;
       var fdate = Utilities.formatDate(dt, Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -150,6 +152,40 @@ function gstStatus() {
   var trs = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
   out.push('5) triggers = ' + (trs.length ? trs.join(', ') : 'இல்லை — installGstTrigger run பண்ணுங்க'));
   var msg = out.join('\n');
+  Logger.log('\n' + msg);
+  return msg;
+}
+
+/* முதல் 40 GST mails-ஐ காட்டும் diagnostic — parser ஏன் skip பண்ணுதுன்னு பார்க்க.
+   Run → Execution log முழுவதும் copy/screenshot. */
+function gstDebug() {
+  var th = GmailApp.search('from:gst.gov.in newer_than:400d in:anywhere', 0, 40);
+  var L = [];
+  L.push('threads=' + th.length);
+  for (var t = 0; t < th.length && L.length < 46; t++) {
+    var msgs = th[t].getMessages();
+    for (var m = 0; m < msgs.length && L.length < 46; m++) {
+      var msg = msgs[m];
+      var subj = msg.getSubject() || '';
+      var body = '';
+      try { body = msg.getPlainBody() || ''; } catch (e) { body = ''; }
+      var probe = (subj + ' ' + body.slice(0, 600));
+      var pass = /filed successfully|return\s+[a-z0-9\/\-]+\s+filed|\bARN\b|acknowledg/i.test(probe);
+      var p = gstParseMail_(subj, body);
+      L.push((t + 1) + '. ' + subj.slice(0, 70)
+        + ' || probe=' + (pass ? 'PASS' : '-')
+        + ' arn=' + (p.arn || '-')
+        + ' type=' + (p.type || '-')
+        + ' fy=' + (p.fy || '-')
+        + ' per=' + (p.period || '-')
+        + ' gstin=' + (p.gstin || '-'));
+      if (!pass || !p.arn) {
+        var snip = body.slice(0, 220).replace(/\s+/g, ' ');
+        L.push('   body[0:220] = ' + snip);
+      }
+    }
+  }
+  var msg = L.join('\n');
   Logger.log('\n' + msg);
   return msg;
 }

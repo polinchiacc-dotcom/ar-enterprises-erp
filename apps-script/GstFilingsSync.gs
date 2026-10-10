@@ -163,3 +163,32 @@ function installGstTrigger() {
   ScriptApp.newTrigger('syncGstFilings').timeBased().everyHours(1).create();
   Logger.log('GST filings hourly trigger installed → syncGstFilings ஒவ்வொரு மணியும் "' + GST_TAB + '"-ஐ புதுப்பிக்கும்');
 }
+
+// ==================================================================
+// v2.1 — arGstFixTabs (2026-10-10):
+// நிலைமை: tracker tab-க்கு தவறா 'GstFilingsAuto' பெயர் போச்சு;
+// 'GstFilings' பெயரில் காலி v1 auto tab இருக்கு.
+// இது: காலி v1 tab → 'GstFilingsOldEmpty' ; tracker → அசல் 'GstFilings'.
+// பிறகு syncGstFilings சரியான காலி 'GstFilingsAuto'-வை உருவாக்கும்.
+// Guards: v1 tab-இல் data இருந்தா தானா எதுவும் செய்யாது.
+// ==================================================================
+function arGstFixTabs() {
+  var ss = SpreadsheetApp.openById(WORKBOOK_ID);
+  var out = ['Before: ' + ss.getSheets().map(function (s) { return s.getName(); }).join(' | ')];
+  var auto = ss.getSheetByName(GST_TAB);      // 'GstFilingsAuto'
+  var old = ss.getSheetByName(GST_OLD_TAB);   // 'GstFilings'
+  if (!auto) { out.push('GstFilingsAuto இல்லை — syncGstFilings run பண்ணுங்க, அது உருவாக்கும்.'); }
+  else if (String(auto.getRange(1, 1).getValue()) === 'Filing Type') {
+    out.push('GstFilingsAuto ஏற்கனவே சரியான auto tab — tab மாற்றம் வேண்டாம்.');
+  } else if (old && String(old.getRange(1, 1).getValue()) === 'Filing Type' && old.getLastRow() <= 1) {
+    old.setName('GstFilingsOldEmpty');
+    auto.setName(GST_OLD_TAB);
+    out.push('DONE: tracker → GstFilings (அசல் பெயர்); காலி v1 tab → GstFilingsOldEmpty');
+  } else {
+    out.push('*** பழைய GstFilings-இல் data இருக்கு (rows=' + (old ? old.getLastRow() : '?') + ') — தானா தொடவில்லை. screenshot அனுப்புங்க ***');
+  }
+  out.push('After: ' + ss.getSheets().map(function (s) { return s.getName(); }).join(' | '));
+  var msg = out.join('\n');
+  Logger.log('\n' + msg);
+  return msg;
+}

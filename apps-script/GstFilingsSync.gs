@@ -1,5 +1,5 @@
 /********************************************************************
- * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilingsAuto" tab (v2.2, 2026-10-10)
+ * AR ENTERPRISES ERP — GST Portal filing mails → "GstFilingsAuto" tab (v2.3, 2026-10-10)
  *
  * நிலைமை (உறுதி செய்யப்பட்டது):
  *   - உங்க GST follow-up tracker இப்போ "Reminder" tab-இல் — இந்த script அதை
@@ -17,7 +17,7 @@
 var GST_WB = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
 var GST_TAB = 'GstFilingsAuto';
 var GST_GSTIN = '33AEQFS3938D1ZU';
-var GST_MAX_THREADS = 60;
+var GST_MAX_THREADS = 200;
 var GST_HEADER = ['Filing Type', 'FY', 'Period', 'ARN', 'Filing Date', 'GSTIN', 'Status', 'Subject', 'Synced'];
 
 function gstFilerSheet_() {
@@ -79,8 +79,7 @@ function syncGstFilings() {
 
   var props = PropertiesService.getScriptProperties();
   var since = props.getProperty('gstF_last') || '';
-  var q = 'from:(email.gst.gov.in OR gst.gov.in OR info@gst.gov.in OR noreply@gst.gov.in)';
-  q += since ? ' after:' + since : ' newer_than:400d';
+  var q = 'from:gst.gov.in newer_than:400d in:anywhere'; // donotreply@/email@ எல்லாம் ஒரே substring match + spam-ல விழுந்த mails-ம்
 
   var threads = GmailApp.search(q, 0, GST_MAX_THREADS);
   var rows = [], scanned = 0;

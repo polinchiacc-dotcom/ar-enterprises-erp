@@ -2223,7 +2223,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081w';
+var ARXV='202610081x';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2923,3 +2923,7 @@ function anomaliesOpen(){
 window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem('arXrayCache')}catch(e){}C.bank=C.b2b=C.recon=null},coverage:coverageOpen,_cov:buildCoverage,works:worksOpen,_works:buildWorksData,anomalies:anomaliesOpen,_anom:buildAnomalies,_fbrecon:buildReconFromSheets};
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
+
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610081x";
+__bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
+document.body.appendChild(__bd)}catch(e){}

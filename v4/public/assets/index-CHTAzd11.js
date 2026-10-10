@@ -117,6 +117,12 @@ function EyPayMatch(blocks,pays){var batches=[];
       if(dd>=-2&&dd<=3&&dd<bd){bd=dd;best=pi}});
     if(best>=0){used[best]=1;bt.pay=pays[best];bt.dd=bd}});
   return batches}
+function EyFy(dstr){var p=String(dstr||"").split("-");if(p.length<3)return"";var Y=+p[0],M=+p[1];if(!Y||!M)return"";return M>=4?Y+"-"+String(Y+1).slice(2):(Y-1)+"-"+String(Y).slice(2)}
+function EyRawRows(d3){var t=d3&&d3.table,rs=(t&&t.rows)||[],out=[],i2,j2,c2,q,g;
+  for(i2=0;i2<rs.length;i2++){c2=rs[i2].c||[];g=[];
+    for(j2=0;j2<c2.length;j2++){q=c2[j2];g.push(!q?'':(q.v==null?(q.f!=null?String(q.f):''):String(q.v)))}
+    out.push(g)}
+  return out}
 function EyPayCard(pr){var fy=pr.fy||"";
   var st=E.useState({load:!0,pays:[],err:""}),pay=st[0],paySet=st[1];
   var reg=pr.reg||{};
@@ -124,35 +130,100 @@ function EyPayCard(pr){var fy=pr.fy||"";
     gvizFetch("1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw","gid:2024650928",function(e3,d3){
       if(done)return;done=!0;
       if(e3){paySet({load:!1,pays:[],err:String(e3)});return}
-      var pp=null;try{pp=parseGvizTable(d3)}catch(e4){}paySet({load:!1,err:"",pays:pp?EyBankPays(pp.rows):[]})},
+      var rr3=null;try{rr3=EyRawRows(d3)}catch(e4){}
+      paySet({load:!1,err:"",pays:rr3?EyBankPays(rr3):[]})},
       "select A,B,C,D,E,F,G where C contains 'RBIS0GST' or C contains 'GSTP'");
     return function(){done=!0}},[]);
   var fy4="";if(fy){var p3=fy.split("-");fy4=p3[0]+"-"+(String(p3[1]).length===2?"20"+p3[1]:p3[1])}
-  var batches=EyPayMatch(reg.blocks||[],pay.pays).filter(function(bt){return !fy4||bt.fys[fy4]});
-  var mt=batches.filter(function(b2){return b2.pay}),um=batches.length-mt.length;
-  batches=mt.concat(batches.filter(function(b2){return !b2.pay}));
+  var all=EyPayMatch(reg.blocks||[],pay.pays);
+  all.forEach(function(b2){b2.fy=EyFy(b2.d2)});
+  var fl=all.filter(function(bt){return !fy4||bt.fys[fy4]});
+  var mt=fl.filter(function(b2){return b2.pay}),um=fl.filter(function(b2){return !b2.pay});
   var tsum=mt.reduce(function(a2,b2){return a2+b2.pay.amt},0);
-  return n.jsx(oe,{title:"💰 GST Payment ↔ Bank Match",sub:pay.load?"Bank payments ஏற்றுகிறது…":(reg.load?"Register ஏற்றுகிறது…":(mt.length+" payment ✓ · ₹"+EyInr(tsum)+" matched · "+um+" batch இந்த bank account-இல் தெரியவில்லை · RBIS0GST RTGS/NEFT மட்டும்")),children:
+  function subRow(f2,s2,k2){return n.jsxs("tr",{style:{background:"#e8effa",fontWeight:800},children:[n.jsx("td",{colSpan:4,children:"FY "+f2+" மொத்தம்"}),n.jsx("td",{className:"mono",children:"₹"+EyInr(s2)}),n.jsx("td",{}),n.jsx("td",{})]},"st"+k2)}
+  var rowsArr=[],lastF="",sub=0,idx=0;
+  fl.forEach(function(b2){
+    if(b2.pay){
+      if(lastF&&b2.fy!==lastF){rowsArr.push(subRow(lastF,sub,idx));idx++;sub=0}
+      if(!lastF||b2.fy!==lastF)lastF=b2.fy;
+      sub+=b2.pay.amt;
+      rowsArr.push(n.jsxs("tr",{children:[
+        n.jsx("td",{className:"mono",style:{fontSize:11},children:b2.gstin||"—"}),
+        n.jsx("td",{children:b2.per.length>1?(b2.per[0]+" → "+b2.per[b2.per.length-1]+" · "+b2.per.length+" மாதம்"):String(b2.per[0])}),
+        n.jsx("td",{className:"mono",children:b2.d2}),
+        n.jsx("td",{children:b2.pay.d+" · "+(b2.dd===0?"அதே நாள்":Math.abs(b2.dd)+" நாள் "+(b2.dd>0?"முன்":"பின்"))}),
+        n.jsx("td",{className:"mono",children:"₹"+EyInr(b2.pay.amt)}),
+        n.jsx("td",{className:"mono",style:{fontSize:10.5},children:(b2.pay.utr||"—").slice(-8)}),
+        n.jsx("td",{children:n.jsx(me,{tone:St("filed"),children:"✓ match"})})
+      ]},"r"+idx));idx++}
+    else rowsArr.push(n.jsxs("tr",{style:{background:"#fdf2f2"},children:[
+        n.jsx("td",{className:"mono",style:{fontSize:11},children:b2.gstin||"—"}),
+        n.jsx("td",{children:b2.per.length>1?(b2.per[0]+" → "+b2.per[b2.per.length-1]+" · "+b2.per.length+" மாதம்"):String(b2.per[0])}),
+        n.jsx("td",{className:"mono",children:b2.d2}),
+        n.jsx("td",{children:"—"}),
+        n.jsx("td",{className:"mono",children:"—"}),
+        n.jsx("td",{className:"mono",children:"—"}),
+        n.jsx("td",{children:n.jsx(me,{tone:St("mismatch"),children:"⚠ payment இல்லை"})})
+      ]},"r"+idx));idx++});
+  if(lastF&&mt.length){rowsArr.push(subRow(lastF,sub,idx));idx++}
+  rowsArr.push(n.jsxs("tr",{style:{fontWeight:800,background:"#0d1b2a",color:"#fff"},children:[
+    n.jsx("td",{colSpan:4,children:"மொத்தம் — matched payments"+(fy4?" · "+fy4:" · எல்லா FY")}),
+    n.jsx("td",{className:"mono",children:"₹"+EyInr(tsum)}),
+    n.jsx("td",{children:mt.length+" ✓"}),
+    n.jsx("td",{children:um.length?um.length+" ⚠":""})
+  ]},"gt"));
+  return n.jsx(oe,{title:"💰 GST Payment ↔ Bank Match",
+    sub:pay.load?"Bank payments ஏற்றுகிறது…":(reg.load?"Register ஏற்றுகிறது…":("மொத்தம் ₹"+EyInr(tsum)+" matched · "+mt.length+" payment ✓ · "+um.length+" batch ⚠ payment இல்லை · RBIS0GST RTGS/NEFT")),
+    right:n.jsx(L,{kind:"ghost",small:!0,onClick:function(){EyPayPrint(mt,um,fy4)},children:"🖨️ A4 Print"}),children:
     pay.load?n.jsx(Ze,{label:"Bank payments ஏற்றுகிறது…"}):
     pay.err?n.jsx(Yl,{children:"⚠ Bank sheet-ஐ படிக்க முடியவில்லை: "+pay.err}):
     reg.load?n.jsx(Ze,{label:"Register ஏற்றுகிறது…"}):
     reg.err?n.jsx(Yl,{children:"⚠ Register tab இல்லை: "+reg.err}):
-    !batches.length?n.jsx(Yl,{children:fy?fy+"-க்கு 3B filings இல்லை":"Register-இல் 3B filings இல்லை"}):
-    n.jsx("div",{style:{overflowX:"auto"},children:n.jsx(Xe,{head:["GSTIN","காலம்","3B Filed","Bank Payment","தொகை","UTR","நிலை"],empty:!1,children:batches.map(function(bt,i2){
-      var span=bt.per.length>1?(bt.per[0]+" → "+bt.per[bt.per.length-1]+" · "+bt.per.length+" மாதம்"):String(bt.per[0]);
-      return n.jsxs("tr",{children:[
-        n.jsx("td",{className:"mono",style:{fontSize:11},children:bt.gstin||"—"}),
-        n.jsx("td",{children:span}),
-        n.jsx("td",{className:"mono",children:bt.d2}),
-        n.jsx("td",{children:bt.pay?(bt.pay.d+" · "+(bt.dd===0?"அதே நாள்":Math.abs(bt.dd)+" நாள் "+(bt.dd>0?"முன்":"பின்"))):"—"}),
-        n.jsx("td",{className:"mono",children:bt.pay?"₹"+EyInr(bt.pay.amt):"—"}),
-        n.jsx("td",{className:"mono",style:{fontSize:10.5},children:bt.pay?(bt.pay.utr||"—").slice(-8):"—"}),
-        n.jsx("td",{children:bt.pay?n.jsx(me,{tone:St("filed"),children:"✓ match"}):n.jsx(me,{tone:St("pending"),children:"தெரியவில்லை"})})
-      ]},i2)})})})})}
-function Ey(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(rr()),v=ge("gst.filings.list",{fy:f},[f]),[p,j]=E.useState(null),[gf,gfSet]=E.useState({load:!0,rows:[],labels:[],err:""}),[gfRe,gfReSet]=E.useState(0),[reg,regSet]=E.useState({load:!0,blocks:[],err:""}),[regRe,regReSet]=E.useState(0);
+    !fl.length?n.jsx(Yl,{children:fy?fy+"-க்கு 3B filings இல்லை":"Register-இல் 3B filings இல்லை"}):
+    n.jsx("div",{style:{overflowX:"auto"},children:n.jsx(Xe,{head:["GSTIN","காலம்","3B Filed","Bank Payment","தொகை","UTR","நிலை"],empty:!1,children:rowsArr})})})}
+function EyPayPrint(mt,um,fy4){
+  var w=window.open("","_blank");if(!w)return;
+  var tsum=mt.reduce(function(a2,b2){return a2+b2.pay.amt},0);
+  function esc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+  function inr(x){try{return Math.round(x).toLocaleString("en-IN")}catch(e4){return String(Math.round(x))}}
+  var today=new Date().toISOString().slice(0,10);
+  var rows="",lastF="",sub=0;
+  function subrow(f2){return '<tr class="sub"><td colspan="4">FY '+f2+' மொத்தம்</td><td class="mono">₹'+inr(sub)+'</td><td></td><td></td></tr>'}
+  mt.forEach(function(b2){
+    if(lastF&&b2.fy!==lastF){rows+=subrow(lastF);sub=0}
+    if(!lastF||b2.fy!==lastF)lastF=b2.fy;
+    sub+=b2.pay.amt;
+    rows+='<tr><td class="mono">'+esc(b2.gstin)+'</td><td>'+esc(b2.per.length>1?(b2.per[0]+" → "+b2.per[b2.per.length-1]+" ("+b2.per.length+" மாதம்)"):String(b2.per[0]))+'</td><td class="mono">'+esc(b2.d2)+'</td><td>'+esc(b2.pay.d)+" · "+(b2.dd===0?"அதே நாள்":Math.abs(b2.dd)+" நாள் "+(b2.dd>0?"முன்":"பின்"))+'</td><td class="mono">₹'+inr(b2.pay.amt)+'</td><td class="mono">'+esc((b2.pay.utr||"—").slice(-8))+'</td><td>✓ match</td></tr>'});
+  if(lastF)rows+=subrow(lastF);
+  rows+='<tr class="gt"><td colspan="4">மொத்தம் — matched payments'+(fy4?" · "+fy4:" · எல்லா FY")+'</td><td class="mono">₹'+inr(tsum)+'</td><td>'+mt.length+' ✓</td><td></td></tr>';
+  var fol="";
+  um.forEach(function(b2){
+    var days="";if(b2.d2){try{days=Math.floor((new Date(today)-new Date(b2.d2))/864e5)+" நாள்"}catch(e5){}}
+    fol+='<tr><td class="mono">'+esc(b2.gstin)+'</td><td>'+esc(b2.per.length>1?(b2.per[0]+" → "+b2.per[b2.per.length-1]+" ("+b2.per.length+" மாதம்)"):String(b2.per[0]))+'</td><td class="mono">'+esc(b2.d2)+'</td><td>'+esc(days)+'</td><td>Bank statement-இல் RBIS0GST payment இல்லை — சரிபார்க்க/தொடர்ந்து அறியவும்</td></tr>'});
+  var h="<html><head><meta charset='utf-8'><title>GST Payment — Bank Match</title><style>"+
+    "@page{size:A4 portrait;margin:8mm 6mm}"+
+    "body{font-family:Calibri,'Segoe UI',Arial,sans-serif;color:#111;margin:0;font-size:11px}"+
+    ".ban{background:#0d1b2a;color:#fff;padding:10px 12px}.ban .t1{font-size:16px;font-weight:800;letter-spacing:.5px}.ban .t2{font-size:12px;opacity:.92}"+
+    "table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#1f3864;color:#fff;padding:6px 7px;text-align:left;font-size:10.5px}td{border:1px solid #c9d4e5;padding:5px 7px;vertical-align:top}.mono{font-family:Consolas,monospace;font-size:10.5px}"+
+    "tr.sub td{background:#e8effa;font-weight:800}tr.gt td{background:#0d1b2a;color:#fff;font-weight:800}"+
+    ".meta{margin-top:6px;color:#333;font-size:10.5px}.meta b{color:#0d1b2a}"+
+    "h2.fh{background:#7f1d1d;color:#fff;padding:6px 8px;font-size:12.5px;margin:14px 0 0}"+
+    ".sig{margin-top:26px;display:flex;gap:60px}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:10.5px;color:#333}"+
+    "@media print{.noprint{display:none}}"+
+    "</style></head><body>"+
+    '<div class="ban"><div class="t1">AR ENTERPRISES ERP</div><div class="t2">GST Payment ↔ Bank Match — தணிக்கை அறிக்கை'+(fy4?" · "+fy4:" · எல்லா FY")+"</div></div>"+
+    '<div class="meta">நாள்: <b>'+today+"</b> · மூலம்: register sheet (3 GSTIN) + வங்கி statement (RBIS0GST RTGS/NEFT) · matched "+mt.length+" · payment-இல்லை "+um.length+"</div>"+
+    "<table><tr><th>GSTIN</th><th>காலம்</th><th>3B Filed</th><th>Bank Payment</th><th>தொகை</th><th>UTR</th><th>நிலை</th></tr>"+rows+"</table>";
+  if(um.length)h+='<h2 class="fh">⚠ தொடர் நடவடிக்கை — Payment கண்டுபிடிக்க முடியாத batches ('+um.length+")</h2>"+
+    "<table><tr><th>GSTIN</th><th>காலம்</th><th>3B Filed</th><th>எவ்வளவு நாள் ஆச்சு</th><th>குறிப்பு</th></tr>"+fol+"</table>";
+  h+='<div class="sig"><div>தயாரித்தவர்</div><div>சரிபார்த்தவர்</div><div>அங்கீகாரம்</div></div>'+
+     "<div class='noprint' style='margin-top:12px'><button onclick='window.print()' style='padding:8px 14px;background:#1f3864;color:#fff;border:0;border-radius:6px;font-size:13px;cursor:pointer'>🖨️ Print / Save PDF</button></div>"+
+     "<script>window.onload=function(){setTimeout(function(){window.print()},300)}</scr"+"ipt></body></html>";
+  w.document.write(h);w.document.close()}
+function Ey(){const{t:c}=xe(),u=Ue(),[f,r]=E.useState(""),v=ge("gst.filings.list",{fy:f},[f]),[p,j]=E.useState(null),[gf,gfSet]=E.useState({load:!0,rows:[],labels:[],err:""}),[gfRe,gfReSet]=E.useState(0),[reg,regSet]=E.useState({load:!0,blocks:[],err:""}),[regRe,regReSet]=E.useState(0);
   E.useEffect(function(){var done=!1;gfSet({load:!0,rows:[],labels:[],err:""});gvizFetch("1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw","GstFilingsAuto",function(e2,d2){if(done)return;done=!0;if(e2){gfSet({load:!1,rows:[],labels:[],err:String(e2)});return}var pp=null;try{pp=parseGvizTable(d2)}catch(e4){}gfSet({load:!1,err:"",rows:(pp&&pp.rows)||[],labels:(pp&&pp.labels)||[]})});return function(){done=!0}},[gfRe]);
   E.useEffect(function(){var done2=!1;regSet({load:!0,blocks:[],err:""});gvizFetch("1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw","gid:1705023565",function(e3,d3){if(done2)return;done2=!0;if(e3){regSet({load:!1,blocks:[],err:String(e3)});return}var pp3=null;try{pp3=parseGvizTable(d3)}catch(e4){}regSet({load:!1,err:"",blocks:pp3?EyRegParse(pp3.rows):[]})});return function(){done2=!0}},[regRe]);
-  return n.jsxs("div",{children:[n.jsx(oe,{title:c("gst.filings"),right:n.jsxs("div",{className:"flex",children:[n.jsx(be,{value:f,onChange:g=>r(g.target.value),style:{width:120},children:["2024-25","2025-26","2026-27","2027-28"].map(g=>n.jsx("option",{value:g,children:g},g))}),n.jsx(L,{onClick:()=>j({gstin:"",filingType:"GSTR1",period:"03",status:"filed",arn:""}),children:c("gst.newFiling")})]}),children:v.loading&&!v.data?n.jsx(Ze,{label:c("common.loading")}):n.jsx(Xe,{head:["GSTIN",c("gst.filingType"),c("gst.period"),c("gst.arn"),c("common.date"),c("common.status")],empty:(v.data?.rows||[]).length===0,children:(v.data?.rows||[]).map(g=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:g.gstin}),n.jsx("td",{children:g.filingType}),n.jsxs("td",{children:[g.fy||f," · ",g.period]}),n.jsx("td",{className:"mono",children:g.arn||"—"}),n.jsx("td",{children:Pe(g.submittedAt)}),n.jsx("td",{children:n.jsx(me,{tone:St(g.status),children:g.status})})]},g.filingId))})}),EyGstSum({reg:reg,fy:f}),EyRegCard({fy:f,reg:reg,onRefresh:function(){regReSet(regRe+1)}}),EyPayCard({fy:f,reg:reg}),EyGfCard({fy:f,gf:gf,onRefresh:function(){gfReSet(gfRe+1)}}),p&&n.jsxs($e,{open:!0,onClose:()=>j(null),title:c("gst.newFiling"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>j(null),children:c("common.cancel")}),n.jsx(L,{onClick:async()=>{if(p.gstin)try{await jy({gstin:p.gstin,filingType:p.filingType,period:p.period,status:p.status,arn:p.arn||void 0}),u(!0,c("gst.filingSaved")),j(null),v.reload()}catch(g){u(!1,g.message)}},children:c("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:"GSTIN",req:!0,children:n.jsx(J,{value:p.gstin,onChange:g=>j({...p,gstin:g.target.value.toUpperCase()})})}),n.jsx(K,{label:c("gst.filingType"),children:n.jsx(be,{value:p.filingType,onChange:g=>j({...p,filingType:g.target.value}),children:["GSTR1","GSTR3B","TDS_CREDIT"].map(g=>n.jsx("option",{value:g,children:g},g))})}),n.jsx(K,{label:c("gst.period"),children:n.jsx(be,{value:p.period,onChange:g=>j({...p,period:g.target.value}),children:["01","02","03","04","05","06","07","08","09","10","11","12"].map(g=>n.jsx("option",{value:g,children:g},g))})}),n.jsx(K,{label:c("gst.arn"),children:n.jsx(J,{value:p.arn,onChange:g=>j({...p,arn:g.target.value})})})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsx("span",{className:"ui-field-label",children:c("common.status")}),n.jsx(be,{value:p.status,onChange:g=>j({...p,status:g.target.value}),children:["pending","filed","late","cancelled"].map(g=>n.jsx("option",{value:g,children:g},g))})]})]})]})}function _y(c){c.user;const u=Ue(),[f,r]=E.useState("all"),[v,p]=E.useState("all"),[j,g]=E.useState(""),[N,b]=E.useState(""),[h,m]=E.useState(""),[S,w]=E.useState("all"),[y,D]=E.useState(null),[H,Y]=E.useState(!1),[V,k]=E.useState({filterStatus:"all",filterFY:"all",search:"",dateFrom:"",dateTo:"",workPlace:"all"}),O=ge("bank.liveRecon",V,[V.filterStatus,V.filterFY,V.search,V.dateFrom,V.dateTo,V.workPlace],!0);ge("bank.liveSheets",{},[],!0),E.useEffect(()=>{const B=setTimeout(()=>{k({filterStatus:f,filterFY:v,search:j,dateFrom:N,dateTo:h,workPlace:S})},300);return()=>clearTimeout(B)},[f,v,j,N,h,S]);const Z=O.data,I=E.useMemo(()=>Z?.combined||[],[Z]),F=Z?.stats,ee=E.useMemo(()=>{if(!Z)return[];const B=new Set;return Z.contractRows.forEach(we=>{we.workPlace&&B.add(we.workPlace)}),Array.from(B).slice(0,100)},[Z]),W=E.useMemo(()=>{if(!I.length)return null;const B=we=>I.reduce(($,ce)=>$+(Number(ce.contract[we])||0),0);return{receiptAmount:B("receiptAmount"),taxableValue:B("taxableValue"),labourWelfare:B("labourWelfare"),gst:B("gst"),invoiceValue:B("invoiceValue"),tds:B("tds"),gstTds:B("gstTds"),withHeld:B("withHeld"),emd:B("emd"),otherDeduction:B("otherDeduction"),receivableAmount:B("receivableAmount"),count:I.length}},[I]),je=E.useMemo(()=>{if(!Z)return null;const B=we=>Z.contractRows.reduce(($,ce)=>$+(Number(ce[we])||0),0);return{receiptAmount:B("receiptAmount"),taxableValue:B("taxableValue"),gst:B("gst"),invoiceValue:B("invoiceValue"),tds:B("tds"),gstTds:B("gstTds"),withHeld:B("withHeld"),emd:B("emd"),otherDeduction:B("otherDeduction"),receivableAmount:B("receivableAmount"),count:Z.contractRows.length}},[Z]);function mt(B){D(B)}async function ht(B){try{await pe("bank.liveUpdate",{gid:B.sheetGid,rowIndex:B.rowIndex,workName:B.workName,workPlace:B.workPlace}),u(!0,"Live Google Sheet updated — Admin/Auditor edit"),D(null),O.reload()}catch(we){u(!1,we.message||"Update failed")}}function ll(){Y(!0),setTimeout(()=>window.print(),100)}function exl(){const ec=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  return n.jsxs("div",{children:[n.jsx(oe,{title:c("gst.filings"),right:n.jsxs("div",{className:"flex",children:[n.jsx(be,{value:f,onChange:g=>r(g.target.value),style:{width:120},children:["","2024-25","2025-26","2026-27","2027-28"].map(g=>n.jsx("option",{value:g,children:g||"எல்லா FY"},g||"all"))}),n.jsx(L,{onClick:()=>j({gstin:"",filingType:"GSTR1",period:"03",status:"filed",arn:""}),children:c("gst.newFiling")})]}),children:v.loading&&!v.data?n.jsx(Ze,{label:c("common.loading")}):n.jsx(Xe,{head:["GSTIN",c("gst.filingType"),c("gst.period"),c("gst.arn"),c("common.date"),c("common.status")],empty:(v.data?.rows||[]).length===0,children:(v.data?.rows||[]).map(g=>n.jsxs("tr",{children:[n.jsx("td",{className:"mono",children:g.gstin}),n.jsx("td",{children:g.filingType}),n.jsxs("td",{children:[g.fy||f," · ",g.period]}),n.jsx("td",{className:"mono",children:g.arn||"—"}),n.jsx("td",{children:Pe(g.submittedAt)}),n.jsx("td",{children:n.jsx(me,{tone:St(g.status),children:g.status})})]},g.filingId))})}),EyGstSum({reg:reg,fy:f}),EyRegCard({fy:f,reg:reg,onRefresh:function(){regReSet(regRe+1)}}),EyPayCard({fy:f,reg:reg}),EyGfCard({fy:f,gf:gf,onRefresh:function(){gfReSet(gfRe+1)}}),p&&n.jsxs($e,{open:!0,onClose:()=>j(null),title:c("gst.newFiling"),footer:n.jsxs(n.Fragment,{children:[n.jsx(L,{kind:"ghost",onClick:()=>j(null),children:c("common.cancel")}),n.jsx(L,{onClick:async()=>{if(p.gstin)try{await jy({gstin:p.gstin,filingType:p.filingType,period:p.period,status:p.status,arn:p.arn||void 0}),u(!0,c("gst.filingSaved")),j(null),v.reload()}catch(g){u(!1,g.message)}},children:c("common.save")})]}),children:[n.jsxs(Ct,{cols:2,children:[n.jsx(K,{label:"GSTIN",req:!0,children:n.jsx(J,{value:p.gstin,onChange:g=>j({...p,gstin:g.target.value.toUpperCase()})})}),n.jsx(K,{label:c("gst.filingType"),children:n.jsx(be,{value:p.filingType,onChange:g=>j({...p,filingType:g.target.value}),children:["GSTR1","GSTR3B","TDS_CREDIT"].map(g=>n.jsx("option",{value:g,children:g},g))})}),n.jsx(K,{label:c("gst.period"),children:n.jsx(be,{value:p.period,onChange:g=>j({...p,period:g.target.value}),children:["01","02","03","04","05","06","07","08","09","10","11","12"].map(g=>n.jsx("option",{value:g,children:g},g))})}),n.jsx(K,{label:c("gst.arn"),children:n.jsx(J,{value:p.arn,onChange:g=>j({...p,arn:g.target.value})})})]}),n.jsxs("div",{className:"ui-field mt-8",children:[n.jsx("span",{className:"ui-field-label",children:c("common.status")}),n.jsx(be,{value:p.status,onChange:g=>j({...p,status:g.target.value}),children:["pending","filed","late","cancelled"].map(g=>n.jsx("option",{value:g,children:g},g))})]})]})]})}function _y(c){c.user;const u=Ue(),[f,r]=E.useState("all"),[v,p]=E.useState("all"),[j,g]=E.useState(""),[N,b]=E.useState(""),[h,m]=E.useState(""),[S,w]=E.useState("all"),[y,D]=E.useState(null),[H,Y]=E.useState(!1),[V,k]=E.useState({filterStatus:"all",filterFY:"all",search:"",dateFrom:"",dateTo:"",workPlace:"all"}),O=ge("bank.liveRecon",V,[V.filterStatus,V.filterFY,V.search,V.dateFrom,V.dateTo,V.workPlace],!0);ge("bank.liveSheets",{},[],!0),E.useEffect(()=>{const B=setTimeout(()=>{k({filterStatus:f,filterFY:v,search:j,dateFrom:N,dateTo:h,workPlace:S})},300);return()=>clearTimeout(B)},[f,v,j,N,h,S]);const Z=O.data,I=E.useMemo(()=>Z?.combined||[],[Z]),F=Z?.stats,ee=E.useMemo(()=>{if(!Z)return[];const B=new Set;return Z.contractRows.forEach(we=>{we.workPlace&&B.add(we.workPlace)}),Array.from(B).slice(0,100)},[Z]),W=E.useMemo(()=>{if(!I.length)return null;const B=we=>I.reduce(($,ce)=>$+(Number(ce.contract[we])||0),0);return{receiptAmount:B("receiptAmount"),taxableValue:B("taxableValue"),labourWelfare:B("labourWelfare"),gst:B("gst"),invoiceValue:B("invoiceValue"),tds:B("tds"),gstTds:B("gstTds"),withHeld:B("withHeld"),emd:B("emd"),otherDeduction:B("otherDeduction"),receivableAmount:B("receivableAmount"),count:I.length}},[I]),je=E.useMemo(()=>{if(!Z)return null;const B=we=>Z.contractRows.reduce(($,ce)=>$+(Number(ce[we])||0),0);return{receiptAmount:B("receiptAmount"),taxableValue:B("taxableValue"),gst:B("gst"),invoiceValue:B("invoiceValue"),tds:B("tds"),gstTds:B("gstTds"),withHeld:B("withHeld"),emd:B("emd"),otherDeduction:B("otherDeduction"),receivableAmount:B("receivableAmount"),count:Z.contractRows.length}},[Z]);function mt(B){D(B)}async function ht(B){try{await pe("bank.liveUpdate",{gid:B.sheetGid,rowIndex:B.rowIndex,workName:B.workName,workPlace:B.workPlace}),u(!0,"Live Google Sheet updated — Admin/Auditor edit"),D(null),O.reload()}catch(we){u(!1,we.message||"Update failed")}}function ll(){Y(!0),setTimeout(()=>window.print(),100)}function exl(){const ec=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
 const cols=[["S.No",x=>x.contract.sNo],["Receipt Date",x=>x.contract.receiptDate],["Work Name",x=>x.contract.workName],["Work Place",x=>x.contract.workPlace],["Work Type",x=>x.contract.workType],["Party",x=>x.contract.party],["Taxable Value",x=>x.contract.taxableValue],["Labour WF",x=>x.contract.labourWelfare],["18% GST",x=>x.contract.gst],["Invoice Value",x=>x.contract.invoiceValue],["IT TDS 2%",x=>x.contract.tds],["GST TDS 2%",x=>x.contract.gstTds],["With Held",x=>x.contract.withHeld],["EMD",x=>x.contract.emd],["Other Ded",x=>x.contract.otherDeduction],["Receivable",x=>x.contract.receivableAmount],["Receipt Amount",x=>x.contract.receiptAmount],["FY",x=>x.contract.fy],["File Name",x=>x.contract.fileName],["BRS Status",x=>x.matchType],["Confidence %",x=>x.confidence],["Bank Date",x=>x.bank?x.bank.date:""],["Bank Details",x=>x.bank?x.bank.description:""],["Bank Credit",x=>x.bank?x.bank.credit:""],["Date Diff(d)",x=>x.dateDiff],["Amt Diff",x=>x.amountDiff]];
 const wk=["","","","","","","taxableValue","labourWelfare","gst","invoiceValue","tds","gstTds","withHeld","emd","otherDeduction","receivableAmount","receiptAmount","","","","","","","","","",""];
 const numc=[6,7,8,9,10,11,12,13,14,15,16];
@@ -2223,7 +2294,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610081x';
+var ARXV='202610081z';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2924,6 +2995,6 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610081x";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610081z";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}

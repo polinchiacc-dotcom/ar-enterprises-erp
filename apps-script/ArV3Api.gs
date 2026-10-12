@@ -147,6 +147,29 @@ function userPass_(p){
   for(i=1;i<u.length;i++){ if(String(u[i][0]).trim()===String(p.userId).trim()){ sh('User_Config').getRange(i+1,3).setValue(String(p.password||'')); audit_(p.user,'USER_PASS',p.userId,''); return {ok:true}; } }
   throw new Error('User கிடைக்கவில்லை');
 }
+function userEdit_(p){
+  var u=rows_('User_Config'), i, hit=0;
+  for(i=1;i<u.length;i++){ if(String(u[i][0]).trim()===String(p.userId).trim()){ hit=i+1; break; } }
+  if(!hit) throw new Error('User கிடைக்கவில்லை: '+p.userId);
+  var cur=u[hit-1];
+  var un=(p.username!=null&&String(p.username).trim()!=='')?String(p.username).trim():String(cur[1]);
+  var pw=(p.password!=null&&String(p.password)!=='')?String(p.password):String(cur[2]);
+  var rl=(p.role!=null&&String(p.role).trim()!=='')?String(p.role).trim():String(cur[3]||'');
+  var dn=(p.district!=null)?String(p.district).trim():String(cur[4]||'');
+  if(un!==String(cur[1]) && findRow_('User_Config',1,un)) throw new Error('இந்த username ஏற்கனவே உள்ளது: '+un);
+  sh('User_Config').getRange(hit,2,1,4).setValues([[un,pw,rl,dn]]);
+  audit_(p.user,'USER_EDIT',p.userId,un+' ('+rl+')');
+  return {ok:true, username:un, role:rl};
+}
+function userRemove_(p){
+  var u=rows_('User_Config'), i, hit=0;
+  for(i=1;i<u.length;i++){ if(String(u[i][0]).trim()===String(p.userId).trim() || (p.username && String(u[i][1]).trim()===String(p.username).trim())){ hit=i+1; break; } }
+  if(!hit) throw new Error('User கிடைக்கவில்லை');
+  if(u.length<=2) throw new Error('கடைசி user-ஐ நீக்க முடியாது');
+  sh('User_Config').deleteRow(hit);
+  audit_(p.user,'USER_REMOVE',p.userId||p.username,'');
+  return {ok:true};
+}
 function agentAdd_(p){
   var a=rows_('Agents'), max=0, i, code;
   for(i=1;i<a.length;i++){ code=String(a[i][0]||''); if(/^AGT\d{3}$/.test(code)){ var n=parseInt(code.slice(3),10); if(n>max)max=n; } }
@@ -154,6 +177,20 @@ function agentAdd_(p){
   sh('Agents').appendRow([id, String(p.fullName||'').trim(), String(p.username||'').trim(), String(p.password||''), String(p.mobile||'').trim(), '', String(p.managerName||'admin'), String(p.managerDistrict||'Pudukkottai'), String(p.ct||'auto'), num(p.cpercent)||0.5, String(p.bank||''), String(p.acct||''), String(p.ifsc||''), String(p.upi||''), 'approved', String(p.user||'admin'), nowIso(), 0, nowIso(), '']);
   audit_(p.user,'AGENT_ADD',id,p.fullName);
   return {ok:true, agentId:id};
+}
+function agentEdit_(p){
+  var a=rows_('Agents'), i, hit=0;
+  for(i=1;i<a.length;i++){ if(String(a[i][0]).trim()===String(p.agentId).trim()){ hit=i+1; break; } }
+  if(!hit) throw new Error('Agent கிடைக்கவில்லை: '+p.agentId);
+  var cur=a[hit-1];
+  var pct=(p.cpercent!=null&&String(p.cpercent)!=='')?num(p.cpercent):num(cur[9]);
+  sh('Agents').getRange(hit,10).setValue(pct);
+  if(p.status!=null&&String(p.status).trim()!=='') sh('Agents').getRange(hit,15).setValue(String(p.status).trim());
+  audit_(p.user,'AGENT_EDIT',p.agentId,pct+'% '+(p.status||''));
+  return {ok:true, cpercent:pct, status:p.status||String(cur[14]||'')};
+}
+function agentRemove_(p){
+  return agentEdit_({agentId:p.agentId, status:'Inactive', user:p.user});
 }
 function overrideAdd_(p){
   var id='OV'+rid(8);
@@ -208,7 +245,11 @@ function doGet(e){
       case 'txnConfirm': r=txnConfirm_(p); break;
       case 'userAdd': r=userAdd_(p); break;
       case 'userPass': r=userPass_(p); break;
+      case 'userEdit': r=userEdit_(p); break;
+      case 'userRemove': r=userRemove_(p); break;
       case 'agentAdd': r=agentAdd_(p); break;
+      case 'agentEdit': r=agentEdit_(p); break;
+      case 'agentRemove': r=agentRemove_(p); break;
       case 'overrideAdd': r=overrideAdd_(p); break;
       default: r={ok:false, error:'தெரியா action: '+p.action};
     }

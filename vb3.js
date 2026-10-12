@@ -162,6 +162,7 @@ function EyTxnDetail(p){
 var EyV3Key="ARV3-2026-KX9Q42";
 function EyV3Url(){try{return localStorage.getItem("ar4.v3url")||""}catch(e){return ""}}
 function EyV3Call(act,pr,cb){
+ try{ if(typeof window!=="undefined"&&window.EyV3Api&&window.EyV3Api.stub)return window.EyV3Api.call(act,pr,cb); }catch(e){}
  var u=EyV3Url();
  if(!u)return cb("V3 API URL இன்னும் அமைக்கவில்லை — ⚙ V3 API-இல் Web App URL paste பண்ணுங்க");
  var fn="__arV3"+Date.now()+((Math.random()*1e6)|0),q=[],k;
@@ -350,3 +351,142 @@ function EyTxnOps(p){
      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(r.taxable)}),
      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(r.total)})]},key)})})}):n.jsx("div",{className:"ui-empty",children:L("No rows","வரிசை இல்லை")})):n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")})]}):null,
   st?n.jsx("div",{style:{fontSize:13,marginBottom:8,color:st.indexOf("✓")>=0?"#0a7d43":(st.indexOf("✗")>=0?"#b3261e":"var(--tx-3)")},children:st}):null]})}
+
+function EyV3Session(d){
+  var role=String(d.role||"").toLowerCase();
+  var map={admin:"super_admin",district:"district_admin",auditor:"auditor",vendor:"vendor"};
+  return {username:d.username,name:d.username,role:map[role]||"district_admin",v3:true,v3userId:d.userId,v3district:d.districtName||""};
+}
+function EyV3LoginBox(p){
+  const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
+  var[un,Sun]=E.useState(""),[pw,Spw]=E.useState(""),[st,Sst]=E.useState(""),[bsy,Sbsy]=E.useState(false);
+  function go(){
+    if(bsy)return;Sbsy(true);Sst("");
+    EyV3Call("login",{u:un,p:pw},function(e,d){
+      Sbsy(false);
+      if(e||!d||!d.ok){Sst("✗ "+L("Login failed","உள்நுழைவு தவறு")+" — "+String((d&&d.error)||e||""));return}
+      var u2=EyV3Session(d);
+      try{sessionStorage.setItem("ar4.token","v3:"+d.userId);sessionStorage.setItem("ar4.user",JSON.stringify(u2))}catch(e2){}
+      Sst("✓ "+L("Welcome ","வரவேற்பு ")+d.username);
+      if(p.onDone)setTimeout(function(){p.onDone(u2)},150);
+    });
+  }
+  return n.jsx("form",{onSubmit:function(ev){ev.preventDefault();go()},children:n.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:14},children:[
+    n.jsx("div",{style:{fontSize:12,color:"var(--tx-3)"},children:L("V3 workbook users (User_Config) — admin / district manager / auditor / vendor","V3 workbook பயனர்கள் (User_Config) — நிர்வாகம் / மாவட்ட மேலாளர் / தணிக்கை / வணிகர்")}),
+    n.jsx("input",{className:"ui-input",placeholder:L("Username","பயனர்பெயர்"),value:un,onChange:function(e){Sun(e.target.value)},autoComplete:"username"}),
+    n.jsx("input",{className:"ui-input",type:"password",placeholder:L("Password","கடவுச்சொல்"),value:pw,onChange:function(e){Spw(e.target.value)},autoComplete:"current-password"}),
+    n.jsx("button",{className:"ui-btn ui-btn-primary",type:"submit",disabled:bsy,children:bsy?"…":L("V3 Login","V3 உள்நுழைவு")}),
+    st?n.jsx("div",{style:{fontSize:12,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null
+  ]})})}
+function EyV3UsersCard(){
+  const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
+  var[rows,Srows]=E.useState(null),[st,Sst]=E.useState(""),[ed,Sed]=E.useState(null),[bsy,Sbsy]=E.useState(false);
+  var[un,Sun]=E.useState(""),[pw,Spw]=E.useState(""),[rl,Srl]=E.useState("district"),[dn,Sdn]=E.useState("Pudukkottai");
+  function load(){Srows(null);EyV3Call("list",{tab:"users"},function(e,d){if(e){Srows([]);Sst("✗ "+String(e).slice(0,120));return}Srows((d&&d.rows)||[])})}
+  E.useEffect(function(){load()},[]);
+  function add(){
+    if(!un.trim()||!pw){Sst("✗ "+L("Username & password required","பயனர்பெயர் & கடவுச்சொல் வேணும்"));return}
+    Sbsy(true);EyV3Call("userAdd",{username:un,password:pw,role:rl,district:dn,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+L("User added ","பயனர் சேர்க்கப்பட்டார் ")+(d&&d.userId?("("+d.userId+")"):""));Sun("");Spw("");load();});}
+  function saveEd(){
+    Sbsy(true);EyV3Call("userEdit",{userId:ed.id,username:ed.un,password:ed.pw,role:ed.rl,district:ed.dn,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+L("Updated ","மேம்படுத்தப்பட்டது ")+ed.un);Sed(null);load();});}
+  function rm(r2){
+    if(!window.confirm(L("Remove user "+r2.username+"?","பயனர் "+r2.username+" ஐ நீக்கவா?")))return;
+    Sbsy(true);EyV3Call("userRemove",{userId:r2.userId,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+L("Removed","நீக்கப்பட்டது"));load();});}
+  var tbl=null;
+  if(rows===null)tbl=n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")});
+  else if(!rows.length)tbl=n.jsx("div",{className:"ui-empty",children:L("No V3 users","V3 பயனர்கள் இல்லை")});
+  else tbl=n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:rows.map(function(r,i){
+    return n.jsxs("tr",{children:[
+      n.jsx("td",{className:"mono",children:r.userId}),
+      n.jsx("td",{children:r.username}),
+      n.jsx("td",{children:"••••••"}),
+      n.jsx("td",{children:r.role||"—"}),
+      n.jsx("td",{children:r.districtName||"—"}),
+      n.jsxs("td",{children:[
+        n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:function(){Sed({id:r.userId,un:r.username,pw:"",rl:r.role||"district",dn:r.districtName||""})},children:"✏"}),
+        " ",
+        n.jsx("button",{className:"ui-btn ui-btn-sm",disabled:bsy,onClick:function(){rm(r)},children:"🗑"})]},"a")]},r.userId)})})});
+  return n.jsxs("div",{className:"ui-card",style:{marginBottom:12},children:[
+    n.jsxs("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:8},children:[
+      n.jsx("div",{style:{fontWeight:800},children:"👥 "+L("V3 Users & Roles (User_Config)","V3 பயனர்கள் & பங்குகள் (User_Config)")}),
+      n.jsx("div",{style:{flex:1}}),
+      n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:load,children:"↻"})]}),
+    n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10},children:[
+      n.jsx("input",{className:"ui-input",style:{width:150},placeholder:L("Username","பயனர்பெயர்"),value:un,onChange:function(e){Sun(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:150},placeholder:L("Password","கடவுச்சொல்"),value:pw,onChange:function(e){Spw(e.target.value)}}),
+      n.jsxs("select",{className:"ui-input",style:{width:130},value:rl,onChange:function(e){Srl(e.target.value)},children:[
+        n.jsx("option",{value:"admin",children:"admin"}),n.jsx("option",{value:"district",children:"district"}),
+        n.jsx("option",{value:"auditor",children:"auditor"}),n.jsx("option",{value:"vendor",children:"vendor"})]}),
+      n.jsx("input",{className:"ui-input",style:{width:150},placeholder:L("District","மாவட்டம்"),value:dn,onChange:function(e){Sdn(e.target.value)}}),
+      n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:bsy,onClick:add,children:"+ "+L("Add user","பயனர் சேர்")})]}),
+    tbl,
+    ed?n.jsxs("div",{style:{marginTop:10,padding:10,border:"1px solid var(--line)",borderRadius:8},children:[
+      n.jsx("div",{style:{fontWeight:700,marginBottom:6},children:"✏ "+L("Edit user ","பயனரை திருத்து ")+ed.id}),
+      n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap"},children:[
+        n.jsx("input",{className:"ui-input",style:{width:150},value:ed.un,onChange:function(e){Sed(Object.assign({},ed,{un:e.target.value}))},placeholder:L("Username","பயனர்பெயர்")}),
+        n.jsx("input",{className:"ui-input",style:{width:150},value:ed.pw,onChange:function(e){Sed(Object.assign({},ed,{pw:e.target.value}))},placeholder:L("New password (blank = same)","புது கடவுச்சொல் (காலியானால் அதே)")}),
+        n.jsxs("select",{className:"ui-input",style:{width:130},value:ed.rl,onChange:function(e){Sed(Object.assign({},ed,{rl:e.target.value}))},children:[
+          n.jsx("option",{value:"admin",children:"admin"}),n.jsx("option",{value:"district",children:"district"}),
+          n.jsx("option",{value:"auditor",children:"auditor"}),n.jsx("option",{value:"vendor",children:"vendor"})]}),
+        n.jsx("input",{className:"ui-input",style:{width:150},value:ed.dn,onChange:function(e){Sed(Object.assign({},ed,{dn:e.target.value}))},placeholder:L("District","மாவட்டம்")}),
+        n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:bsy,onClick:saveEd,children:L("Save","சேமி")}),
+        n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:function(){Sed(null)},children:L("Cancel","ரத்து")})]})]}):null,
+    st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}
+function EyV3AgentsCard(){
+  const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
+  var[rows,Srows]=E.useState(null),[st,Sst]=E.useState(""),[bsy,Sbsy]=E.useState(false);
+  var[fn2,Sfn]=E.useState(""),[un,Sun]=E.useState(""),[pw,Spw]=E.useState(""),[mb,Smb]=E.useState(""),[md,Smd]=E.useState("Pudukkottai"),[cp,Scp]=E.useState("0.5");
+  function load(){Srows(null);EyV3Call("list",{tab:"agents"},function(e,d){if(e){Srows([]);Sst("✗ "+String(e).slice(0,120));return}Srows((d&&d.rows)||[])})}
+  E.useEffect(function(){load()},[]);
+  function add(){
+    if(!fn2.trim()){Sst("✗ "+L("Full name required","பெயர் வேணும்"));return}
+    Sbsy(true);EyV3Call("agentAdd",{fullName:fn2,username:un,password:pw,mobile:mb,managerDistrict:md,cpercent:cp,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+L("Agent added ","ஏஜெண்ட் சேர்க்கப்பட்டார் ")+(d&&d.agentId||""));Sfn("");Sun("");Spw("");Smb("");load();});}
+  function setPct(r2){
+    var v2=window.prompt(L("Commission % for "+r2.fullName,"கமிஷன் % — "+r2.fullName),String(r2.cpercent||"0.5"));
+    if(v2===null)return;
+    Sbsy(true);EyV3Call("agentEdit",{agentId:r2.agentId,cpercent:v2,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+r2.agentId+" → "+v2+"%");load();});}
+  function tog(r2){
+    var ns=String(r2.status||"")==="Inactive"?"approved":"Inactive";
+    Sbsy(true);EyV3Call(ns==="Inactive"?"agentRemove":"agentEdit",ns==="Inactive"?{agentId:r2.agentId,user:"admin"}:{agentId:r2.agentId,status:ns,user:"admin"},function(e,d){Sbsy(false);
+      if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
+      Sst("✓ "+r2.agentId+" → "+ns);load();});}
+  var tbl=null;
+  if(rows===null)tbl=n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")});
+  else if(!rows.length)tbl=n.jsx("div",{className:"ui-empty",children:L("No agents yet","ஏஜெண்ட்கள் இல்லை")});
+  else tbl=n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:rows.map(function(r){return n.jsxs("tr",{children:[
+    n.jsx("td",{className:"mono",children:r.agentId}),
+    n.jsx("td",{children:r.fullName}),
+    n.jsx("td",{children:r.username||"—"}),
+    n.jsx("td",{children:r.mobile||"—"}),
+    n.jsx("td",{children:r.managerDistrict||"—"}),
+    n.jsx("td",{className:"mono",children:(r.cpercent||"0.5")+"%"}),
+    n.jsx("td",{children:String(r.status||"")==="Inactive"?n.jsx("span",{style:{color:"#b3261e"},children:"Inactive"}):n.jsx("span",{style:{color:"#0a7d43"},children:"Active"})}),
+    n.jsxs("td",{children:[
+      n.jsx("button",{className:"ui-btn ui-btn-sm",disabled:bsy,onClick:function(){setPct(r)},children:"%"}),
+      " ",
+      n.jsx("button",{className:"ui-btn ui-btn-sm",disabled:bsy,onClick:function(){tog(r)},children:String(r.status||"")==="Inactive"?"✓":"⊘"})]},"a")]},r.agentId)})})});
+  return n.jsxs("div",{className:"ui-card",style:{marginBottom:12},children:[
+    n.jsxs("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:8},children:[
+      n.jsx("div",{style:{fontWeight:800},children:"🤝 "+L("V3 Agents (1 district · 1 agent basis, unlimited)","V3 ஏஜெண்ட்கள் (ஒரு மாவட்டம் · ஒரு ஏஜெண்ட், எத்தனை வேணுமானாலும்)")}),
+      n.jsx("div",{style:{flex:1}}),
+      n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:load,children:"↻"})]}),
+    n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10},children:[
+      n.jsx("input",{className:"ui-input",style:{width:160},placeholder:L("Full name","முழு பெயர்"),value:fn2,onChange:function(e){Sfn(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:130},placeholder:L("Username","பயனர்பெயர்"),value:un,onChange:function(e){Sun(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:130},placeholder:L("Password","கடவுச்சொல்"),value:pw,onChange:function(e){Spw(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:130},placeholder:L("Mobile","கைபேசி"),value:mb,onChange:function(e){Smb(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:140},placeholder:L("Manager district","மாவட்டம்"),value:md,onChange:function(e){Smd(e.target.value)}}),
+      n.jsx("input",{className:"ui-input",style:{width:80},value:cp,onChange:function(e){Scp(e.target.value)},title:"%"}),
+      n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:bsy,onClick:add,children:"+ "+L("Add agent","ஏஜெண்ட் சேர்")})]}),
+    tbl,
+    st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}

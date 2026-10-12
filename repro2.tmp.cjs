@@ -1,0 +1,23 @@
+const {JSDOM,VirtualConsole}=require('jsdom'),fs=require('fs');
+const bundle=fs.readFileSync('v4/public/assets/index-CHTAzd11.js','utf8');
+const vc=new VirtualConsole();
+vc.on('error',(...a)=>console.log('CONSOLE:',String(a[0]).slice(0,150)));
+const dom=new JSDOM('<body><div id=root></div></body>',{url:'https://x.test/',runScripts:'outside-only',pretendToBeVisual:!0,virtualConsole:vc});
+const w=dom.window;
+w.sessionStorage.setItem('ar4.token','t');w.sessionStorage.setItem('ar4.user',JSON.stringify({username:'a',role:'super_admin'}));
+const USER={username:'a',role:'super_admin'};
+w.fetch=u=>{u=String(u);const c=u.split('/api/')[1];let b={ok:!0,data:{}};
+ if(c==='auth.me')b.data={user:USER};else if(c==='gst.filings.list')b.data={rows:[]};
+ return Promise.resolve({ok:!0,status:200,text:()=>Promise.resolve(JSON.stringify(b))})};
+const errs=[];
+w.addEventListener('error',e=>errs.push(e.message+' || '+((e.error&&e.error.stack)||'').split('\n').slice(0,5).join(' | ')));
+w.localStorage.setItem("ar4.v3url","https://script.google.com/macros/s/TEST/exec");
+w.EyV3Api={call:function(a,p,cb){cb("offline-stub")}};
+w.eval(bundle);
+setTimeout(()=>{w.location.hash='#/reports';w.dispatchEvent(new w.Event('hashchange'))},1800);
+setTimeout(()=>{
+  const T=w.document.body.textContent;
+  console.log('errors:',errs.length);errs.slice(0,3).forEach(x=>console.log(x.slice(0,600)));
+  console.log('reports rendered?',T.includes('அறிக்கை')||T.includes('Reports'));
+  console.log('error box?',T.includes('பக்கப் பிழை'), T.includes('before initialization')?T.match(/Cannot[^"]*/)[0]:'');
+  process.exit(0)},4500);

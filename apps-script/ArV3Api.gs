@@ -1,0 +1,219 @@
+/**
+ * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
+ * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
+ * Deploy: Deploy → New deployment → Web app → Execute as: Me → Anyone → copy URL
+ * ERP-இல் Vendors பக்கத்தில "⚙ V3 API" → URL paste.
+ */
+var V3_ID = '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ';
+var API_KEY = 'ARV3-2026-KX9Q42'; // விரும்பினால் மாற்றலாம் — ERP-இல் இதே key இருக்கணும்
+
+var TYPE_CODE = {Hardware:'HW', Paint:'GN', Civil:'CV', Plumbing:'PL', Electrical:'EL', Tiles:'TL', Steel:'ST', Other:'OT'};
+
+function ss(){ return SpreadsheetApp.openById(V3_ID); }
+function sh(name){ var s=ss().getSheetByName(name); if(!s) throw new Error('Tab இல்லை: '+name); return s; }
+function rid(n){ var c='ABCDEFGHJKMNPQRSTUVWXYZ23456789', s=''; for(var i=0;i<n;i++) s+=c.charAt(Math.floor(Math.random()*c.length)); return s; }
+function nowIso(){ return new Date().toISOString(); }
+function num(x){ var v=parseFloat(String(x==null?'':x).replace(/[₹,\s]/g,'')); return isFinite(v)?v:0; }
+
+function rows_(name){ var v=sh(name).getDataRange().getValues(); return v; }
+function findRow_(name, col, val){
+  var v=rows_(name);
+  for(var i=1;i<v.length;i++){ if(String(v[i][col]).trim()===String(val).trim()) return i+1; }
+  return 0;
+}
+
+function audit_(user, action, entity, detail){
+  try{
+    var s=sh('AuditLogs');
+    s.appendRow([rid(10), nowIso(), user||'', action||'', entity||'', '', String(detail||'').slice(0,200), '', '']);
+  }catch(e){}
+}
+
+function vendorCode_(district, type){
+  var dc=String(district||'Pudukkottai').replace(/[^A-Za-z]/g,'').slice(0,3).toUpperCase()||'PDK';
+  var tc=TYPE_CODE[type]||'OT';
+  var yy=String(new Date().getFullYear()).slice(-2);
+  var v=rows_('Vendors'), pre=dc+yy+tc, max=0, i, code;
+  for(i=1;i<v.length;i++){ code=String(v[i][0]||'');
+    if(code.indexOf(pre)===0){ var n=parseInt(code.slice(pre.length),10); if(n>max)max=n; } }
+  return pre+('00'+(max+1)).slice(-3);
+}
+
+function txnAdd_(p){
+  var v=rows_('Vendors'), vr=null, i;
+  for(i=1;i<v.length;i++){ if(String(v[i][0]).trim()===String(p.vendorCode).trim()){ vr=v[i]; break; } }
+  if(!vr) throw new Error('Vendor கிடைக்கவில்லை: '+p.vendorCode);
+  var exp=num(p.expected), adv=num(p.advance), gp=num(p.gp)||4;
+  var gst=+(exp*gp/100).toFixed(2);
+  var bal=+(gst-adv).toFixed(2);
+  var id='TXN'+rid(10);
+  var row=[id, vr[2], vr[0], vr[1], String(p.fy||''), String(p.month||''), exp, adv, gp, gst, 0, exp, bal, 'Open'];
+  sh('Transactions').appendRow(row);
+  try{ sh('Monthly_Transactions').appendRow(row); }catch(e){}
+  // commission (V3 model): agent + override % → AgentWallet
+  var agentId=String(p.agentId||'').trim();
+  if(agentId){
+    var pct=0.5, ag=rows_('Agents'), j;
+    for(j=1;j<ag.length;j++){ if(String(ag[j][0]).trim()===agentId){
+      if(num(ag[j][9])>0) pct=num(ag[j][9]);
+      break; } }
+    var ov=rows_('AgentOverrides');
+    for(j=1;j<ov.length;j++){ if(String(ov[j][1]).trim()===agentId && String(ov[j][2]).trim()===String(vr[0]).trim()){ if(num(ov[j][4])>0) pct=num(ov[j][4]); break; } }
+    var com=+(exp*pct/100).toFixed(2);
+    sh('AgentWallet').appendRow(['AW'+rid(10), agentId, nowIso(), 'Commission — '+vr[1], id, vr[1], exp, gp, pct, com, String(p.ct||'auto'), com]);
+  }
+  audit_(p.user,'TXN_ADD',id,vr[1]+' '+p.fy+' '+p.month);
+  return {ok:true, txnId:id, gstAmount:gst, balance:bal};
+}
+
+function billsRecalc_(txnId){
+  var b=rows_('Bills'), amt=0, tot=0, i;
+  for(i=1;i<b.length;i++){ if(String(b[i][1]).trim()===String(txnId).trim()){ amt+=num(b[i][6]); tot+=num(b[i][9]); } }
+  var t=rows_('Transactions');
+  for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===String(txnId).trim()){
+    var exp=num(t[i][6]);
+    t[i][10]=+amt.toFixed(2); t[i][11]=+Math.max(0,exp-tot).toFixed(2);
+    sh('Transactions').getRange(i+1,11,1,2).setValues([[t[i][10],t[i][11]]]);
+    break; } }
+  return {actual:+amt.toFixed(2), billsTotal:+tot.toFixed(2)};
+}
+
+function billAdd_(p){
+  var t=rows_('Transactions'), tr=null, i;
+  for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===String(p.txnId).trim()){ tr=t[i]; break; } }
+  if(!tr) throw new Error('Txn கிடைக்கவில்லை: '+p.txnId);
+  var amt=num(p.amt), gp=num(p.gp)||num(tr[8])||4;
+  var gst=+(amt*gp/100).toFixed(2), tot=+(amt*1.18).toFixed(2);
+  var id='B'+rid(7);
+  var row=[id, tr[0], tr[2], tr[3], String(p.no||''), String(p.date||''), amt, gp, gst, tot];
+  sh('Bills').appendRow(row);
+  try{ sh('Bill_Details').appendRow(row); }catch(e){}
+  var rc=billsRecalc_(tr[0]);
+  audit_(p.user,'BILL_ADD',id,tr[3]+' ₹'+amt);
+  return {ok:true, billId:id, gst:gst, total:tot, actual:rc.actual, billsTotal:rc.billsTotal};
+}
+
+function bills2B_(sheetName){
+  if(!/^GSTR2B_/i.test(sheetName)) throw new Error('2B month tab மட்டும்: '+sheetName);
+  var v=rows_(sheetName), out=[], i;
+  for(i=1;i<v.length;i++){
+    var inv=String(v[i][0]||'').trim();
+    if(!inv) continue;
+    out.push({inv:inv, nm:String(v[i][1]||'').trim(), dt:String(v[i][2]||'').trim(), taxable:num(v[i][3]), total:num(v[i][8]), fy:String(v[i][10]||'').trim(), period:String(v[i][9]||'').trim()});
+  }
+  return {ok:true, rows:out};
+}
+
+function txnConfirm_(p){
+  var t=rows_('Transactions'), i, row=0;
+  for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===String(p.txnId).trim()){ row=i+1; break; } }
+  if(!row) throw new Error('Txn கிடைக்கவில்லை: '+p.txnId);
+  var v=t[row-1];
+  var rc=billsRecalc_(p.txnId);
+  sh('Transactions').getRange(row,14).setValue('Closed');
+  try{
+    var ven=rows_('Vendors'), gstin='';
+    for(i=1;i<ven.length;i++){ if(String(ven[i][0]).trim()===String(v[2]).trim()){ gstin=String(ven[i][5]||'').trim(); break; } }
+    if(gstin){
+      var g=rows_('GSTR2B_Summary'), found=0;
+      for(i=1;i<g.length;i++){ if(String(g[i][0]).trim()===String(v[4]).trim() && String(g[i][1]).trim().toLowerCase()===String(v[5]).trim().toLowerCase().slice(0,3) && String(g[i][3]).trim()===gstin){ found=i+1; break; } }
+      var exp=num(v[6]), actTot=rc.billsTotal;
+      var tax=+Math.round(exp/1.18).toFixed(2);
+      if(found){ sh('GSTR2B_Summary').getRange(found,5,1,5).setValues([[tax, +Math.max(0,actTot-tax).toFixed(2), 0, +actTot.toFixed(2), num(p.g2count)||0]]); }
+      else { sh('GSTR2B_Summary').appendRow([String(v[4]), String(v[5]), new Date(), gstin, tax, +Math.max(0,actTot-tax).toFixed(2), 0, +actTot.toFixed(2), num(p.g2count)||0, nowIso()]); }
+    }
+  }catch(e){}
+  audit_(p.user,'TXN_CONFIRM',p.txnId,'Closed · bills ₹'+rc.billsTotal);
+  return {ok:true, actual:rc.actual, billsTotal:rc.billsTotal, status:'Closed'};
+}
+
+function vendorAdd_(p){
+  var code=vendorCode_(p.district, p.type);
+  var row=[code, String(p.name||'').trim(), String(p.district||'Pudukkottai').trim(), String(p.mobile||'').trim(), String(p.type||'').trim(), String(p.gst||'').trim().toUpperCase(), String(p.addr||'').trim(), String(p.reg||new Date().getFullYear()), nowIso()];
+  sh('Vendors').appendRow(row);
+  try{ sh('Vendor_Master').appendRow(row); }catch(e){}
+  audit_(p.user,'VENDOR_ADD',code,p.name);
+  return {ok:true, vendorCode:code};
+}
+
+function userAdd_(p){
+  var id='U'+rid(8);
+  sh('User_Config').appendRow([id, String(p.username||'').trim(), String(p.password||''), String(p.role||'vendor'), String(p.district||'')]);
+  audit_(p.user,'USER_ADD',id,p.username+' ('+p.role+')');
+  return {ok:true, userId:id};
+}
+function userPass_(p){
+  var u=rows_('User_Config'), i;
+  for(i=1;i<u.length;i++){ if(String(u[i][0]).trim()===String(p.userId).trim()){ sh('User_Config').getRange(i+1,3).setValue(String(p.password||'')); audit_(p.user,'USER_PASS',p.userId,''); return {ok:true}; } }
+  throw new Error('User கிடைக்கவில்லை');
+}
+function agentAdd_(p){
+  var a=rows_('Agents'), max=0, i, code;
+  for(i=1;i<a.length;i++){ code=String(a[i][0]||''); if(/^AGT\d{3}$/.test(code)){ var n=parseInt(code.slice(3),10); if(n>max)max=n; } }
+  var id='AGT'+('00'+(max+1)).slice(-3);
+  sh('Agents').appendRow([id, String(p.fullName||'').trim(), String(p.username||'').trim(), String(p.password||''), String(p.mobile||'').trim(), '', String(p.managerName||'admin'), String(p.managerDistrict||'Pudukkottai'), String(p.ct||'auto'), num(p.cpercent)||0.5, String(p.bank||''), String(p.acct||''), String(p.ifsc||''), String(p.upi||''), 'approved', String(p.user||'admin'), nowIso(), 0, nowIso(), '']);
+  audit_(p.user,'AGENT_ADD',id,p.fullName);
+  return {ok:true, agentId:id};
+}
+function overrideAdd_(p){
+  var id='OV'+rid(8);
+  sh('AgentOverrides').appendRow([id, String(p.agentId||''), String(p.vendorCode||''), String(p.vendorName||''), num(p.percent), String(p.user||'admin'), nowIso()]);
+  audit_(p.user,'OVERRIDE_ADD',id,p.agentId+' → '+p.vendorCode+' '+p.percent+'%');
+  return {ok:true, id:id};
+}
+function login_(p){
+  var u=rows_('User_Config'), i;
+  for(i=1;i<u.length;i++){
+    if(String(u[i][1]).trim()===String(p.u||'').trim()){
+      if(String(u[i][2])!==String(p.p||'')) return {ok:false, error:'கடவுச்சொல் தவறு'};
+      var role=String(u[i][3]||'').trim();
+      return {ok:true, userId:String(u[i][0]), username:String(u[i][1]), role:role, districtName:String(u[i][4]||'')};
+    }
+  }
+  return {ok:false, error:'பயனர் இல்லை'};
+}
+function vlist_(tab){
+  function obj(keys){ var v=rows_(tab), out=[], i, j, o; for(i=1;i<v.length;i++){ var any=false; o={};
+    for(j=0;j<keys.length;j++){ o[keys[j]]=(v[i][j]==null?'':v[i][j]); if(o[keys[j]]!=='')any=true; }
+    if(any) out.push(o); } return out; }
+  if(tab==='vendors') return {ok:true, rows:obj(['vendorCode','vendorName','districtName','mobile','businessType','gstNumber','address','regYear','createdAt'])};
+  if(tab==='txns') return {ok:true, rows:obj(['txnId','districtName','vendorCode','vendorName','fy','month','expected','advance','gp','gst','actual','remaining','balance','status'])};
+  if(tab==='bills') return {ok:true, rows:obj(['billId','txnId','vendorCode','vendorName','no','date','amt','gp','gst','total'])};
+  if(tab==='users') return {ok:true, rows:obj(['userId','username','password','role','districtName'])};
+  if(tab==='agents') return {ok:true, rows:obj(['agentId','fullName','username','password','mobile','managerId','managerName','managerDistrict','ct','cpercent','bank','acct','ifsc','upi','status','approvedBy','approvedAt','bonus','createdAt','lastLogin'])};
+  if(tab==='wallet') return {ok:true, rows:obj(['id','agentId','date','description','txnId','vendorName','txnAmount','gp','pct','commission','ct','credited'])};
+  if(tab==='overrides') return {ok:true, rows:obj(['id','agentId','vendorCode','vendorName','percent','setBy','setAt'])};
+  if(tab==='2btabs'){
+    var all=ss().getSheets(), out=[], i;
+    for(i=0;i<all.length;i++){ var nm=all[i].getName(); if(/^GSTR2B_/i.test(nm)) out.push(nm); }
+    return {ok:true, rows:out};
+  }
+  throw new Error('தெரியா tab: '+tab);
+}
+
+function doGet(e){
+  var p=(e&&e.parameter)||{}, cb=p.callback||'cb';
+  function out(o){ return ContentService.createTextOutput(cb+'('+JSON.stringify(o)+')').setMimeType(ContentService.MimeType.JAVASCRIPT); }
+  if(p.k!==API_KEY) return out({ok:false, error:'Key தவறு'});
+  try{
+    var r;
+    switch(p.action){
+      case 'ping': r={ok:true, time:nowIso()}; break;
+      case 'login': r=login_(p); break;
+      case 'list': r=vlist_(p.tab); break;
+      case 'vendorAdd': r=vendorAdd_(p); break;
+      case 'txnAdd': r=txnAdd_(p); break;
+      case 'billAdd': r=billAdd_(p); break;
+      case 'bills2B': r=bills2B_(p.sheet); break;
+      case 'txnConfirm': r=txnConfirm_(p); break;
+      case 'userAdd': r=userAdd_(p); break;
+      case 'userPass': r=userPass_(p); break;
+      case 'agentAdd': r=agentAdd_(p); break;
+      case 'overrideAdd': r=overrideAdd_(p); break;
+      default: r={ok:false, error:'தெரியா action: '+p.action};
+    }
+    return out(r);
+  }catch(err){
+    return out({ok:false, error:String(err&&err.message||err)});
+  }
+}

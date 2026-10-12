@@ -1,5 +1,5 @@
 // ==================================================================
-// v7 MAIL SYNC FIX — 2026-10-10
+// v7.1 MAIL SYNC FIX — 2026-10-10
 // பிரச்சனை: Gmail search 'after:<epoch-எண்>' தவறு — Gmail 'after:'-க்கு
 // தேதி (yyyy/MM/dd) தான் எதிர்பார்க்கும். எண் கொடுத்தபோது 0 results வந்து,
 // புது mails எப்போதும் sync ஆகவே இல்லை (Oct-2-ல backfill மட்டும் நின்னுது).
@@ -20,15 +20,14 @@ function arMailSync() {
   if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;
   var qDate = Utilities.formatDate(new Date(lastEpoch * 1000), 'GMT', 'yyyy/MM/dd'); // FIX: yyyy/MM/dd
   var seen = arMailSeen_(sh);
-  var threads = GmailApp.search('after:' + qDate, 0, 80);
+  var threads = GmailApp.search('after:' + qDate, 0, 100);
   var rows = [], newest = lastEpoch;
   for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {
     var msgs = threads[t].getMessages();
     for (var m = 0; m < msgs.length && rows.length < MAX_PER_RUN; m++) {
       var msg = msgs[m];
-      if (seen[msg.getId()]) continue;
+      if (seen[msg.getId()]) continue; // v7.1: MsgID dedupe மட்டும்
       var epoch = Math.floor(msg.getDate().getTime() / 1000);
-      if (epoch <= lastEpoch) continue;
       if (epoch > newest) newest = epoch;
       rows.push(arMailRow_(msg, threads[t], SAVE_ATTACHMENTS));
     }

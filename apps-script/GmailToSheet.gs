@@ -101,15 +101,14 @@ function arMailSync() {
   if (!lastEpoch) lastEpoch = Math.floor(Date.now() / 1000) - INITIAL_DAYS * 86400;
   var seen = arMailSeen_(sh);
   var qDate = Utilities.formatDate(new Date(lastEpoch * 1000), 'GMT', 'yyyy/MM/dd'); // Gmail after: needs yyyy/MM/dd — epoch number gives 0 results!
-  var threads = GmailApp.search('after:' + qDate, 0, 80);
+  var threads = GmailApp.search('after:' + qDate, 0, 100);
   var rows = [], newest = lastEpoch;
   for (var t = 0; t < threads.length && rows.length < MAX_PER_RUN; t++) {
     var msgs = threads[t].getMessages();
     for (var m = 0; m < msgs.length && rows.length < MAX_PER_RUN; m++) {
       var msg = msgs[m];
-      if (seen[msg.getId()]) continue;
+      if (seen[msg.getId()]) continue; // MsgID dedupe மட்டும் — epoch guard நீக்கம்: அதே-நாள் பின்வரும் mails தவறா skip ஆகும் bug
       var epoch = Math.floor(msg.getDate().getTime() / 1000);
-      if (epoch <= lastEpoch) continue;
       if (epoch > newest) newest = epoch;
       rows.push(arMailRow_(msg, threads[t], SAVE_ATTACHMENTS));
     }

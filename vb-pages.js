@@ -37,7 +37,7 @@ function EyVbFetch(k){
 var EyTxCache=null;
 function EyTxFetch(k){
  if(EyTxCache&&EyTxCache.done)return k(EyTxCache);
- var T=[],pend=6,fin=false;
+ var T=[],pend=4,fin=false;
  function mk(sigCol,sig,skip,parse){return function(e,d){if(fin)return;
   if(!e){var rows=EyRawRows(d),j,st=-1,r,x;
    for(j=0;j<rows.length;j++){if(String(rows[j][sigCol])===sig){st=j+1+skip;break}}
@@ -45,18 +45,14 @@ function EyTxFetch(k){
    for(j=st;j<rows.length;j++){r=rows[j];x=parse(r);if(x)T.push(x)}}
   if(--pend===0){fin=true;EyTxCache={done:true,err:false,rows:T};k(EyTxCache)}}}
  function Cn(fy){return mk(1,"Receipt Amount",0,function(r){var rc=EyVbN(r[1]),iv=EyVbN(r[4]);
-  if(!rc&&!iv)return null;
+  if(!(rc>0))return null;
   return{ty:"in",fy:fy,d:"",de:String(r[0]||"").trim()||"(பெயரிடப்படாத வேலை)",cat:String(r[3]||"").trim()||"வேலை",pl:String(r[2]||"").trim(),amt:rc,inv:iv,src:fy}})}
  gvizFetch(EyVbId,"Contract Work FY 23 to 24",Cn("FY 23-24"),"select C,E,F,G,L");
  gvizFetch(EyVbId,"Contract work FY 24-25",Cn("FY 24-25"),"select C,E,F,G,L");
  gvizFetch(EyVbId,"Contract work FY 25-26",Cn("FY 25-26"),"select C,E,F,G,L");
  gvizFetch(EyVbId,"2024-25 Expense Journal",mk(0,"Item",0,function(r){var a=EyVbN(r[1]);if(!a)return null;
   return{ty:"out",fy:"FY 24-25",d:EyVbD(r[2]),de:String(r[0]||"").trim()||"(செலவு)",cat:String(r[3]||"").trim()||"செலவு",pl:"",amt:a,inv:0,src:"Expense Journal"}}),"select B,C,F,G");
- gvizFetch(EyVbId,"GST Tax Payment",mk(0,"Month",0,function(r){var c=EyVbN(r[1]),d=EyVbD(r[0]);if(!c)return null;
-  return{ty:"out",fy:"",d:d,de:"GST வரி செலுத்தல் (ரொக்கம்)"+(d?" · "+d:""),cat:"GST",pl:"",amt:c,inv:0,src:"GST Tax Payment"}}),"select A,E");
- gvizFetch(EyVbId,"TNEB",mk(0,"Payment",1,function(r){var p=EyVbN(r[1]);if(!p)return null;
-  return{ty:"out",fy:"",d:EyVbD(r[0]),de:"TNEB மின் கட்டணம்"+(r[2]?" · ரசீது "+String(r[2]).trim():""),cat:"TNEB",pl:"",amt:p,inv:0,src:"TNEB"}}),"select A,I,J");
-}
+ }
 function EyVbPrint(title,sub,head,rows,foots,land){
  var w=window.open("","_blank");if(!w)return;
  function esc(x){return EyVbEsc(x)}
@@ -251,7 +247,8 @@ function EyTxnPage({user:c}){
   list.map(function(x){return [x.d,"",x.ty==="in"?"IN":"OUT",x.de,x.cat,x.amt,x.src]}),
   [["Receipts (filtered)","","","","",fI],["Payments (filtered)","","","","",fO],["Grand Receipts","","","","",gI],["Grand Payments","","","","",gO]])}
  return n.jsxs("div",{children:[
-  EyVbHead(L("Transactions","பரிவர்த்தனைகள்"),null,L("Work receipts + expenses + GST + TNEB","வேலை வரவுகள் + செலவுகள் + GST + TNEB")),
+  EyVbHead(L("Transactions","பரிவர்த்தனைகள்"),null,L("Work receipts + office expenses","வேலை ரசீதுகள் + அலுவலக செலவுகள்")),
+  n.jsx("div",{style:{fontSize:12,color:"var(--tx-3)",marginTop:-8,marginBottom:12},children:L("GST tax payments & TNEB (bank-linked) are in GST Centre / Bank pages","GST வரி செலுத்தல் & TNEB (வங்கி சம்பந்தப்பட்ட) பதிவுகள் GST Centre / Bank பக்கங்களில் உண்டு")}),
   EyVbChips([["₹ "+L("Receipts (all)","வரவு (எல்லாம்)"),"₹"+EyVbInr(gI),"#0a7d43"],["₹ "+L("Payments (all)","செலவு (எல்லாம்)"),"₹"+EyVbInr(gO),"#b3261e"],["₹ "+L("Net (all)","நிகர (எல்லாம்)"),"₹"+EyVbInr(gI-gO)]]),
   n.jsxs("div",{className:"ui-card",style:{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"},children:[
    n.jsxs("select",{className:"ui-input",style:{maxWidth:170},value:ty,onChange:function(e){Sty(e.target.value)},children:[

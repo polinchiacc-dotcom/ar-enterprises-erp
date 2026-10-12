@@ -1350,8 +1350,6 @@ function By({user:c}){
       count: filteredR14.length
     };
   }, [filteredR14, f]);
-  E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — Bank Live BRS 200",AT(f,AT(f,"வரிசைகள்: ","Rows: "),"Rows: ")+totalsR14.count,AT(f,"ரசீது மொத்தம்: ","Receipts total: ")+Q(totalsR14.receiptAmount)]:null}else{window.__arShareLines=r1to13Data&&r1to13Data.rowCount?[(m&&m.id||"")+" — "+(f==="ta"?m&&m.ta:m&&m.en),AT(f,AT(f,"வரிசைகள்: ","Rows: "),"Rows: ")+r1to13Data.rowCount]:null}},[v,totalsR14,r1to13Data]);
-
   const r1to13Data = E.useMemo(() => {
     const rawData = S.data;
     if (!rawData || rawData.reportId !== v || !rawData.rows || !rawData.rows.length) {
@@ -1380,6 +1378,7 @@ function By({user:c}){
     });
     return { columns: cols, rows: formattedRows, totals, rowCount: formattedRows.length };
   }, [S.data, v]);
+E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — Bank Live BRS 200",AT(f,AT(f,"வரிசைகள்: ","Rows: "),"Rows: ")+totalsR14.count,AT(f,"ரசீது மொத்தம்: ","Receipts total: ")+Q(totalsR14.receiptAmount)]:null}else{window.__arShareLines=r1to13Data&&r1to13Data.rowCount?[(m&&m.id||"")+" — "+(f==="ta"?m&&m.ta:m&&m.en),AT(f,AT(f,"வரிசைகள்: ","Rows: "),"Rows: ")+r1to13Data.rowCount]:null}},[v,totalsR14,r1to13Data]);
 
   const tnDistricts = [
     "Ariyalur","Chengalpattu","Chennai","Coimbatore","Cuddalore","Dharmapuri","Dindigul","Erode",
@@ -2299,7 +2298,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610082b';
+var ARXV='202610082c';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -3000,7 +2999,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082b";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082c";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

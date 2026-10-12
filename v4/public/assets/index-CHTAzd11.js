@@ -1355,6 +1355,11 @@ function By({user:c}){
     if (!rawData || rawData.reportId !== v || !rawData.rows || !rawData.rows.length) {
       return { columns: [], rows: [], totals: {}, rowCount: 0 };
     }
+  if (v === "R10") { var s0 = rawData.rows[0] && rawData.rows[0].summary ? rawData.rows[0].summary : {};
+    var q10 = {};
+    q10["✓ Matched"] = s0.matched || 0; q10["⚠ Unmatched"] = s0.unmatched || 0;
+    q10["⊘ Ignored"] = s0.ignored || 0; q10["Δ வேறுபாடு (Discrepancy)"] = s0.discrepancy || 0;
+    return { columns: ["✓ Matched", "⚠ Unmatched", "⊘ Ignored", "Δ வேறுபாடு (Discrepancy)"], rows: [q10], totals: {}, rowCount: 1 }; }
     const rawRows = rawData.rows;
     let cols = [];
     let formattedRows = [];
@@ -2298,7 +2303,7 @@ Ax.createRoot(document.getElementById("root")).render(n.jsx(Vl.StrictMode,{child
 (function(){
 if (typeof window==='undefined'||window.__arTri) return;
 var WB='1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw';
-var ARXV='202610082c';
+var ARXV='202610082d';
 var C={bank:null,b2b:null,recon:null};
 function num(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function pad2(x){return (x<10?'0':'')+x}
@@ -2999,7 +3004,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082c";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082d";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

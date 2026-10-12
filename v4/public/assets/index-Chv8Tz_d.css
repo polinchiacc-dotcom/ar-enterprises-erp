@@ -27,3 +27,23 @@
 .aud-regbadge{display:inline-block;background:#f59e0b;color:#fff;font-weight:700;font-size:9px;line-height:1.2;padding:2px 6px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;cursor:pointer}
 .aud-regbadge:hover{filter:brightness(.9)}
 .a4-print-document td.aud-regname{background:#fff4d6!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+/* 1ae: desktop icon-rail sidebar — hover=expand, cursor-leave=collapse (req 2026-10-12) */
+@media(min-width:901px){
+.app-sidebar{transition:width .18s ease;overflow-x:hidden;scrollbar-width:none}
+.app-sidebar::-webkit-scrollbar{display:none}
+.app-sidebar:not(:hover):not(:focus-within){width:70px;min-width:70px}
+.app-sidebar:not(:hover):not(:focus-within) .app-brand{padding-left:2px;padding-right:0;gap:0}
+.app-sidebar:not(:hover):not(:focus-within) .app-brand>div:last-child{opacity:0}
+.app-sidebar:not(:hover):not(:focus-within) .app-nav-section{height:0;padding-top:0;padding-bottom:0;opacity:0;overflow:hidden}
+.app-sidebar:not(:hover):not(:focus-within) .app-nav-item{padding-left:11px;padding-right:0;gap:0}
+.app-sidebar:not(:hover):not(:focus-within) .app-nav-item span:not(.n){opacity:0}
+.app-sidebar:not(:hover):not(:focus-within) .app-nav-badge{opacity:0}
+.app-sidebar:not(:hover):not(:focus-within) .app-sidebar-foot{opacity:0}
+.app-nav-section{transition:padding .18s ease,opacity .15s ease}
+.app-sidebar-foot{transition:opacity .15s ease}
+.app-brand>div:last-child{transition:opacity .12s ease}
+.app-nav-item{transition:padding .18s ease,gap .18s ease,background .15s ease,color .15s ease}
+.app-nav-item span:not(.n){transition:opacity .12s ease}
+.app-nav-badge{transition:opacity .12s ease}
+.app-sidebar:hover,.app-sidebar:focus-within{width:var(--sidebar-w);box-shadow:10px 0 30px rgba(2,6,23,.15)}
+}

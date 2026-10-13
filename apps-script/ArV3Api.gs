@@ -128,12 +128,30 @@ function txnConfirm_(p){
 }
 
 function vendorAdd_(p){
+  var rr=String(p.role||'').toLowerCase();
+  if(['admin','district','agent'].indexOf(rr)<0) throw new Error('Vendor சேர்க்க அனுமதி இல்லை (agent / manager / admin மட்டும்)');
   var code=vendorCode_(p.district, p.type);
   var row=[code, String(p.name||'').trim(), String(p.district||'Pudukkottai').trim(), String(p.mobile||'').trim(), String(p.type||'').trim(), String(p.gst||'').trim().toUpperCase(), String(p.addr||'').trim(), String(p.reg||new Date().getFullYear()), nowIso()];
   sh('Vendors').appendRow(row);
   try{ sh('Vendor_Master').appendRow(row); }catch(e){}
-  audit_(p.user,'VENDOR_ADD',code,p.name);
+  audit_(p.user,'VENDOR_ADD',code,p.name+' ('+rr+')');
   return {ok:true, vendorCode:code};
+}
+function vendorRemove_(p){
+  var rr=String(p.role||'').toLowerCase();
+  if(rr!=='admin'&&rr!=='district') throw new Error('Vendor நீக்க அனுமதி இல்லை (manager / admin மட்டும்)');
+  var v=rows_('Vendors'),i,hit=0;
+  for(i=1;i<v.length;i++){ if(String(v[i][0]).trim()===String(p.vendorCode).trim()){ hit=i+1; break; } }
+  if(!hit) throw new Error('Vendor கிடைக்கவில்லை: '+p.vendorCode);
+  var t=rows_('Transactions');
+  for(i=1;i<t.length;i++){ if(String(t[i][2]).trim()===String(p.vendorCode).trim()) throw new Error('இந்த vendor-க்கு transactions உள்ளது — முதலில் அவற்றை நீக்கவும்'); }
+  sh('Vendors').deleteRow(hit);
+  try{
+    var m=rows_('Vendor_Master');
+    for(i=1;i<m.length;i++){ if(String(m[i][0]).trim()===String(p.vendorCode).trim()){ sh('Vendor_Master').deleteRow(i+1); break; } }
+  }catch(e){}
+  audit_(p.user,'VENDOR_REMOVE',p.vendorCode,'');
+  return {ok:true};
 }
 
 function userAdd_(p){
@@ -209,6 +227,14 @@ function login_(p){
       return {ok:true, userId:String(u[i][0]), username:String(u[i][1]), role:role, districtName:String(u[i][4]||'')};
     }
   }
+  var ag=rows_('Agents'), j;
+  for(j=1;j<ag.length;j++){
+    if(String(ag[j][2]).trim()===un){
+      if(String(ag[j][3])!==pw) return {ok:false, error:'கடவுச்சொல் தவறு'};
+      if(String(ag[j][14]).trim()==='Inactive') return {ok:false, error:'ஏஜெண்ட் Inactive நிலையில் உள்ளார்'};
+      return {ok:true, userId:String(ag[j][0]), username:String(ag[j][2]), role:'agent', districtName:String(ag[j][7]||''), agentId:String(ag[j][0])};
+    }
+  }
   return {ok:false, error:'பயனர் இல்லை'};
 }
 function vlist_(tab){
@@ -241,6 +267,7 @@ function doGet(e){
       case 'login': r=login_(p); break;
       case 'list': r=vlist_(p.tab); break;
       case 'vendorAdd': r=vendorAdd_(p); break;
+      case 'vendorRemove': r=vendorRemove_(p); break;
       case 'txnAdd': r=txnAdd_(p); break;
       case 'billAdd': r=billAdd_(p); break;
       case 'bills2B': r=bills2B_(p.sheet); break;

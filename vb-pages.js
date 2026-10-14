@@ -479,7 +479,7 @@ function EyTxnForm(p){
   n.jsxs("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8},children:[
    n.jsxs("select",{className:"ui-input",value:Fm.vc,onChange:set("vc"),children:[
     n.jsx("option",{value:"",children:L("— Select vendor name —","— வணிகர் பெயரை தேர்ந்து —")}),
-    vens.map(function(v2){return n.jsx("option",{value:v2.code,children:(v2.vendorName||v2.code)+" · "+v2.code},v2.code)})]}),
+    vens.map(function(v2){return n.jsx("option",{value:v2.code,children:(v2.nm||v2.code)+" · "+v2.code},v2.code)})]}),
    n.jsxs("select",{className:"ui-input",value:Fm.fy,onChange:set("fy"),children:[
     ["2024-25","2025-26","2026-27","2027-28"].map(function(x){return n.jsx("option",{children:x},x)})]}),
    n.jsxs("select",{className:"ui-input",value:Fm.mo,onChange:set("mo"),children:[

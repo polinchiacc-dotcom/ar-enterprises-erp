@@ -604,7 +604,7 @@ function EyTxnForm(p){
   n.jsxs("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8},children:[
    n.jsxs("select",{className:"ui-input",value:Fm.vc,onChange:set("vc"),children:[
     n.jsx("option",{value:"",children:L("— Select vendor name —","— வணிகர் பெயரை தேர்ந்து —")}),
-    vens.map(function(v2){return n.jsx("option",{value:v2.code,children:(v2.vendorName||v2.code)+" · "+v2.code},v2.code)})]}),
+    vens.map(function(v2){return n.jsx("option",{value:v2.code,children:(v2.nm||v2.code)+" · "+v2.code},v2.code)})]}),
    n.jsxs("select",{className:"ui-input",value:Fm.fy,onChange:set("fy"),children:[
     ["2024-25","2025-26","2026-27","2027-28"].map(function(x){return n.jsx("option",{children:x},x)})]}),
    n.jsxs("select",{className:"ui-input",value:Fm.mo,onChange:set("mo"),children:[
@@ -3802,7 +3802,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082m";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082n";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

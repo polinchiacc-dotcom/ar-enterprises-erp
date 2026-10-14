@@ -120,6 +120,7 @@ function part3(){
     const vsel2=[...A.w.document.querySelectorAll('select')].find(sl=>[...sl.options].some(o=>o.value==='PDK26HW001'));
     ok(!!vsel2,'vendor dropdown first option');
     ok(vsel2.options[0].value===''&&vsel2.options[0].textContent.includes('தேர்ந்து'),'placeholder first');
+    ok([...vsel2.options].some(o=>o.textContent.indexOf('Sri Balaji Hardwares · PDK26HW001')>=0),'option shows vendor NAME · code');
     const dis=[...A.w.document.querySelectorAll('select')].find(sl=>sl.disabled);
     ok(!!dis&&dis.options[0].textContent.includes('ஏஜெண்ட்'),'agent field empty/disabled');
     vsel2.value='PDK26HW001';vsel2.dispatchEvent(new A.w.Event('change',{bubbles:!0}));

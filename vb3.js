@@ -178,7 +178,8 @@ function EyV3Call(act,pr,cb){
  s.src=u+"?callback="+encodeURIComponent(fn)+"&k="+encodeURIComponent(EyV3Key)+"&action="+encodeURIComponent(act)+(q.length?"&"+q.join("&"):"");
  document.head.appendChild(s)}
 if(!(window.EyV3Api&&window.EyV3Api.stub))window.EyV3Api={call:EyV3Call,url:EyV3Url};
-function EyV3SetupCard(on){
+function EyV3SetupCard(p){
+ var on=p&&p.on;
  const{lang:f}=xe();
  var L=function(a,b){return f==="ta"?b:a};
  var[u,Su]=E.useState(EyV3Url()),[st,Sst]=E.useState("");

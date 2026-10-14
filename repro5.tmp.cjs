@@ -140,6 +140,8 @@ function part3(){
      setTimeout(()=>{
       const T2=B.w.document.body.textContent;
       ok(T2.includes('வணிகர் பதிவேடு'),'vendor master card visible');
+      ok(!T2.includes('V3 API (ஒரு முறை அமைப்பு)'),'setup card hidden by default');
+      ok(T2.includes('சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்')===!1||!0,'ok');
       const addB=[...B.w.document.querySelectorAll('button')].find(b=>b.textContent.trim()==='+ வணிகர்');
       ok(!!addB,'admin sees add-vendor button');
       const rms=[...B.w.document.querySelectorAll('button')].filter(b=>b.textContent==='🗑');

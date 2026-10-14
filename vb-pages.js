@@ -93,7 +93,6 @@ function EyVendPage({user:c}){
   [["Filtered total",list.length,"","",fV,fN],["Grand total",all.length,"","",tV,tN]])}
  return n.jsxs("div",{children:[
   EyVbHead(L("Vendors","வணிகர்கள்"),null,L("Suppliers from GSTR-2B + IMS — click a vendor for their bills","GSTR-2B + IMS சப்ளையர்கள் — பில்களுக்கு வணிகரை click பண்ணுங்க")),,
-  n.jsx(EyV3SetupCard,{}),
   n.jsx(EyV3VenCard,{}),
   EyVbChips([[L("Vendors","வணிகர்கள்"),String(all.length)],["பில்கள்",String(tN)],["₹ "+L("Total purchases","மொத்த கொள்முதல்"),"₹"+EyVbInr(tV)]]),
   n.jsxs("div",{className:"ui-card",style:{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"},children:[

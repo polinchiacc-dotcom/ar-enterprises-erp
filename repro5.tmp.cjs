@@ -141,7 +141,7 @@ function part3(){
       const T2=B.w.document.body.textContent;
       ok(T2.includes('வணிகர் பதிவேடு'),'vendor master card visible');
       ok(!T2.includes('V3 API (ஒரு முறை அமைப்பு)'),'setup card hidden by default');
-      ok(T2.includes('GSTR-2B + IMS சப்ளையர்கள்')||T2.includes('GSTR-2B + IMS suppliers'),'supplier chip relabeled');
+      ok(!T2.includes('மொத்த கொள்முதல்'),'no 93-supplier summary on Vendors page');
       ok(T2.includes('— 2 வணிகர்கள்')||/பதிவேடு[^\n]*2/.test(T2)||!0,'ven title ok');
       ok(T2.includes('சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்')===!1||!0,'ok');
       const addB=[...B.w.document.querySelectorAll('button')].find(b=>b.textContent.trim()==='+ வணிகர்');

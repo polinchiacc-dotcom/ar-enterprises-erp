@@ -217,7 +217,9 @@ function EyVendPage({user:c}){
   list.map(function(s,i){return [i+1,s.nm,s.g,s.n,s.vl,s.tx,s.last]}),
   [["Filtered total",list.length,"","",fV,fN],["Grand total",all.length,"","",tV,tN]])}
  return n.jsxs("div",{children:[
-  EyVbHead(L("Vendors","வணிகர்கள்"),null,L("Suppliers from GSTR-2B + IMS — click a vendor for their bills","GSTR-2B + IMS சப்ளையர்கள் — பில்களுக்கு வணிகரை click பண்ணுங்க")),
+  EyVbHead(L("Vendors","வணிகர்கள்"),null,L("Suppliers from GSTR-2B + IMS — click a vendor for their bills","GSTR-2B + IMS சப்ளையர்கள் — பில்களுக்கு வணிகரை click பண்ணுங்க")),,
+  n.jsx(EyV3SetupCard,{}),
+  n.jsx(EyV3VenCard,{}),
   EyVbChips([[L("Vendors","வணிகர்கள்"),String(all.length)],["பில்கள்",String(tN)],["₹ "+L("Total purchases","மொத்த கொள்முதல்"),"₹"+EyVbInr(tV)]]),
   n.jsxs("div",{className:"ui-card",style:{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"},children:[
    n.jsx("input",{className:"ui-input",style:{maxWidth:280},placeholder:L("Search name / GSTIN…","பெயர் / GSTIN தேடு…"),value:q,onChange:function(e){Sq(e.target.value)}}),
@@ -238,9 +240,7 @@ function EyVendPage({user:c}){
     n.jsx("td",{className:"mono",children:"₹"+EyVbInr(s.tx)}),
     n.jsx("td",{className:"mono",children:s.last||"—"}),
     n.jsx("td",{children:(s.b2?"2B":"")+(s.b2&&s.ims?" + ":"")+(s.ims?"IMS":"")})]},s.g)})}),
-  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Filtered total","வடிகட்டிய மொத்தம்")}),n.jsx("td",{children:list.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:fN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(fV)})]},"ft1"),n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")}),n.jsx("td",{children:all.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:tN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(tV)})]},"ft2")]})]}),
- n.jsx(EyV3SetupCard,{}),
- n.jsx(EyV3VenCard,{})]})
+  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Filtered total","வடிகட்டிய மொத்தம்")}),n.jsx("td",{children:list.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:fN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(fV)})]},"ft1"),n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")}),n.jsx("td",{children:all.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:tN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(tV)})]},"ft2")]})]})]})
 }
 function EyVendDetail({user:c,gin:g0}){
  const{t:u,lang:f}=xe(),r=Ue();
@@ -3803,7 +3803,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082k";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082l";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

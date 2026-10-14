@@ -184,6 +184,7 @@ function part3(){
             setTimeout(()=>{
             const T5=D.w.document.body.textContent;
             ok(T5.includes('101'),'2B auto-matched supplier row 101 shown');
+            ok(T5.includes('TXN-TEST1')&&T5.includes('இந்த வணிகருக்கு transactions'),'vendor-month hint line');
             ok(!T5.includes('777'),'non-matching supplier hidden');
             const cbx=[...D.w.document.querySelectorAll('input[type=checkbox]')].filter(c=>!c.disabled);
             ok(cbx.length>=1,'checkbox present');cbx[0]&&cbx[0].click();

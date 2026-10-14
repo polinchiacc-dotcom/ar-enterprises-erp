@@ -54,10 +54,9 @@ const step=(fn,ms)=>new Promise(r=>setTimeout(()=>{fn();r()},ms));
  await step(()=>nav('#/vendors'),2000);
  await step(()=>{},2500);
  ok(T().includes('வணிகர்கள்'),'Vendors page title');
- ok(T().includes('NAGA AND CO')&&T().includes('MS BLUE METAL'),'vendor rows render');
- ok(T().includes('33ADXPB8031G1ZL'),'GSTIN mono col');
- ok(T().includes('₹93,04,117')&&T().includes('₹93,86,326'),'NAGA ₹93,04,117 + grand ₹93,86,326');
- ok(T().includes('வடிகட்டிய மொத்தம்')&&T().includes('மொத்த கூட்டுத்தொகை (வடிகட்டாத)'),'both totals rows');
+ ok(T().includes('V3 வணிகர் பதிவேடு'),'V3 vendor master card on Vendors page');
+ ok(!T().includes('NAGA AND CO'),'93-supplier list removed from Vendors page');
+ // (93-supplier table moved off Vendors page — GSTIN/total checks covered on Bills & txn pages)
  // detail
  await step(()=>nav('#/vendors/33ADXPB8031G1ZL'),800);
  await step(()=>{},1500);

@@ -71,50 +71,12 @@ function EyVbChips(items){return n.jsx("div",{className:"ui-stats",children:item
   n.jsx("div",{style:{fontSize:11,color:"var(--tx-3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"},children:c[0]}),
   n.jsx("div",{style:{fontSize:20,fontWeight:800,marginTop:3,color:c[2]||"var(--tx-1)"},children:c[1]})]},i)})})}
 function EyVendPage({user:c}){
- const{t:u,lang:f}=xe(),r=Ue();
- var[rd,Srd]=E.useState(0),[q,Sq]=E.useState(""),[srt,Ssrt]=E.useState("vl");
+ const{t:u,lang:f}=xe();
  var L=function(a,b){return f==="ta"?b:a};
- E.useEffect(function(){EyVbFetch(function(){Srd(function(x){return x+1})})},[]);
- if(!EyVbSup||!EyVbSup.done)return EyVbLoad("l",L("Vendor data loading…","வணிகர் தரவு ஏற்றப்படுகிறது…"));
- if(EyVbSup.err)return n.jsx(EyVbLoad,{f:"e"});
- var all=Object.keys(EyVbSup.sup).map(function(g){return EyVbSup.sup[g]});
- var qq=q.trim().toLowerCase();
- var list=all.filter(function(s){return !qq||s.nm.toLowerCase().indexOf(qq)>=0||s.g.toLowerCase().indexOf(qq)>=0});
- list.sort(function(a,b){return srt==="n"?b.n-a.n:srt==="nm"?a.nm.localeCompare(b.nm):b.vl-a.vl});
- var tN=all.reduce(function(a,s){return a+s.n},0),tV=all.reduce(function(a,s){return a+s.vl},0);
- var fN=list.reduce(function(a,s){return a+s.n},0),fV=list.reduce(function(a,s){return a+s.vl},0);
- function pr(){EyVbPrint(L("Vendors — Purchase Summary","வணிகர்கள் — கொள்முதல் சுருக்கம்"),L("From GSTR-2B + IMS","GSTR-2B + IMS இலிருந்து"),
-  ["#","Name","GSTIN","Bills","Total ₹","Taxable ₹","Last bill"],
-  list.map(function(s,i){return [i+1,s.nm||"—",s.g,s.n,"₹"+EyVbInr(s.vl),"₹"+EyVbInr(s.tx),s.last||"—"]}),
-  [[L("Filtered total","வடிகட்டிய மொத்தம்")+" ("+list.length+" "+L("vendors","வணிகர்கள்")+")","₹"+EyVbInr(fV)+" · "+fN+" "+L("bills","பில்கள்")],
-   [L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")+" ("+all.length+")","₹"+EyVbInr(tV)+" · "+tN+" "+L("bills","பில்கள்")]],false)}
- function csv(){EyVbCsv("vendors.csv",["#","Name","GSTIN","Bills","Total","Taxable","Last bill"],
-  list.map(function(s,i){return [i+1,s.nm,s.g,s.n,s.vl,s.tx,s.last]}),
-  [["Filtered total",list.length,"","",fV,fN],["Grand total",all.length,"","",tV,tN]])}
  return n.jsxs("div",{children:[
-  EyVbHead(L("Vendors","வணிகர்கள்"),null,L("Suppliers from GSTR-2B + IMS — click a vendor for their bills","GSTR-2B + IMS சப்ளையர்கள் — பில்களுக்கு வணிகரை click பண்ணுங்க")),,
-  n.jsx(EyV3VenCard,{}),
-  EyVbChips([[L("GSTR-2B + IMS suppliers","GSTR-2B + IMS சப்ளையர்கள்"),String(all.length)],["பில்கள்",String(tN)],["₹ "+L("Total purchases","மொத்த கொள்முதல்"),"₹"+EyVbInr(tV)]]),
-  n.jsxs("div",{className:"ui-card",style:{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"},children:[
-   n.jsx("input",{className:"ui-input",style:{maxWidth:280},placeholder:L("Search name / GSTIN…","பெயர் / GSTIN தேடு…"),value:q,onChange:function(e){Sq(e.target.value)}}),
-   n.jsxs("select",{className:"ui-input",style:{maxWidth:200},value:srt,onChange:function(e){Ssrt(e.target.value)},children:[
-    n.jsx("option",{value:"vl",children:L("Sort: Value ↓","வரிசை: தொகை ↓")}),
-    n.jsx("option",{value:"n",children:L("Sort: Bills ↓","வரிசை: பில்கள் ↓")}),
-    n.jsx("option",{value:"nm",children:L("Sort: Name","வரிசை: பெயர்")})]}),
-   n.jsx("div",{style:{flex:1}}),
-   n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:csv,children:"📊 CSV"}),
-   n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:pr,children:"🖨️ "+L("Print A4","A4 அச்சு")})]}),
-  n.jsx(EyTblX,{head:["#",L("Name","பெயர்"),"GSTIN",L("Bills","பில்கள்"),L("Total ₹","மொத்தம் ₹"),L("Taxable ₹","வரி மதிப்பு ₹"),L("Last bill","கடைசி பில்"),"ⓘ"],children:
-   list.map(function(s,i){return n.jsxs("tr",{style:{cursor:"pointer"},onClick:function(){r("/vendors/"+encodeURIComponent(s.g))},children:[
-    n.jsx("td",{children:i+1}),
-    n.jsx("td",{style:{fontWeight:700},children:s.nm||"—"}),
-    n.jsx("td",{className:"mono",children:s.g}),
-    n.jsx("td",{className:"mono",children:s.n}),
-    n.jsx("td",{className:"mono",style:{fontWeight:700},children:"₹"+EyVbInr(s.vl)}),
-    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(s.tx)}),
-    n.jsx("td",{className:"mono",children:s.last||"—"}),
-    n.jsx("td",{children:(s.b2?"2B":"")+(s.b2&&s.ims?" + ":"")+(s.ims?"IMS":"")})]},s.g)})}),
-  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Filtered total","வடிகட்டிய மொத்தம்")}),n.jsx("td",{children:list.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:fN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(fV)})]},"ft1"),n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")}),n.jsx("td",{children:all.length+" "+L("vendors","வணிகர்கள்")}),n.jsx("td",{children:tN+" "+L("bills","பில்கள்")}),n.jsx("td",{style:{fontWeight:800},children:"₹"+EyVbInr(tV)})]},"ft2")]})]})]})
+  EyVbHead(L("Vendors","வணிகர்கள்"),null,L("Field vendor master — the same 12-name list used in Transactions & Bills","கள வணிகர் பதிவேடு — Transactions & Bills இல் உள்ள அதே பட்டியல்")),
+  n.jsx(EyV3VenCard,{})
+ ]});
 }
 function EyVendDetail({user:c,gin:g0}){
  const{t:u,lang:f}=xe(),r=Ue();
@@ -733,7 +695,7 @@ function EyV3BillsCard(){
  const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
  var[list,Slist]=E.useState(null),[tabs,Stabs]=E.useState(null),[tab2,Stab2]=E.useState("");
  var[vc,Svc]=E.useState(""),[rows2,Srows2]=E.useState(null),[sup,Ssup]=E.useState(""),[q2,Sq2]=E.useState("");
- var[sel,Ssel]=E.useState({}),[busy,Sbusy]=E.useState(false),[st,Sst]=E.useState(""),[prg,Sprg]=E.useState("");
+ var[sel,Ssel]=E.useState({}),[busy,Sbusy]=E.useState(false),[st,Sst]=E.useState(""),[prg,Sprg]=E.useState(""),[txv,Stxv]=E.useState(null);
  var loadV=function(){Slist(null);EyV3Call("list",{tab:"vendors"},function(e2,d2){Slist(e2?[]:((d2&&d2.rows)||[]))})};
  E.useEffect(function(){loadV();EyV3Call("list",{tab:"2btabs"},function(e2,d2){var tl=e2?[]:((d2&&d2.rows)||[]);Stabs(tl);if(tl.length)Stab2(tl[0])})},[]);
  var norm=function(x){return String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"")};
@@ -741,6 +703,7 @@ function EyV3BillsCard(){
   EyV3Call("bills2B",{sheet:name},function(e2,d2){Srows2(e2?[]:((d2&&d2.rows)||[]))})};
  E.useEffect(function(){loadTab(tab2)},[tab2]);
  var rows=rows2||[];
+ E.useEffect(function(){ if(!vc){Stxv(null);return} EyV3Call("list",{tab:"txns"},function(e3,d3){Stxv(e3?[]:((d3&&d3.rows)||[]).filter(function(t){return String(t.vendorCode)===vc}))})},[vc]);
  var supNames=[];(function(){var seen={};rows.forEach(function(r){var k=r.nm||"—";if(!seen[k]){seen[k]=1;supNames.push(k)}});supNames.sort()})();
  var selVen=(list||[]).filter(function(x){return x.vendorCode===vc})[0]||null;
  var autoSup=null;
@@ -784,6 +747,7 @@ function EyV3BillsCard(){
     supNames.map(function(sn){return n.jsx("option",{value:sn,children:sn+" ("+sups_count(rows,sn)+")"},sn)})]}),
    n.jsx("input",{className:"ui-input",style:{maxWidth:190},placeholder:L("Filter invoice…","Invoice வடிகட்டு…"),value:q2,onChange:function(e2){Sq2(e2.target.value)}}),
    busy?n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)",alignSelf:"center"},children:prg}):null]}),
+  txv?n.jsx("div",{style:{fontSize:12.5,color:"var(--tx-3)",marginBottom:8},children: txv.length? L("Transactions for this vendor","இந்த வணிகருக்கு transactions")+": "+txv.map(function(t){return (EyV3M3(t.month)+" "+String(t.fy||"")).trim()+" · "+t.txnId+(t.status?" ("+t.status+")":"")}).join(" | ") : L("No transaction yet for this vendor — create one in Transactions for the month you want bills for","இந்த வணிகருக்கு இன்னும் transaction இல்லை — பில் வேண்டிய மாதத்துக்கு Transactions பக்கத்தில் உருவாக்குங்க")}):null,
   rows2?(shown.length?n.jsx("div",{style:{maxHeight:300,overflowY:"auto"},children:n.jsx(EyTblX,{head:["",L("Supplier","சப்ளையர்"),L("Invoice","Invoice"),L("Date","தேதி"),L("Taxable ₹","வரி மதிப்பு ₹"),L("Total ₹","மொத்த ₹")],children:
    shown.map(function(r){var key=String(rows.indexOf(r));return n.jsxs("tr",{children:[
     n.jsx("td",{children:n.jsx("input",{type:"checkbox",checked:!!sel[key],onChange:function(e2){var x=Object.assign({},sel);x[key]=e2.target.checked;Ssel(x)}})}),

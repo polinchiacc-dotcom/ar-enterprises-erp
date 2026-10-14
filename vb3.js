@@ -527,7 +527,7 @@ function EyV3BillsCard(){
  const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
  var[list,Slist]=E.useState(null),[tabs,Stabs]=E.useState(null),[tab2,Stab2]=E.useState("");
  var[vc,Svc]=E.useState(""),[rows2,Srows2]=E.useState(null),[sup,Ssup]=E.useState(""),[q2,Sq2]=E.useState("");
- var[sel,Ssel]=E.useState({}),[busy,Sbusy]=E.useState(false),[st,Sst]=E.useState(""),[prg,Sprg]=E.useState("");
+ var[sel,Ssel]=E.useState({}),[busy,Sbusy]=E.useState(false),[st,Sst]=E.useState(""),[prg,Sprg]=E.useState(""),[txv,Stxv]=E.useState(null);
  var loadV=function(){Slist(null);EyV3Call("list",{tab:"vendors"},function(e2,d2){Slist(e2?[]:((d2&&d2.rows)||[]))})};
  E.useEffect(function(){loadV();EyV3Call("list",{tab:"2btabs"},function(e2,d2){var tl=e2?[]:((d2&&d2.rows)||[]);Stabs(tl);if(tl.length)Stab2(tl[0])})},[]);
  var norm=function(x){return String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"")};
@@ -535,6 +535,7 @@ function EyV3BillsCard(){
   EyV3Call("bills2B",{sheet:name},function(e2,d2){Srows2(e2?[]:((d2&&d2.rows)||[]))})};
  E.useEffect(function(){loadTab(tab2)},[tab2]);
  var rows=rows2||[];
+ E.useEffect(function(){ if(!vc){Stxv(null);return} EyV3Call("list",{tab:"txns"},function(e3,d3){Stxv(e3?[]:((d3&&d3.rows)||[]).filter(function(t){return String(t.vendorCode)===vc}))})},[vc]);
  var supNames=[];(function(){var seen={};rows.forEach(function(r){var k=r.nm||"—";if(!seen[k]){seen[k]=1;supNames.push(k)}});supNames.sort()})();
  var selVen=(list||[]).filter(function(x){return x.vendorCode===vc})[0]||null;
  var autoSup=null;
@@ -578,6 +579,7 @@ function EyV3BillsCard(){
     supNames.map(function(sn){return n.jsx("option",{value:sn,children:sn+" ("+sups_count(rows,sn)+")"},sn)})]}),
    n.jsx("input",{className:"ui-input",style:{maxWidth:190},placeholder:L("Filter invoice…","Invoice வடிகட்டு…"),value:q2,onChange:function(e2){Sq2(e2.target.value)}}),
    busy?n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)",alignSelf:"center"},children:prg}):null]}),
+  txv?n.jsx("div",{style:{fontSize:12.5,color:"var(--tx-3)",marginBottom:8},children: txv.length? L("Transactions for this vendor","இந்த வணிகருக்கு transactions")+": "+txv.map(function(t){return (EyV3M3(t.month)+" "+String(t.fy||"")).trim()+" · "+t.txnId+(t.status?" ("+t.status+")":"")}).join(" | ") : L("No transaction yet for this vendor — create one in Transactions for the month you want bills for","இந்த வணிகருக்கு இன்னும் transaction இல்லை — பில் வேண்டிய மாதத்துக்கு Transactions பக்கத்தில் உருவாக்குங்க")}):null,
   rows2?(shown.length?n.jsx("div",{style:{maxHeight:300,overflowY:"auto"},children:n.jsx(EyTblX,{head:["",L("Supplier","சப்ளையர்"),L("Invoice","Invoice"),L("Date","தேதி"),L("Taxable ₹","வரி மதிப்பு ₹"),L("Total ₹","மொத்த ₹")],children:
    shown.map(function(r){var key=String(rows.indexOf(r));return n.jsxs("tr",{children:[
     n.jsx("td",{children:n.jsx("input",{type:"checkbox",checked:!!sel[key],onChange:function(e2){var x=Object.assign({},sel);x[key]=e2.target.checked;Ssel(x)}})}),

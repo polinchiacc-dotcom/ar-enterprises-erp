@@ -117,11 +117,19 @@ function part3(){
    const btn=[...A.w.document.querySelectorAll('button')].find(b=>b.textContent.indexOf('பரிவர்த்தனை')>=0&&b.textContent.trim().indexOf('+')>=0);
    ok(!!btn,'+ txn button found');btn&&btn.click();
    setTimeout(()=>{
+    const vsel2=[...A.w.document.querySelectorAll('select')].find(sl=>[...sl.options].some(o=>o.value==='PDK26HW001'));
+    ok(!!vsel2,'vendor dropdown first option');
+    ok(vsel2.options[0].value===''&&vsel2.options[0].textContent.includes('தேர்ந்து'),'placeholder first');
+    const dis=[...A.w.document.querySelectorAll('select')].find(sl=>sl.disabled);
+    ok(!!dis&&dis.options[0].textContent.includes('ஏஜெண்ட்'),'agent field empty/disabled');
+    vsel2.value='PDK26HW001';vsel2.dispatchEvent(new A.w.Event('change',{bubbles:!0}));
+    setTimeout(()=>{
     const T=A.w.document.body.textContent.replace(/\s+/g,' ');
     ok(T.includes('இந்த வணிகர் இதுவரை'),'vendor summary line shown');
     ok(T.includes('1 txns')&&T.includes('3,00,950'),'summary has 1 txn & ₹3,00,950');
     ok(T.includes('jan/Open')||T.includes('January/Open')||/jan\//i.test(T),'summary status shown');
     A.w.close();
+    },400);
     // 3b: gateway admin on vendors page -> add button + remove buttons
     const B=mk(!0);
     B.w.eval(bundle);

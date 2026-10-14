@@ -198,6 +198,9 @@ function EyV3SetupCard(p){
      EyV3Call("ping",{},function(e2,d2){Sst(e2?("✗ "+e2):("✓ V3 API OK"+(d2&&d2.time?" · "+d2.time.slice(0,19):"")))})},
     children:L("Test","சோதி")}):null]}),
   st?n.jsx("div",{style:{fontSize:12,marginTop:6,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}
+function V3VenTitle(L,list){
+ return "V3 வணிகர் பதிவேடு (AR_ERP_Pudukkottai)"+(list&&list.length?" — "+list.length+" "+L("vendors","வணிகர்கள்"):"");
+}
 function EyV3VenCard(){
  const{lang:f}=xe();
  var L=function(a,b){return f==="ta"?b:a};
@@ -224,7 +227,7 @@ function EyV3VenCard(){
    Sst("✓ "+v2.vendorCode+" "+L("removed","நீக்கப்பட்டது"));refresh()})};
  return n.jsxs("div",{className:"ui-card",children:[
   n.jsxs("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:8},children:[
-   n.jsx("div",{style:{fontWeight:800},children:L("V3 Vendor Master (AR_ERP_Pudukkottai)","V3 வணிகர் பதிவேடு (AR_ERP_Pudukkottai)")}),
+   n.jsx("div",{style:{fontWeight:800},children:V3VenTitle(L,list)}),
    n.jsx("div",{style:{flex:1}}),
    n.jsx("button",{className:"ui-btn ui-btn-sm",title:"V3 API",onClick:function(){Sso(!so)},children:"⚙"}),
    perm.canAddVen?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",onClick:function(){Saf(!af)},children:(af?"✕ ":"+ ")+L("Vendor","வணிகர்")}):n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)"},children:L("Add: agent / manager / admin only","சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்")})]}),

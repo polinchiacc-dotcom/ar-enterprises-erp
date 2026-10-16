@@ -205,7 +205,7 @@ function EyV3VenCard(){
  const{lang:f}=xe();
  var L=function(a,b){return f==="ta"?b:a};
  var perm=EyV3Role();
- var[list,Slist]=E.useState(null),[af,Saf]=E.useState(false),[st,Sst]=E.useState(""),[so,Sso]=E.useState(false);
+ var[list,Slist]=E.useState(null),[af,Saf]=E.useState(false),[st,Sst]=E.useState(""),[so,Sso]=E.useState(false),[em,Sem]=E.useState("");
  var[Fm,SFm]=E.useState({name:"",district:"Pudukkottai",mobile:"",type:"Hardware",gst:"",addr:"",reg:String(new Date().getFullYear())});
  var refresh=function(){Slist(null);EyV3Call("list",{tab:"vendors"},function(e2,d2){Slist(e2?[]:((d2&&d2.rows)||[]))})};
  E.useEffect(function(){refresh()},[]);
@@ -213,11 +213,20 @@ function EyV3VenCard(){
  var submit=function(){
   if(!Fm.name.trim())return Sst(L("Name வேணும்","பெயர் வேணும்"));
   Sst("…");
+  if(em){
+   EyV3Call("vendorEdit",{vendorCode:em,name:Fm.name,district:Fm.district,mobile:Fm.mobile,type:Fm.type,gst:Fm.gst,addr:Fm.addr,reg:Fm.reg,role:perm.role,user:"admin"},function(e2,d2){
+    if(e2)return Sst("✗ "+e2);
+    if(!d2||!d2.ok)return Sst("✗ "+((d2&&d2.error)||"தவறு"));
+    Sst("✓ "+em+" — "+Fm.name);Sem("");Saf(false);refresh()});
+   return}
   EyV3Call("vendorAdd",{name:Fm.name,district:Fm.district,mobile:Fm.mobile,type:Fm.type,gst:Fm.gst,addr:Fm.addr,reg:Fm.reg,role:perm.role,user:"admin"},function(e2,d2){
    if(e2)return Sst("✗ "+e2);
    if(!d2||!d2.ok)return Sst("✗ "+((d2&&d2.error)||"தவறு"));
    Sst("✓ "+(d2.vendorCode||"")+" — "+Fm.name);
    SFm({name:"",district:Fm.district,mobile:"",type:Fm.type,gst:"",addr:"",reg:Fm.reg});Saf(false);refresh()})};
+ var edit=function(v2){
+  Sem(v2.vendorCode);Saf(true);
+  SFm({name:v2.vendorName||v2.nm||"",district:v2.districtName||v2.dist||"Pudukkottai",mobile:v2.mobile||v2.mob||"",type:v2.businessType||v2.ty||"Hardware",gst:v2.gstNumber||v2.gstin||"",addr:v2.address||v2.addr||"",reg:v2.regYear||v2.reg||String(new Date().getFullYear())})};
  var rm=function(v2){
   if(!window.confirm(L("Remove vendor "+v2.vendorCode+" — "+v2.vendorName+"?","வணிகர் "+v2.vendorCode+" — "+v2.vendorName+" ஐ நீக்கவா?")))return;
   Sst("…");
@@ -230,8 +239,9 @@ function EyV3VenCard(){
    n.jsx("div",{style:{fontWeight:800},children:V3VenTitle(L,list)}),
    n.jsx("div",{style:{flex:1}}),
    n.jsx("button",{className:"ui-btn ui-btn-sm",title:"V3 API",onClick:function(){Sso(!so)},children:"⚙"}),
-   perm.canAddVen?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",onClick:function(){Saf(!af)},children:(af?"✕ ":"+ ")+L("Vendor","வணிகர்")}):n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)"},children:L("Add: agent / manager / admin only","சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்")})]}),
+   perm.canAddVen?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",onClick:function(){Saf(!af);Sem("")},children:(af?"✕ ":"+ ")+L("Vendor","வணிகர்")}):n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)"},children:L("Add: agent / manager / admin only","சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்")})]}),
   so?n.jsx(EyV3SetupCard,{on:!0}):null,
+  af&&em?n.jsx("div",{style:{fontSize:13,marginBottom:6,color:"var(--accent)"},children:"✏ "+L("Editing ","திருத்துகிறது ")+em}):null,
   af?n.jsxs("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:8,marginBottom:10},children:[
    n.jsx("input",{className:"ui-input",placeholder:L("Vendor name *","வணிகர் பெயர் *"),value:Fm.name,onChange:set("name")}),
    n.jsx("input",{className:"ui-input",placeholder:L("Mobile","கைபேசி"),value:Fm.mobile,onChange:set("mobile")}),
@@ -251,7 +261,7 @@ function EyV3VenCard(){
     n.jsx("td",{className:"mono",children:v2.gstNumber||"—"}),
     n.jsx("td",{className:"mono",children:v2.mobile||"—"}),
     n.jsx("td",{children:v2.districtName}),
-    n.jsx("td",{children:perm.canDelVen?n.jsx("button",{className:"ui-btn ui-btn-sm",title:"🗑",onClick:function(){rm(v2)},children:"🗑"}):"—"})]},v2.vendorCode)}):
+    n.jsx("td",{children:[perm.canAddVen?n.jsx("button",{className:"ui-btn ui-btn-sm",title:L("Edit","திருத்து"),onClick:function(){edit(v2)},children:"✏"}):null," ",perm.canDelVen?n.jsx("button",{className:"ui-btn ui-btn-sm",title:"🗑",onClick:function(){rm(v2)},children:"🗑"}):null]})]},v2.vendorCode)}):
    [n.jsx("tr",{children:n.jsx("td",{colSpan:7,className:"ui-empty",children:L("No vendors yet","இன்னும் வணிகர் இல்லை")})},"e")]})]})}
 function EyTxnForm(p){
  var v=p.v,onDone=p.onDone;
@@ -472,9 +482,10 @@ function EyV3UsersCard(){
     st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}
 function EyV3AgentsCard(){
   const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
-  var[rows,Srows]=E.useState(null),[st,Sst]=E.useState(""),[bsy,Sbsy]=E.useState(false);
+  var[rows,Srows]=E.useState(null),[st,Sst]=E.useState(""),[bsy,Sbsy]=E.useState(false),[wal,Swal]=E.useState([]);
   var[fn2,Sfn]=E.useState(""),[un,Sun]=E.useState(""),[pw,Spw]=E.useState(""),[mb,Smb]=E.useState(""),[md,Smd]=E.useState("Pudukkottai"),[cp,Scp]=E.useState("0.5");
-  function load(){Srows(null);EyV3Call("list",{tab:"agents"},function(e,d){if(e){Srows([]);Sst("✗ "+String(e).slice(0,120));return}Srows((d&&d.rows)||[])})}
+  function load(){Srows(null);EyV3Call("list",{tab:"agents"},function(e,d){if(e){Srows([]);Sst("✗ "+String(e).slice(0,120));return}
+    EyV3Call("list",{tab:"wallet"},function(e2,d2){Swal(e2?[]:((d2&&d2.rows)||[]));Srows((d&&d.rows)||[])})})}
   E.useEffect(function(){load()},[]);
   function add(){
     if(!fn2.trim()){Sst("✗ "+L("Full name required","பெயர் வேணும்"));return}
@@ -492,6 +503,7 @@ function EyV3AgentsCard(){
     Sbsy(true);EyV3Call(ns==="Inactive"?"agentRemove":"agentEdit",ns==="Inactive"?{agentId:r2.agentId,user:"admin"}:{agentId:r2.agentId,status:ns,user:"admin"},function(e,d){Sbsy(false);
       if(e||(d&&!d.ok)){Sst("✗ "+String((d&&d.error)||e).slice(0,140));return}
       Sst("✓ "+r2.agentId+" → "+ns);load();});}
+  var awSum=function(id){var t=0;wal.forEach(function(r2){if(String(r2.agentId||"")===String(id))t+=(+r2.commission||0)});return t};
   var tbl=null;
   if(rows===null)tbl=n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")});
   else if(!rows.length)tbl=n.jsx("div",{className:"ui-empty",children:L("No agents yet","ஏஜெண்ட்கள் இல்லை")});
@@ -502,6 +514,7 @@ function EyV3AgentsCard(){
     n.jsx("td",{children:r.mobile||"—"}),
     n.jsx("td",{children:r.managerDistrict||"—"}),
     n.jsx("td",{className:"mono",children:(r.cpercent||"0.5")+"%"}),
+    n.jsx("td",{className:"mono",style:{color:"#0a7d43",fontWeight:700},children:"₹"+EyVbInr(awSum(r.agentId))}),
     n.jsx("td",{children:String(r.status||"")==="Inactive"?n.jsx("span",{style:{color:"#b3261e"},children:"Inactive"}):n.jsx("span",{style:{color:"#0a7d43"},children:"Active"})}),
     n.jsxs("td",{children:[
       n.jsx("button",{className:"ui-btn ui-btn-sm",disabled:bsy,onClick:function(){setPct(r)},children:"%"}),
@@ -594,3 +607,110 @@ function EyV3BillsCard(){
    n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:busy||!selKeys.length,onClick:doImport,children:L("Add as bills","பில்களாக சேர்")+(selKeys.length?" ("+selKeys.length+")":"")})]}),
   st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}
 function sups_count(rows,nm){var c2=0;for(var i2=0;i2<rows.length;i2++)if((rows[i2].nm||"—")===nm)c2++;return c2}
+
+function EyV3AdminPage(){
+ const{lang:f}=xe();var L=function(a,b){return f==="ta"?b:a};
+ var perm=EyV3Role();
+ var[D,SD]=E.useState(null),[fy,Sfy]=E.useState(""),[dist,Sdist]=E.useState(""),[st,Sst]=E.useState(""),[bsy,Sbsy]=E.useState(false);
+ var[wm,Swm]=E.useState({date:"",desc:"",type:"Invest",debit:"",credit:""});
+ var load=function(){SD(null);
+  EyV3Call("list",{tab:"vendors"},function(e1,d1){ if(e1){SD({err:String(e1)});return}
+  EyV3Call("list",{tab:"txns"},function(e2,d2){ if(e2){SD({err:String(e2)});return}
+  EyV3Call("list",{tab:"bills"},function(e3,d3){ if(e3){SD({err:String(e3)});return}
+  EyV3Call("list",{tab:"wallet"},function(e4,d4){
+  EyV3Call("list",{tab:"adminwallet"},function(e5,d5){
+   SD({ven:e1?[]:((d1&&d1.rows)||[]),txn:e2?[]:((d2&&d2.rows)||[]),bil:e3?[]:((d3&&d3.rows)||[]),wal:e4?[]:((d4&&d4.rows)||[]),awl:e5?[]:((d5&&d5.rows)||[])})})})})})})};
+ E.useEffect(function(){load()},[]);
+ if(!D)return EyVbLoad("l",L("Loading V3 admin data…","V3 நிர்வாக தரவு ஏற்றுகிறது…"));
+ if(D.err)return n.jsxs("div",{children:[n.jsx(EyV3SetupCard,{on:!0}),EyVbLoad("e",String(D.err))]});
+ var txns=D.txn.map(function(t){return {id:String(t.txnId||""),dist:String(t.districtName||"—"),fy:String(t.fy||""),mo:String(t.month||""),exp:+t.expected||0,gst:+t.gst||0,st:String(t.status||"").toLowerCase()}}).filter(function(t){return t.id});
+ var bills=D.bil.map(function(b){return {txn:String(b.txnId||""),amt:+b.amt||0,tot:+b.total||0}}).filter(function(b){return b.txn});
+ var awl=D.awl;
+ var bal=awl.length?(+awl[awl.length-1].balance||0):0;
+ var dBal=awl.reduce(function(a,r){return a+(+r.debit||0)},0),cBal=awl.reduce(function(a,r){return a+(+r.credit||0)},0);
+ var v3dist="";try{var _u=JSON.parse(sessionStorage.getItem("ar4.user")||"null");if(_u&&_u.v3)v3dist=_u.v3district||""}catch(e){}
+ var dists={};txns.forEach(function(t){dists[t.dist]=1});var distL=Object.keys(dists).sort();
+ var effDist=dist||(v3dist||"");
+ var F=txns.filter(function(t){return (!fy||t.fy===fy)&&(!effDist||t.dist===effDist)});
+ var bMap={},tMap={};bills.forEach(function(b){bMap[b.txn]=(bMap[b.txn]||0)+b.amt;tMap[b.txn]=(bMap[b.txn]||0)+b.tot});
+ var wMap={};D.wal.forEach(function(r){var k=String(r.txnId||"");if(k)wMap[k]=(wMap[k]||0)+(+r.commission||0)});
+ var allExp=txns.reduce(function(a,t){return a+t.exp},0),allGst=txns.reduce(function(a,t){return a+t.gst},0),allB=bills.reduce(function(a,b){return a+b.amt},0),allP=allExp*0.08;
+ var exp=F.reduce(function(a,t){return a+t.exp},0),gst=F.reduce(function(a,t){return a+t.gst},0),bA=F.reduce(function(a,t){return a+(bMap[t.id]||0)},0),prof=exp*0.08,comm=F.reduce(function(a,t){return a+(wMap[t.id]||0)},0);
+ var dMap={};F.forEach(function(t){var k=t.dist;var o=dMap[k]=dMap[k]||{d:k,n:0,exp:0,gst:0,b:0,c:0};o.n++;o.exp+=t.exp;o.gst+=t.gst;if(t.st==="closed")o.c++;o.b+=bMap[t.id]||0});
+ var dList=Object.keys(dMap).map(function(k){return dMap[k]});
+ var gMap={};F.forEach(function(t){var k=t.fy+"|"+EyV3M3(t.mo);var o=gMap[k]=gMap[k]||{k:k,fy:t.fy,mo:t.mo,n:0,exp:0,gst:0,comm:0,bA:0,bT:0};o.n++;o.exp+=t.exp;o.gst+=t.gst;o.comm+=wMap[t.id]||0;o.bA+=bMap[t.id]||0;o.bT+=tMap[t.id]||0});
+ var gList=Object.keys(gMap).map(function(k){return gMap[k]}).sort(function(a,b){return a.k.localeCompare(b.k)});
+ var dTot=dList.reduce(function(a,o){return a+o.b},0);
+ var gBT=gList.reduce(function(a,o){return a+o.bT},0);
+ var allComm=D.wal.reduce(function(a,r){return a+(+r.commission||0)},0),allBT=bills.reduce(function(a,b){return a+b.tot},0);
+ var addWal=function(){
+  Sbsy(true);EyV3Call("walletAdd",{date:wm.date,desc:wm.desc,type:wm.type,debit:num(wm.debit),credit:num(wm.credit),role:"admin",user:"admin"},function(e,d){Sbsy(false);
+   if(e||(d&&!d.ok))return Sst("✗ "+String((d&&d.error)||e).slice(0,140));
+   Sst("✓ "+L("Wallet updated · balance","வாலட் சேமிக்கப்பட்டது · நிலுவை")+" ₹"+EyVbInr((d&&d.balance)||0));Swm({date:"",desc:"",type:"Invest",debit:"",credit:""});load()})};
+ function pr(){EyVbPrint(L("V3 Admin — District Report","V3 நிர்வாகம் — மாவட்ட அறிக்கை"),(fy?("FY "+fy+" · "):"")+(effDist||L("All districts","எல்லா மாவட்டம்")),
+  [L("District","மாவட்டம்"),"Txns",L("Expected ₹","எதிர்பார்ப்பு ₹"),"GST ₹",L("Bills ₹","பில்கள் ₹"),"8% "+L("Profit","லாபம்"),L("Closed","மூடிய")],
+  dList.map(function(o){return [o.d,o.n,"₹"+EyVbInr(o.exp),"₹"+EyVbInr(o.gst),"₹"+EyVbInr(o.b),"₹"+EyVbInr(o.exp*0.08),o.c+"/"+o.n]}),
+  [[L("Filtered total","வடிகட்டிய மொத்தம்"),F.length,"₹"+EyVbInr(exp),"₹"+EyVbInr(gst),"₹"+EyVbInr(bA),"₹"+EyVbInr(prof),""],
+   [L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)"),txns.length,"₹"+EyVbInr(allExp),"₹"+EyVbInr(allGst),"₹"+EyVbInr(allB),"₹"+EyVbInr(allP),""]],false)}
+ function csv(){EyVbCsv("v3-admin.csv",[L("Month","மாதம்"),"FY","Txns",L("Expected ₹","எதிர்பார்ப்பு ₹"),"GST ₹",L("Bills Amt ₹","பில் தொகை ₹"),L("Bills Total ₹","பில் மொத்த ₹"),L("Commission ₹","கமிஷன் ₹"),"8% "+L("Profit","லாபம்")],
+  gList.map(function(o){return [o.mo,o.fy,o.n,o.exp,o.gst,o.bA,o.bT,o.comm,o.exp*0.08]}),
+  [[L("Filtered total","வடிகட்டிய மொத்தம்"),"",F.length,exp,gst,bA,gBT,comm,prof],
+   [L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)"),"",txns.length,allExp,allGst,allB,allBT,allComm,allP]])}
+ return n.jsxs("div",{children:[
+  EyVbHead(L("V3 Admin — Wallet & Reports","V3 நிர்வாகம் — வாலட் & அறிக்கைகள்"),null,L("V3 model: 8% profit on expected · admin wallet ledger · commissions","V3 மாதிரி: எதிர்பார்ப்பில் 8% லாபம் · நிர்வாக வாலட் · கமிஷன்கள்")),
+  EyVbChips([[L("Total Expected","மொத்த எதிர்பார்ப்பு"),"₹"+EyVbInr(exp)],[L("Bills Received","பில்கள் வரவு"),"₹"+EyVbInr(bA)],[L("Total GST","மொத்த GST"),"₹"+EyVbInr(gst)],[L("8% Profit","8% லாபம்"),"₹"+EyVbInr(prof)],[L("Commission","கமிஷன்"),"₹"+EyVbInr(comm)],[L("Wallet Balance","வாலட் நிலுவை"),"₹"+EyVbInr(bal)],[L("Vendors","வணிகர்கள்"),String(D.ven.length)],[L("Transactions","பரிவர்த்தனைகள்")+"",String(txns.length)]]),
+  n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10},children:[
+   n.jsxs("select",{className:"ui-input",style:{maxWidth:150},value:fy,onChange:function(e){Sfy(e.target.value)},children:[
+    n.jsx("option",{value:"",children:L("All FY","எல்லா FY")}),
+    ["2024-25","2025-26","2026-27","2027-28"].map(function(x){return n.jsx("option",{value:x,children:x},x)})]}),
+   n.jsxs("select",{className:"ui-input",style:{maxWidth:170},value:effDist,onChange:function(e){Sdist(e.target.value)},children:[
+    n.jsx("option",{value:"",children:L("All districts","எல்லா மாவட்டம்")}),
+    distL.map(function(x){return n.jsx("option",{value:x,children:x},x)})]}),
+   n.jsx("div",{style:{flex:1}}),
+   n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:csv,children:"📊 CSV"}),
+   n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:pr,children:"🖨️ "+L("Print A4","A4 அச்சு")}),
+   n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:load,children:"↻"})]}),
+  n.jsx(EyTblX,{head:[L("District","மாவட்டம்"),"Txns",L("Expected ₹","எதிர்பார்ப்பு ₹"),"GST ₹",L("Bills ₹","பில்கள் ₹"),"8% "+L("Profit","லாபம்"),L("Closed","மூடிய")],children:
+   dList.length?dList.map(function(o){return n.jsxs("tr",{children:[
+    n.jsx("td",{style:{fontWeight:700},children:o.d}),
+    n.jsx("td",{children:o.n}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.exp)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.gst)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.b)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.exp*0.08)}),
+    n.jsx("td",{children:o.c+"/"+o.n})]},o.d)}):
+   [n.jsx("tr",{children:n.jsx("td",{colSpan:7,className:"ui-empty",children:L("No transactions in filter","வடிகட்டில் பரிவர்த்தனை இல்லை")})},"e")]}) ,
+  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Filtered total","வடிகட்டிய மொத்தம்")}),n.jsx("td",{children:F.length+" txns"}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(exp)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(gst)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(bA)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(prof)}),n.jsx("td",{},"c1")]},"f1"),n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")}),n.jsx("td",{children:txns.length+" txns"}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(allExp)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allGst)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allB)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allP)}),n.jsx("td",{},"c2")]},"f2")]})]}),
+  n.jsx("div",{style:{fontWeight:800,margin:"16px 0 8px"},children:"🧮 "+L("Month-wise settlement (bills + commission)","மாத வாரியான கணக்கு (பில்கள் + கமிஷன்)")}),
+  n.jsx(EyTblX,{head:[L("Month","மாதம்"),"FY","Txns",L("Expected ₹","எதிர்பார்ப்பு ₹"),L("Bills Amt ₹","பில் தொகை ₹"),L("Bills Total ₹","பில் மொத்த ₹"),L("Commission ₹","கமிஷன் ₹"),"8% "+L("Profit","லாபம்")],children:
+   gList.length?gList.map(function(o){return n.jsxs("tr",{children:[
+    n.jsx("td",{style:{fontWeight:700},children:o.mo}),
+    n.jsx("td",{children:o.fy}),
+    n.jsx("td",{children:o.n}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.exp)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.bA)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.bT)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.comm)}),
+    n.jsx("td",{className:"mono",children:"₹"+EyVbInr(o.exp*0.08)})]},o.k)}):
+   [n.jsx("tr",{children:n.jsx("td",{colSpan:8,className:"ui-empty",children:L("No transactions in filter","வடிகட்டில் பரிவர்த்தனை இல்லை")})},"e")]}) ,
+  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Filtered total","வடிகட்டிய மொத்தம்")}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(exp)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(bA)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(gBT)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(comm)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(prof)})]},"f1"),n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Grand total (unfiltered)","மொத்த கூட்டுத்தொகை (வடிகட்டாத)")}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(allExp)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allB)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allBT)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allComm)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(allP)})]},"f2")]})]}),
+  n.jsx("div",{style:{fontWeight:800,margin:"16px 0 8px"},children:"💰 "+L("Admin Wallet (Admin_Wallet ledger)","நிர்வாக வாலட் (Admin_Wallet)")}),
+  perm.role==="admin"?n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10},children:[
+   n.jsx("input",{className:"ui-input",type:"date",style:{width:160},value:wm.date,onChange:function(e){Swm(Object.assign({},wm,{date:e.target.value}))}}),
+   n.jsx("input",{className:"ui-input",style:{width:220},placeholder:L("Description","விளக்கம்"),value:wm.desc,onChange:function(e){Swm(Object.assign({},wm,{desc:e.target.value}))}}),
+   n.jsxs("select",{className:"ui-input",style:{width:140},value:wm.type,onChange:function(e){Swm(Object.assign({},wm,{type:e.target.value}))},children:[
+    ["Invest","Advance","GST","Commission","Withdrawal","Other"].map(function(x){return n.jsx("option",{value:x,children:x},x)})]}),
+   n.jsx("input",{className:"ui-input",type:"number",style:{width:130},placeholder:L("Debit ₹","பற்ற ₹"),value:wm.debit,onChange:function(e){Swm(Object.assign({},wm,{debit:e.target.value}))}}),
+   n.jsx("input",{className:"ui-input",type:"number",style:{width:130},placeholder:L("Credit ₹","வரவு ₹"),value:wm.credit,onChange:function(e){Swm(Object.assign({},wm,{credit:e.target.value}))}}),
+   n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:bsy,onClick:addWal,children:"+ "+L("Add entry","பதிவு சேர்")})]}):null,
+  n.jsx(EyTblX,{head:[L("Date","தேதி"),L("Description","விளக்கம்"),L("Type","வகை"),L("Debit ₹","பற்ற ₹"),L("Credit ₹","வரவு ₹"),L("Balance ₹","நிலுவை ₹")],children:
+   awl.length?awl.map(function(r,i){return n.jsxs("tr",{children:[
+    n.jsx("td",{className:"mono",children:String(r.date||"").slice(0,10)}),
+    n.jsx("td",{children:r.desc||"—"}),
+    n.jsx("td",{children:r.type||"—"}),
+    n.jsx("td",{className:"mono",children:(+r.debit||0)?"₹"+EyVbInr(r.debit):"—"}),
+    n.jsx("td",{className:"mono",style:{color:"#0a7d43"},children:(+r.credit||0)?"₹"+EyVbInr(r.credit):"—"}),
+    n.jsx("td",{className:"mono",style:{fontWeight:700},children:"₹"+EyVbInr(r.balance)})]},"w"+i)}):
+   [n.jsx("tr",{children:n.jsx("td",{colSpan:6,className:"ui-empty",children:L("Wallet ledger is empty — add the first entry above","வாலட் காலியாக உள்ளது — முதல் பதிவை சேருங்கள்")})},"e")]}) ,
+  n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Totals","மொத்தம்")}),n.jsx("td",{}),n.jsx("td",{}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(dBal)}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(cBal)}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(bal)})]},"ft")]})]}),
+  st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}

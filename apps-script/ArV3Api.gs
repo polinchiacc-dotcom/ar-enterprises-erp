@@ -153,6 +153,35 @@ function vendorRemove_(p){
   audit_(p.user,'VENDOR_REMOVE',p.vendorCode,'');
   return {ok:true};
 }
+function vendorEdit_(p){
+  var rr=String(p.role||'').toLowerCase();
+  if(['admin','district','agent'].indexOf(rr)<0) throw new Error('Vendor திருத்த அனுமதி இல்லை (agent / manager / admin மட்டும்)');
+  var v=rows_('Vendors'),i,hit=0;
+  for(i=1;i<v.length;i++){ if(String(v[i][0]).trim()===String(p.vendorCode).trim()){ hit=i+1; break; } }
+  if(!hit) throw new Error('Vendor கிடைக்கவில்லை: '+p.vendorCode);
+  var cur=v[hit-1];
+  function pick(a,b){ return (p[a]!=null&&String(p[a]).trim()!=='')?String(p[a]).trim():String(cur[b]||''); }
+  var row=[cur[0], pick('name',1), pick('district',2), pick('mobile',3), pick('type',4), String(pick('gst',5)).toUpperCase(), pick('addr',6), pick('reg',7), cur[8]||nowIso()];
+  sh('Vendors').getRange(hit,1,1,row.length).setValues([row]);
+  try{
+    var m=rows_('Vendor_Master'),mh=0;
+    for(i=1;i<m.length;i++){ if(String(m[i][0]).trim()===String(p.vendorCode).trim()){ mh=i+1; break; } }
+    if(mh) sh('Vendor_Master').getRange(mh,1,1,row.length).setValues([row]);
+  }catch(e){}
+  audit_(p.user,'VENDOR_EDIT',p.vendorCode,row[1]);
+  return {ok:true, vendorCode:cur[0], vendorName:row[1]};
+}
+function walletAdd_(p){
+  var rr=String(p.role||'').toLowerCase();
+  if(rr!=='admin') throw new Error('Wallet மாற்ற அனுமதி admin-க்கு மட்டும்');
+  var w=rows_('Admin_Wallet'), bal=0, i;
+  for(i=1;i<w.length;i++){ var b2=num(w[i][5]); if(String(w[i][1]).trim()!==''||num(w[i][3])||num(w[i][4])) bal=b2; }
+  var dr=num(p.debit), cr=num(p.credit);
+  bal=+(bal+cr-dr).toFixed(2);
+  sh('Admin_Wallet').appendRow([String(p.date||nowIso()), String(p.desc||''), String(p.type||''), dr, cr, bal]);
+  audit_(p.user,'WALLET_ADD',String(p.type||''),(p.desc||'')+' -₹'+dr+' +₹'+cr+' bal ₹'+bal);
+  return {ok:true, balance:bal};
+}
 
 function userAdd_(p){
   var id='U'+rid(8);
@@ -248,6 +277,15 @@ function vlist_(tab){
   if(tab==='agents') return {ok:true, rows:obj(['agentId','fullName','username','password','mobile','managerId','managerName','managerDistrict','ct','cpercent','bank','acct','ifsc','upi','status','approvedBy','approvedAt','bonus','createdAt','lastLogin'])};
   if(tab==='wallet') return {ok:true, rows:obj(['id','agentId','date','description','txnId','vendorName','txnAmount','gp','pct','commission','ct','credited'])};
   if(tab==='overrides') return {ok:true, rows:obj(['id','agentId','vendorCode','vendorName','percent','setBy','setAt'])};
+  if(tab==='adminwallet'){
+    var w=rows_('Admin_Wallet'), out2=[], i2;
+    for(i2=1;i2<w.length;i2++){
+      var d=String(w[i2][1]||'').trim();
+      if(!d && !num(w[i2][3]) && !num(w[i2][4])) continue;
+      out2.push({date:String(w[i2][0]||''), desc:d, type:String(w[i2][2]||''), debit:num(w[i2][3]), credit:num(w[i2][4]), balance:num(w[i2][5])});
+    }
+    return {ok:true, rows:out2};
+  }
   if(tab==='2btabs'){
     var all=ss().getSheets(), out=[], i;
     for(i=0;i<all.length;i++){ var nm=all[i].getName(); if(/^GSTR2B_/i.test(nm)) out.push(nm); }
@@ -268,6 +306,8 @@ function doGet(e){
       case 'list': r=vlist_(p.tab); break;
       case 'vendorAdd': r=vendorAdd_(p); break;
       case 'vendorRemove': r=vendorRemove_(p); break;
+      case 'vendorEdit': r=vendorEdit_(p); break;
+      case 'walletAdd': r=walletAdd_(p); break;
       case 'txnAdd': r=txnAdd_(p); break;
       case 'billAdd': r=billAdd_(p); break;
       case 'bills2B': r=bills2B_(p.sheet); break;

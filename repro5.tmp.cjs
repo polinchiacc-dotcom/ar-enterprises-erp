@@ -23,6 +23,7 @@ function mkDom(sess){
 const setVal=(w,el,v)=>{const d=Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value');d.set.call(el,v);el.dispatchEvent(new w.Event('input',{bubbles:!0}))};
 const mk=()=>{const r=mkDom(!0);r.calls=[];r.bills=[];r.venEd=null;r.walAdded=null;
  r.w.EyV3Api={stub:!0,call:function(a,p,cb){r.calls.push(a+':'+(p.tab||p.sheet||''));
+  if(r.failApi&&a==='list'&&p.tab==='vendors')return cb('API down');
   if(a==='list'&&p.tab==='vendors')return cb(null,{ok:!0,rows:[{vendorCode:'PDK26HW001',vendorName:'Sri Balaji Hardwares',districtName:'Pudukkottai',mobile:'8838082009',businessType:'Hardware',gstNumber:'33ALXPV6099E3Z6'},{vendorCode:'PDK26CV006',vendorName:'PREMIER WINDOWS',districtName:'Pudukkottai',mobile:'9800000000',businessType:'Civil',gstNumber:'33EUSPK8681R1ZB'}]});
   if(a==='list'&&p.tab==='users')return cb(null,{ok:!0,rows:[{userId:'UXUFTMST',username:'pudukkottai',password:'pudukkottai@123',role:'district',districtName:'Pudukkottai'}]});
   if(a==='list'&&p.tab==='agents')return cb(null,{ok:!0,rows:[{agentId:'AGT001',fullName:'Arivoly',username:'Ariv3240',mobile:'9876543210',managerDistrict:'Pudukkottai',cpercent:0.5,status:'approved'}]});
@@ -260,9 +261,28 @@ function part4(){
    setTimeout(()=>{
     ok(E.walAdded&&E.walAdded.desc==='Test entry'&&+E.walAdded.credit===5000,'walletAdd recorded');
     ok(E.w.document.body.textContent.includes('9,500'),'new balance echoed');
-    console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
-    process.exit(fails===0?0:1);
+    part5();
    },900);
+  },2500);
+ },2600);
+}
+
+// ---- Part 5: vendors page gviz fallback when API down ----
+function part5(){
+ const F=mk();F.failApi=!0;const w=F.w;
+ w.eval(bundle);
+ setTimeout(()=>{
+  const nav=[...w.document.querySelectorAll('button,li,a')].find(x=>x.textContent.trim().indexOf('வணிகர்கள்')>=0);
+  nav&&nav.click();
+  setTimeout(()=>{
+   const T=w.document.body.textContent;
+   ok(T.includes('PDK26HW001')&&T.includes('Sri Balaji Hardwares'),'fallback: vendor rows render via gviz');
+   ok(T.includes('PREMIER WINDOWS'),'fallback: 2nd vendor too');
+   ok(T.includes('gviz'),'fallback: read-only notice shown');
+   ok([...w.document.querySelectorAll('button')].some(b=>b.textContent==='↻'),'refresh button present');
+   w.close();
+   console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
+   process.exit(fails===0?0:1);
   },2500);
  },2600);
 }

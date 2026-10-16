@@ -500,7 +500,18 @@ function EyV3VenCard(){
  var perm=EyV3Role();
  var[list,Slist]=E.useState(null),[af,Saf]=E.useState(false),[st,Sst]=E.useState(""),[so,Sso]=E.useState(false),[em,Sem]=E.useState("");
  var[Fm,SFm]=E.useState({name:"",district:"Pudukkottai",mobile:"",type:"Hardware",gst:"",addr:"",reg:String(new Date().getFullYear())});
- var refresh=function(){Slist(null);EyV3Call("list",{tab:"vendors"},function(e2,d2){Slist(e2?[]:((d2&&d2.rows)||[]))})};
+ var refresh=function(){Slist(null);
+  EyV3Call("list",{tab:"vendors"},function(e2,d2){
+   if(!e2&&d2&&d2.ok){Slist(d2.rows||[]);return}
+   var msg=e2||((d2&&d2.error)||"தரவு இல்லை");
+   gvizFetch(EyV3WB,"Vendors",function(e3,d3){
+    if(e3){Slist([]);Sst("✗ "+msg+" · "+e3);return}
+    var arr=EyRawRows(d3),rows3=[],i,r;
+    for(i=0;i<arr.length;i++){r=arr[i];var c=String(r[0]||"").trim();if(!c||c==="vendorCode")continue;
+     rows3.push({vendorCode:c,vendorName:String(r[1]||"").trim(),districtName:String(r[2]||"").trim(),mobile:String(r[3]||"").trim(),businessType:String(r[4]||"").trim(),gstNumber:String(r[5]||"").trim(),address:String(r[6]||"").trim(),regYear:String(r[7]||"").trim()})}
+    Slist(rows3);
+    Sst("⚠ "+L("V3 API unreachable — read-only list (gviz). ↻ retry / ⚙ check URL","V3 API தொடர்பில்லை — படிக்க மட்டும் பட்டியல் (gviz). ↻ மீண்டும் முயற்சி / ⚙ URL சரிபார்க்க"));
+   })})};
  E.useEffect(function(){refresh()},[]);
  var set=function(k){return function(e2){var x={};x[k]=e2.target.value;SFm(function(m){return Object.assign({},m,x)})}};
  var submit=function(){
@@ -531,6 +542,7 @@ function EyV3VenCard(){
   n.jsxs("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:8},children:[
    n.jsx("div",{style:{fontWeight:800},children:V3VenTitle(L,list)}),
    n.jsx("div",{style:{flex:1}}),
+   n.jsx("button",{className:"ui-btn ui-btn-sm",title:L("Refresh","புதுப்பி"),onClick:function(){refresh()},children:"↻"}),
    n.jsx("button",{className:"ui-btn ui-btn-sm",title:"V3 API",onClick:function(){Sso(!so)},children:"⚙"}),
    perm.canAddVen?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",onClick:function(){Saf(!af);Sem("")},children:(af?"✕ ":"+ ")+L("Vendor","வணிகர்")}):n.jsx("span",{style:{fontSize:12,color:"var(--tx-3)"},children:L("Add: agent / manager / admin only","சேர்க்க: ஏஜெண்ட் / மேனேஜர் / அட்மின் மட்டும்")})]}),
   so?n.jsx(EyV3SetupCard,{on:!0}):null,
@@ -3889,7 +3901,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082t";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610082u";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

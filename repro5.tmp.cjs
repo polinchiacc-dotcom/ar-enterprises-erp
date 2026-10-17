@@ -281,8 +281,25 @@ function part5(){
    ok(T.includes('gviz'),'fallback: read-only notice shown');
    ok([...w.document.querySelectorAll('button')].some(b=>b.textContent==='↻'),'refresh button present');
    w.close();
+   part6();
+  },2500);
+ },2600);
+}
+
+// ---- Part 6: vendors page, NO API stub — real gviz race path ----
+function part6(){
+ const G=mkDom(!0);const w=G.w;
+ w.eval(bundle);
+ setTimeout(()=>{
+  const nav=[...w.document.querySelectorAll('button,li,a')].find(x=>x.textContent.trim().indexOf('வணிகர்கள்')>=0);
+  nav&&nav.click();
+  setTimeout(()=>{
+   const T=w.document.body.textContent;
+   ok(T.includes('PDK26HW001')&&T.includes('Sri Balaji'),'norace-stub: gviz rows render without API');
+   ok(!T.includes('Loading'),'no stuck Loading');
+   w.close();
    console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
    process.exit(fails===0?0:1);
-  },2500);
+  },3000);
  },2600);
 }

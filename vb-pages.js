@@ -376,17 +376,22 @@ function EyV3VenCard(){
  var[list,Slist]=E.useState(null),[af,Saf]=E.useState(false),[st,Sst]=E.useState(""),[so,Sso]=E.useState(false),[em,Sem]=E.useState("");
  var[Fm,SFm]=E.useState({name:"",district:"Pudukkottai",mobile:"",type:"Hardware",gst:"",addr:"",reg:String(new Date().getFullYear())});
  var refresh=function(){Slist(null);
+  var R={api:null,gviz:null,shown:false};
+  var settle=function(){
+   if(R.shown)return;
+   if(R.gviz&&R.gviz.rows&&R.gviz.rows.length){R.shown=true;Slist(R.gviz.rows);Sst(R.api&&R.api.err?("⚠ "+R.api.err+" — "+L("read-only list (gviz), ↻ retry / ⚙ check URL","படிக்க மட்டும் பட்டியல் (gviz), ↻ மீண்டும் முயற்சி / ⚙ URL சரிபார்க்க")):"");return}
+   if(R.api&&R.api.ok){R.shown=true;Slist(R.api.rows||[]);Sst("");return}
+   if(R.gviz&&R.gviz.err&&R.api&&R.api.err){R.shown=true;Slist([]);Sst("✗ "+R.api.err+" · "+R.gviz.err)}};
+  gvizFetch(EyV3WB,"Vendors",function(e3,d3){
+   if(e3){R.gviz={err:e3};settle();return}
+   var arr=EyRawRows(d3),rows3=[],i,r;
+   for(i=0;i<arr.length;i++){r=arr[i];var c=String(r[0]||"").trim();if(!c||c==="vendorCode")continue;
+    rows3.push({vendorCode:c,vendorName:String(r[1]||"").trim(),districtName:String(r[2]||"").trim(),mobile:String(r[3]||"").trim(),businessType:String(r[4]||"").trim(),gstNumber:String(r[5]||"").trim(),address:String(r[6]||"").trim(),regYear:String(r[7]||"").trim()})}
+   R.gviz={rows:rows3};settle()});
   EyV3Call("list",{tab:"vendors"},function(e2,d2){
-   if(!e2&&d2&&d2.ok){Slist(d2.rows||[]);return}
-   var msg=e2||((d2&&d2.error)||"தரவு இல்லை");
-   gvizFetch(EyV3WB,"Vendors",function(e3,d3){
-    if(e3){Slist([]);Sst("✗ "+msg+" · "+e3);return}
-    var arr=EyRawRows(d3),rows3=[],i,r;
-    for(i=0;i<arr.length;i++){r=arr[i];var c=String(r[0]||"").trim();if(!c||c==="vendorCode")continue;
-     rows3.push({vendorCode:c,vendorName:String(r[1]||"").trim(),districtName:String(r[2]||"").trim(),mobile:String(r[3]||"").trim(),businessType:String(r[4]||"").trim(),gstNumber:String(r[5]||"").trim(),address:String(r[6]||"").trim(),regYear:String(r[7]||"").trim()})}
-    Slist(rows3);
-    Sst("⚠ "+L("V3 API unreachable — read-only list (gviz). ↻ retry / ⚙ check URL","V3 API தொடர்பில்லை — படிக்க மட்டும் பட்டியல் (gviz). ↻ மீண்டும் முயற்சி / ⚙ URL சரிபார்க்க"));
-   })})};
+   if(!e2&&d2&&d2.ok)R.api={ok:true,rows:d2.rows||[]};
+   else R.api={err:e2||((d2&&d2.error)||"தவறு")};
+   settle()})};
  E.useEffect(function(){refresh()},[]);
  var set=function(k){return function(e2){var x={};x[k]=e2.target.value;SFm(function(m){return Object.assign({},m,x)})}};
  var submit=function(){

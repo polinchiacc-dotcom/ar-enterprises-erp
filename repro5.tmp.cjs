@@ -18,7 +18,7 @@ function mkDom(sess){
   if(u.indexOf('/api/gsheet?')>=0){const m=u.match(/sheet=([^&]+)/);const nm=m?decodeURIComponent(m[1]):'';const f=GFIX[nm];
    return f?Promise.resolve({ok:!0,text:()=>Promise.resolve('/*O_o*/\ngoogle.visualization.Query.setResponse('+JSON.stringify(f)+');')}):Promise.resolve({ok:!1,status:404,text:()=>Promise.resolve('x')})}
   return Promise.resolve({ok:!0,status:200,text:()=>Promise.resolve(JSON.stringify({ok:!0,data:{}}))})};
- w.open=()=>({document:{write(){},close(){}},focus(){},print(){}});
+ w.open=function(u){w.__openUrl=String(u||'');return{document:{write(){},close(){}},focus(){},print(){}}};
  return {dom,w,vc};
 }
 const setVal=(w,el,v)=>{const d=Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value');d.set.call(el,v);el.dispatchEvent(new w.Event('input',{bubbles:!0}))};
@@ -326,7 +326,42 @@ function part7(){
   ok(btns.some(b2=>b2.textContent.indexOf('A4')>=0),'dash: A4 print btn');
   ok(btns.filter(b2=>b2.textContent.indexOf('→')>=0).length>=2,'dash: open→ links');
   w.close();
-  console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
-  process.exit(fails===0?0:1);
+  part8();
  },3500);
+}
+
+// ---- Part 8: bank recon File Name -> Drive link ----
+function part8(){
+ const K=mk();const w=K.w;
+ const CR=(id,fy,rec,rcv,nm)=>({id:id,sNo:'1',workName:'Test Work',workPlace:'X',party:'',receiptAmount:rec,workType:'',engName:'',taxableValue:rec*0.9,labourWelfare:0,gst:rec*0.09,invoiceValue:rec*1.09,tds:0,gstTds:0,withHeld:0,emd:0,otherDeduction:0,receivableAmount:rcv,receiptDate:'2025-12-01',department:'',fy:fy,fileName:nm,sheetGid:790298656,rowIndex:2});
+ const rows=[
+  {contract:CR('T1','Contract work FY 25-26',3237711,3237711,''),matchType:'Reconciled',confidence:100,bank:{date:'30-01-2025',description:'BY NEFT TFF GOVT',credit:3237711}},
+  {contract:CR('T2','Contract work FY 24-25',684751,684751,'1559-2022 Rs.684751'),matchType:'Reconciled',confidence:100,bank:{date:'12-12-2025',description:'BY NEFT',credit:684751}},
+  {contract:CR('T3','FY 23-24',154168,154168,'240130119.pdf'),matchType:'Unmatched',confidence:0,bank:null}];
+ const oldFetch=w.fetch;
+ w.fetch=function(u,ini){u=String(u);
+  if(u.indexOf('bank.liveRecon')>=0)return Promise.resolve({ok:!0,text:()=>Promise.resolve(JSON.stringify({ok:!0,data:{stats:{totalBank:1,totalContract:3,matched:2,partial:0,near:0,unmatched:1,total:3,bankCount:1,bankCreditCount:1,contractCount:3},combined:rows,allCombined:rows,bankRows:[],contractRows:rows.map(function(r){return r.contract}),sheets:[{name:'Contract work FY 25-26',gid:790298656}],lastSync:'2026-10-28T10:00:00Z'}}))});
+  return oldFetch(u,ini)};
+ w.eval(bundle);
+ setTimeout(()=>{
+  const nav=[...w.document.querySelectorAll('button,li,a')].find(x=>x.textContent.indexOf('வங்கி ஒப்பீடு')>=0);
+  nav&&nav.click();
+ },2500);
+ setTimeout(()=>{
+  const T=w.document.body.textContent.replace(/\s+/g,' ');
+  ok(T.includes('Bill Sanction Rs 3237711.pdf'),'drv: FY25-26 row resolved by amount');
+  ok(T.includes('1559-2022-Rs-684751.jpg'),'drv: FY24-25 row resolved by name');
+  ok(T.includes('240130119.pdf'),'drv: unmatched row keeps sheet name');
+  const links=[...w.document.querySelectorAll('span[title*="Drive"]')];
+  ok(links.length>=2,'drv: clickable file cells '+links.length);
+  w.__openUrl='';
+  const t1=links.find(l=>l.textContent==='Bill Sanction Rs 3237711.pdf');
+  t1&&t1.click();
+  setTimeout(()=>{
+   ok(w.__openUrl==='https://drive.google.com/file/d/1ogpJGxUCixt2q18yUrPPGbeLKPRmhfHL/view','drv: click opens Drive file URL, got '+w.__openUrl);
+   w.close();
+   console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
+   process.exit(fails===0?0:1);
+  },500);
+ },3000);
 }

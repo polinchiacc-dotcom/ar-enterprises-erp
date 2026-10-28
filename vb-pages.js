@@ -899,3 +899,159 @@ function EyV3AdminPage(){
    [n.jsx("tr",{children:n.jsx("td",{colSpan:6,className:"ui-empty",children:L("Wallet ledger is empty — add the first entry above","வாலட் காலியாக உள்ளது — முதல் பதிவை சேருங்கள்")})},"e")]}) ,
   n.jsxs("table",{className:"gtbl",style:{marginTop:8},children:[n.jsx("tbody",{children:[n.jsxs("tr",{children:[n.jsx("td",{style:{fontWeight:800},children:L("Totals","மொத்தம்")}),n.jsx("td",{}),n.jsx("td",{}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(dBal)}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(cBal)}),n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(bal)})]},"ft")]})]}),
   st?n.jsx("div",{style:{fontSize:13,marginTop:8,color:st.indexOf("✓")>=0?"#0a7d43":"#b3261e"},children:st}):null]})}
+function EyDashHome({user:c}){
+ const{lang:f}=xe(),rnav=Ue();
+ var L=function(a,b){return f==="ta"?b:a};
+ var[rd,Srd]=E.useState(0);
+ var[awS,SawS]=E.useState(null);
+ var[bank,Sbank]=E.useState(null);
+ var refresh=function(){EyV3=null;Srd(function(x){return x+1});
+  SawS(null);Sbank(null)};
+ E.useEffect(function(){EyV3Fetch(function(){Srd(function(x){return x+1})})},[]);
+ E.useEffect(function(){
+  var fin=2,got={};
+  var done=function(k,e,d){got[k]=e?null:d;fin--;if(!fin){
+   var comm=0,i,rows,wMap={};
+   rows=(got.aw&&EyRawRows(got.aw))||[];
+   for(i=0;i<rows.length;i++){if(i===0&&String(rows[i][0]||"").trim()==="id")continue;
+    var cm=EyVbN(rows[i][9]);comm+=cm;var tid=String(rows[i][4]||"").trim();if(tid)wMap[tid]=(wMap[tid]||0)+cm}
+   var arows=(got.ad&&EyRawRows(got.ad))||[],bal=0,deb=0,cred=0;
+   for(i=0;i<arows.length;i++){if(i===0&&String(arows[i][0]||"").trim()==="date")continue;
+    deb+=EyVbN(arows[i][3]);cred+=EyVbN(arows[i][4]);var b5=EyVbN(arows[i][5]);if(b5)bal=b5}
+   SawS({comm:comm,bal:bal,deb:deb,cred:cred,wMap:wMap})}};
+  gvizFetch(EyV3WB,"AgentWallet",function(e,d){done("aw",e,d)});
+  gvizFetch(EyV3WB,"Admin_Wallet",function(e,d){done("ad",e,d)})},[rd]);
+ E.useEffect(function(){
+  var tok=null;try{tok=sessionStorage.getItem("ar4.token")||""}catch(e){}
+  if(!tok||tok.indexOf("v3:")===0){Sbank({err:L("login required","உள்நுழைவு தேவை")});return}
+  fetch("/api/bank.liveRecon",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:"{}"})
+   .then(function(r2){return r2.text()}).then(function(t){
+    var j;try{j=JSON.parse(t)}catch(e){Sbank({err:"format"});return}
+    if(!j||!j.ok){Sbank({err:(j&&j.error&&j.error.message)||L("failed","தோல்வி")});return}
+    Sbank(j.data||{})}).catch(function(){Sbank({err:L("network","நெட்வொர்க்")})})},[rd]);
+ if(!EyV3||!EyV3.done)return EyVbLoad("l",L("Loading dashboard…","டாஷ்போர்டு ஏற்றப்படுகிறது…"));
+ if(EyV3.err)return EyVbLoad("e");
+ var i,ven=Object.keys(EyV3.ven).length,txn=EyV3.txn,open=0,closed=0,exp=0;
+ for(i=0;i<txn.length;i++){exp+=txn[i].exp;if(txn[i].st==="Closed")closed++;else open++}
+ var bil=EyV3.bil,bAmt=0,bTot=0;
+ for(i=0;i<bil.length;i++){bAmt+=bil[i].amt;bTot+=bil[i].tot}
+ var profit=exp*0.08;
+ var g2=EyV3.g2,gkeys=Object.keys(g2),gTax=0,gTot=0,gfy={};
+ for(i=0;i<gkeys.length;i++){gTax+=g2[gkeys[i]].tax;gTot+=g2[gkeys[i]].tot;
+  var pp=gkeys[i].split("|");var fy2=pp[0];gfy[fy2]=gfy[fy2]||{n:0,tax:0,tot:0};gfy[fy2].n++;gfy[fy2].tax+=g2[gkeys[i]].tax;gfy[fy2].tot+=g2[gkeys[i]].tot}
+ var comm=awS?awS.comm:0,wMap=(awS&&awS.wMap)||{};
+ // month table
+ var mset={},mkeys=[],byV={};
+ for(i=0;i<txn.length;i++){var t=txn[i],k=t.fy+"|"+t.mo;if(!mset[k]){mset[k]=1;mkeys.push(k)}}
+ mkeys.sort(function(a,b){var ya=EyV3YM(a.split("|")[0],a.split("|")[1]),yb=EyV3YM(b.split("|")[0],b.split("|")[1]);return ya<yb?1:ya>yb?-1:0});
+ var mrows=[],tExp=0,tAmt=0,tTot=0,tCom=0,tPf=0,mExp={},mAmt={},mTot={},mCom={};
+ for(i=0;i<mkeys.length;i++){var kk=mkeys[i],p2=kk.split("|"),fy3=p2[0],mo3=p2[1],e2=0,a2=0,t2=0,c2=0,j;
+  for(j=0;j<txn.length;j++)if(txn[j].fy===fy3&&txn[j].mo===mo3){e2+=txn[j].exp;c2+=(wMap[txn[j].id]||0)}
+  for(j=0;j<bil.length;j++)if(bil[j].nm!==void 0){var bt=null;for(var q=0;q<txn.length;q++)if(txn[q].id===bil[j].txn){bt=txn[q];break}
+   if(bt&&bt.fy===fy3&&bt.mo===mo3){a2+=bil[j].amt;t2+=bil[j].tot}}
+  mrows.push({fy:fy3,mo:mo3,exp:e2,amt:a2,tot:t2,com:c2});tExp+=e2;tAmt+=a2;tTot+=t2;tCom+=c2}
+ tPf=tExp*0.08;
+ for(i=0;i<bil.length;i++){var vc=bil[i].vc||"?";byV[vc]=byV[vc]||{n:0,amt:0,nm:bil[i].nm||""};byV[vc].n++;byV[vc].amt+=bil[i].amt;if(bil[i].nm)byV[vc].nm=bil[i].nm}
+ var top=Object.keys(byV).map(function(v){return{vc:v,n:byV[v].n,amt:byV[v].amt,nm:byV[v].nm||(EyV3.ven[v]&&EyV3.ven[v].nm)||v}});
+ top.sort(function(a,b){return b.amt-a.amt});top=top.slice(0,5);
+ var Card=function(title,right,child){return n.jsxs("div",{className:"ui-card",style:{padding:"12px 14px"},children:[
+  n.jsxs("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:8},children:[
+   n.jsx("div",{style:{fontWeight:800},children:title}),n.jsx("div",{style:{flex:1}}),right||null]}),child]})};
+ var today=new Date().toISOString().slice(0,10);
+ var printA4=function(){
+  var rows=[],i2;
+  rows.push([L("Vendors","வணிகர்கள்"),String(ven)]);
+  rows.push([L("Transactions","பரிவர்த்தனைகள்"),open+" "+L("open","திறந்த")+" · "+closed+" "+L("closed","மூடிய")]);
+  rows.push([L("Total expected","எதிர்பார்ப்பு மொத்தம்"),"₹"+EyVbInr(exp)]);
+  rows.push([L("Bills received","பில் வரவுகள்"),bil.length+" — ₹"+EyVbInr(bAmt)]);
+  rows.push(["8% "+L("profit","லாபம்"),"₹"+EyVbInr(profit)]);
+  rows.push([L("Agent commission","ஏஜெண்ட் கமிஷன்"),"₹"+EyVbInr(comm)]);
+  rows.push([L("Admin wallet balance","நிர்வாக வாலட் இருப்பு"),awS?("₹"+EyVbInr(awS.bal)):"—"]);
+  rows.push(["GSTR-2B",gkeys.length+" "+L("months","மாதம்")+" — ₹"+EyVbInr(gTax)]);
+  if(bank&&bank.stats){var s2=bank.stats;
+   rows.push([L("Bank entries","வங்கி பதிவுகள்"),s2.bankCount+" ("+s2.bankCreditCount+" "+L("credits","வரவு")+")"]);
+   rows.push([L("Contract receipts","ஒப்பந்த வரவுகள்"),s2.contractCount+" — ₹"+EyVbInr(s2.totalContract)]);
+   rows.push([L("Matched","பொருந்தியவை"),s2.matched+" + "+s2.partial+" "+L("partial","பகுதி")+" + "+s2.near+" "+L("near","நெருங்கிய")]);
+   rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
+  for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
+   rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610082w"]],!1)};
+ var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
+  ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
+  ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
+  ["👛",L("Agent Wallet","ஏஜெண்ட் வாலட்"),"/wallet","₹"+EyVbInr(comm)],
+  ["💼",L("V3 Admin","V3 நிர்வாகம்"),"/v3admin",""],
+  ["🛡️",L("Auditor GSTR-2B","ஆடிட்டர் GSTR-2B"),"/auditor",gkeys.length+" "+L("months","மாதம்")],
+  ["🏦",L("Bank Reconciliation","வங்கி ஒப்பீடு"),"/bank",bank&&bank.stats?bank.stats.unmatched+" "+L("unmatched","பொருந்தாத"):""],
+  ["٪",L("GST Centre","GST மையம்"),"/gst",""],
+  ["₹",L("Payments","பணம் பெறல்"),"/payments",""],
+  ["📊",L("Reports","அறிக்கைகள்"),"/reports",""]];
+ return n.jsxs("div",{children:[
+  EyVbHead(L("Dashboard","முகப்பு பலகை"),null,L("Live overview — V3 operations, bank reconciliation, GSTR-2B","நேரடி கண்ணோட்டம் — V3 செயல்பாடு, வங்கி ஒப்பீடு, GSTR-2B")),
+  n.jsxs("div",{style:{display:"flex",gap:8,marginBottom:10},children:[
+   n.jsx("button",{className:"ui-btn ui-btn-soft ui-btn-sm",onClick:refresh,children:"↻ "+L("Refresh","புதுப்பி")}),
+   n.jsx("button",{className:"ui-btn ui-btn-soft ui-btn-sm",onClick:printA4,children:"🖨️ "+L("A4 Print","A4 அச்சு")}),
+   n.jsx("div",{style:{flex:1}}),
+   n.jsx("div",{style:{fontSize:12,color:"var(--tx-3)",alignSelf:"center"},children:(bank&&bank.lastSync)?L("Bank sync: ","வங்கி ஒத்திசைவு: ")+String(bank.lastSync).slice(0,16).replace("T"," "):""})]}),
+  n.jsx(EyVbChips,[[L("Vendors","வணிகர்கள்"),String(ven)],
+   [L("Transactions","பரிவர்த்தனைகள்"),txn.length+" · "+open+" "+L("open","திறந்த")+" / "+closed+" "+L("closed","மூடிய")],
+   [L("Total expected","எதிர்பார்ப்பு மொத்தம்"),"₹"+EyVbInr(exp)],
+   [L("Bills received","பில் வரவுகள்"),bil.length+" — ₹"+EyVbInr(bAmt),"#0a7d43"],
+   ["8% "+L("profit","லாபம்"),"₹"+EyVbInr(profit),"#1d4ed8"],
+   [L("Agent commission","ஏஜெண்ட் கமிஷன்"),awS?("₹"+EyVbInr(comm)):"…"],
+   [L("Admin wallet","நிர்வாக வாலட்"),awS?("₹"+EyVbInr(awS.bal)):"…"],
+   ["GSTR-2B",gkeys.length+" "+L("months","மாதம்")+" · ₹"+EyVbInr(gTax)]]),
+  n.jsxs("div",{className:"settings-grid",style:{gridTemplateColumns:"1.25fr 1fr",marginTop:12},children:[
+   Card(L("Month progress","மாத முன்னேற்றம்"),null,
+    n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:[
+     n.jsx("tr",{children:["Month","FY","Expected","Bills amt","Bills total","Commission","8%"].map(function(h,i2){return n.jsx("th",{style:{textAlign:i2>1?"right":"left"},children:L(h,h)},i2)})},"h"),
+     mrows.map(function(m3,i2){return n.jsxs("tr",{children:[
+      n.jsx("td",{children:EyV3M3(m3.mo)}),n.jsx("td",{className:"mono",children:m3.fy}),
+      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(m3.exp)}),
+      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(m3.amt)}),
+      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(m3.tot)}),
+      n.jsx("td",{className:"mono",style:{color:"#0a7d43"},children:m3.com?"₹"+EyVbInr(m3.com):"—"}),
+      n.jsx("td",{className:"mono",style:{fontWeight:700,color:"#1d4ed8"},children:"₹"+EyVbInr(m3.exp*0.08)})]},"m"+i2)}),
+     n.jsxs("tr",{style:{borderTop:"2px solid var(--border)"},children:[
+      n.jsx("td",{style:{fontWeight:800},children:L("Totals","மொத்தம்")}),n.jsx("td",{}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(tExp)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(tAmt)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(tTot)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800,color:"#0a7d43"},children:"₹"+EyVbInr(tCom)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800,color:"#1d4ed8"},children:"₹"+EyVbInr(tPf)})]},"ft")]})})),
+   Card(L("Top vendors by bills","பில் அடிப்படையில் சிறந்த வணிகர்கள்"),null,
+    top.length?n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:top.map(function(v,i2){return n.jsxs("tr",{style:{cursor:"pointer"},onClick:function(){rnav("/vendors")},children:[
+     n.jsx("td",{style:{fontWeight:600},children:v.nm}),
+     n.jsx("td",{className:"mono",children:v.vc}),
+     n.jsx("td",{className:"mono",children:v.n+" "+L("bills","பில்")}),
+     n.jsx("td",{className:"mono",style:{fontWeight:700},children:"₹"+EyVbInr(v.amt)})]},"v"+i2)})})}):n.jsx("div",{className:"ui-empty",children:L("No bills yet","இன்னும் பில் இல்லை")}))
+  ]}),
+  n.jsxs("div",{className:"settings-grid",style:{gridTemplateColumns:"1fr 1fr",marginTop:12},children:[
+   Card(L("Bank reconciliation (live)","வங்கி ஒப்பீடு (நேரடி)"),
+    n.jsx("button",{className:"ui-btn ui-btn-soft ui-btn-sm",onClick:function(){rnav("/bank")},children:L("Open →","திற →")}),
+    !bank?n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")}):
+     (bank.err||!bank.stats)?n.jsx("div",{className:"ui-empty",children:"⚠ "+(bank.err||L("No bank data","வங்கி தரவு இல்லை"))}):
+    n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:[
+     n.jsxs("tr",{children:[n.jsx("td",{children:L("Bank entries","வங்கி பதிவுகள்")}),n.jsx("td",{className:"mono",children:bank.stats.bankCount+" ("+bank.stats.bankCreditCount+" "+L("credits","வரவு")+")"}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(bank.stats.totalBank)})]},"b1"),
+     n.jsxs("tr",{children:[n.jsx("td",{children:L("Contract receipts","ஒப்பந்த வரவுகள்")}),n.jsx("td",{className:"mono",children:String(bank.stats.contractCount)}),n.jsx("td",{className:"mono",children:"₹"+EyVbInr(bank.stats.totalContract)})]},"b2"),
+     n.jsxs("tr",{children:[n.jsx("td",{children:L("Matched","பொருந்தியவை")}),n.jsx("td",{className:"mono",style:{color:"#0a7d43",fontWeight:700},children:bank.stats.matched+" ✓"}),n.jsx("td",{className:"mono",children:"+"+bank.stats.partial+" "+L("partial","பகுதி")+" · +"+bank.stats.near+" "+L("near","நெருங்கிய")})]},"b3"),
+     n.jsxs("tr",{children:[n.jsx("td",{children:L("Unmatched","பொருந்தாதவை")}),n.jsx("td",{className:"mono",style:{color:bank.stats.unmatched?"#b3261e":"#0a7d43",fontWeight:800},children:String(bank.stats.unmatched)}),n.jsx("td",{})]},"b4")]})})),
+   Card("GSTR-2B ("+L("ITC summary","ITC சுருக்கம்")+")",
+    n.jsx("button",{className:"ui-btn ui-btn-soft ui-btn-sm",onClick:function(){rnav("/auditor")},children:L("Open →","திற →")}),
+    gkeys.length?n.jsx("table",{className:"gtbl",children:n.jsx("tbody",{children:[
+     n.jsx("tr",{children:["FY","Months","Taxable ₹","Total ₹"].map(function(h,i2){return n.jsx("th",{style:{textAlign:i2?"right":"left"},children:L(h,h)},i2)})},"h2"),
+     Object.keys(gfy).sort().reverse().map(function(fy4,i2){return n.jsxs("tr",{children:[
+      n.jsx("td",{className:"mono",children:fy4}),
+      n.jsx("td",{className:"mono",children:String(gfy[fy4].n)}),
+      n.jsx("td",{className:"mono",children:"₹"+EyVbInr(gfy[fy4].tax)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:700},children:"₹"+EyVbInr(gfy[fy4].tot)})]},"g"+i2)}),
+     n.jsxs("tr",{style:{borderTop:"2px solid var(--border)"},children:[
+      n.jsx("td",{style:{fontWeight:800},children:L("Totals","மொத்தம்")}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:String(gkeys.length)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(gTax)}),
+      n.jsx("td",{className:"mono",style:{fontWeight:800},children:"₹"+EyVbInr(gTot)})]},"gft")]})}):
+     n.jsx("div",{className:"ui-empty",children:L("No 2B summary yet","இன்னும் 2B சுருக்கம் இல்லை")}))
+  ]}),
+  n.jsx("div",{className:"ui-card",style:{padding:"12px 14px",marginTop:12},children:
+   n.jsx("div",{className:"chip-row",children:links.map(function(lk,i2){return n.jsxs("button",{className:"ui-btn ui-btn-soft ui-btn-sm",onClick:function(){rnav(lk[2])},children:[lk[0]+" "+lk[1],lk[3]?n.jsx("span",{style:{color:"var(--tx-3)",fontWeight:600,marginLeft:6},children:lk[3]}):null]},"l"+i2)})})})
+ ]})}

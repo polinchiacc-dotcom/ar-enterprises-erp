@@ -11,8 +11,9 @@ function mkDom(sess){
  const V3TXN={table:{rows:[{c:[{v:'txnId'},{v:'districtName'},{v:'vendorCode'},{v:'vendorName'},{v:'financialYear'},{v:'month'},{v:''},{v:''},{v:''},{v:''},{v:''},{v:''},{v:''},{v:'status'}]},{c:[{v:'TXN-Y9WAQEQ'},{v:'Pudukkottai'},{v:'PDK26HW001'},{v:'Sri Balaji Hardwares'},{v:'2024-25'},{v:'December'},{v:300950},{v:5000},{v:4},{v:12038},{v:255043},{v:0},{v:7038},{v:'Closed'}]}]}};
  const V3BIL={table:{rows:[{c:[{v:'billId'},{v:'txnId'},{v:'vendorCode'},{v:'vendorName'},{v:''},{v:'billDate'},{v:''},{v:''},{v:''},null]},{c:[{v:'BN5ILN39'},{v:'TXN-Y9WAQEQ'},{v:'PDK26HW001'},{v:'Sri Balaji Hardwares'},{v:1},{v:'2025-12-09T18:30:00.000Z'},{v:76664},{v:4},{v:3066.56},{v:90463.52}]}]}};
  const V3G2={table:{rows:[{c:[{v:'FY'},{v:'Period'},{v:''},{v:'Trade Name'},{v:''},{v:'SavedAt'}]},{c:[{v:'2024-25'},{v:'Dec'},{v:'33ALXPV6099E3Z6'},{v:255043},{v:300950},{v:5}]}]}};
- const GFIX={'Vendors':V3VEN,'Transactions':V3TXN,'Bills':V3BIL,'GSTR2B_Summary':V3G2};
- w.fetch=(u)=>{u=String(u);
+ const GFIX={'Vendors':V3VEN,'Transactions':V3TXN,'Bills':V3BIL,'GSTR2B_Summary':V3G2,'AgentWallet':{"table": {"rows": [{"c": [{"v": "id"}, {"v": "agentId"}, {"v": "date"}, {"v": "description"}, {"v": "txnId"}, {"v": "vendorName"}, {"v": "txnAmount"}, {"v": "gstPercent"}, {"v": "percent"}, {"v": "commission"}, {"v": "commissionType"}, {"v": "credited"}]}, {"c": [{"v": "AW1"}, {"v": "AGT001"}, {"v": "2026-01-06"}, {"v": "Commission"}, {"v": "TXN-TEST1"}, {"v": "Sri Balaji Hardwares"}, {"v": 500000}, {"v": 4}, {"v": 0.5}, {"v": 2500}, {"v": "auto"}, {"v": 2500}]}]}},'Admin_Wallet':{"table": {"rows": [{"c": [{"v": "date"}, {"v": "description"}, {"v": "type"}, {"v": "debit"}, {"v": "credit"}, {"v": "balance"}]}, {"c": [{"v": "2026-01-05"}, {"v": "Invest"}, {"v": "Invest"}, {"v": 0}, {"v": 10000}, {"v": 10000}]}, {"c": [{"v": "2026-01-07"}, {"v": "GST paid"}, {"v": "GST"}, {"v": 3000}, {"v": 0}, {"v": 7000}]}]}}};
+ w.fetch=(u,ini)=>{u=String(u);
+  if(u.indexOf('bank.liveRecon')>=0)return Promise.resolve({ok:!0,status:200,text:()=>Promise.resolve(JSON.stringify({ok:!0,data:{stats:{totalBank:857229490,totalContract:488844781.01,matched:183,partial:2,near:4,unmatched:14,total:203,bankCount:2655,bankCreditCount:509,contractCount:203},lastSync:'2026-10-28T09:28:31Z'}}))});
   if(u.indexOf('auth.me')>=0)return Promise.resolve({ok:!0,status:200,text:()=>Promise.resolve(JSON.stringify({ok:!0,data:{user:USER}}))});
   if(u.indexOf('/api/gsheet?')>=0){const m=u.match(/sheet=([^&]+)/);const nm=m?decodeURIComponent(m[1]):'';const f=GFIX[nm];
    return f?Promise.resolve({ok:!0,text:()=>Promise.resolve('/*O_o*/\ngoogle.visualization.Query.setResponse('+JSON.stringify(f)+');')}):Promise.resolve({ok:!1,status:404,text:()=>Promise.resolve('x')})}
@@ -298,8 +299,34 @@ function part6(){
    ok(T.includes('PDK26HW001')&&T.includes('Sri Balaji'),'norace-stub: gviz rows render without API');
    ok(!T.includes('Loading'),'no stuck Loading');
    w.close();
-   console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
-   process.exit(fails===0?0:1);
+   part7();
   },3000);
  },2600);
+}
+
+// ---- Part 7: admin dashboard (live interconnect) ----
+function part7(){
+ const H=mk();const w=H.w;
+ w.eval(bundle);
+ setTimeout(()=>{
+  const T=w.document.body.textContent.replace(/\s+/g,' ');
+  ok(T.includes('நேரடி கண்ணோட்டம்'),'dash: title+sub rendered');
+  ok(T.includes('₹3,00,950'),'dash: expected chip');
+  ok(T.includes('24,076'),'dash: 8% profit chip');
+  ok(T.includes('76,664'),'dash: bills amount chip');
+  ok(T.includes('2,500'),'dash: agent commission chip');
+  ok(T.includes('7,000'),'dash: admin wallet balance chip');
+  ok(T.includes('3,00,950'),'dash: month row exp');
+  ok(T.includes('Sri Balaji Hardwares'),'dash: top vendor');
+  ok(T.includes('2655'),'dash: bank entries 2655');
+  ok(T.includes('183'),'dash: matched 183');
+  ok(T.includes('48,88,44,781'),'dash: contract total');
+  ok(T.includes('2024-25'),'dash: 2B FY row');
+  const btns=[...w.document.querySelectorAll('button')];
+  ok(btns.some(b2=>b2.textContent.indexOf('A4')>=0),'dash: A4 print btn');
+  ok(btns.filter(b2=>b2.textContent.indexOf('→')>=0).length>=2,'dash: open→ links');
+  w.close();
+  console.log(fails===0?'REPRO5 ALL PASS':'REPRO5 FAILURES: '+fails);
+  process.exit(fails===0?0:1);
+ },3500);
 }

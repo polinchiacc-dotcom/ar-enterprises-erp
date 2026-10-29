@@ -267,7 +267,8 @@ function login_(p){
   return {ok:false, error:'பயனர் இல்லை'};
 }
 function vlist_(tab){
-  function obj(keys){ var v=rows_(tab), out=[], i, j, o; for(i=1;i<v.length;i++){ var any=false; o={};
+  var src=({txns:'Transactions',overrides:'AgentOverrides',wallet:'AgentWallet'})[tab]||tab;
+  function obj(keys){ var v=rows_(src), out=[], i, j, o; for(i=1;i<v.length;i++){ var any=false; o={};
     for(j=0;j<keys.length;j++){ o[keys[j]]=(v[i][j]==null?'':v[i][j]); if(o[keys[j]]!=='')any=true; }
     if(any) out.push(o); } return out; }
   if(tab==='vendors') return {ok:true, rows:obj(['vendorCode','vendorName','districtName','mobile','businessType','gstNumber','address','regYear','createdAt'])};

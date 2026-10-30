@@ -1167,7 +1167,7 @@ function EyDashHome({user:c}){
    rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
   for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
    rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
-  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301b"]],!1)};
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301c"]],!1)};
  var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
   ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
   ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
@@ -2445,6 +2445,7 @@ function By({user:c}){
     [district, setDistrict] = E.useState("all"),
     [vendorId, setVendorId] = E.useState(""),
     [orientation, setOrientation] = E.useState("landscape"),
+    [paperSize, setPaperSize] = E.useState("A4"),
     [isPrint, setIsPrint] = E.useState(!1),
     [N, b] = E.useState(!1);
 
@@ -2698,6 +2699,22 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
                                 })
                               ]
                             }),
+                            v === "R14" && n.jsxs("div", {
+                              children: [
+                                n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: f === "ta" ? AT(f, "காகித அளவு:", "Paper size:") : "Paper size:" }),
+                                n.jsxs("select", {
+                                  className: "ui-input",
+                                  style: { width: 150 },
+                                  value: paperSize,
+                                  onChange: ev => setPaperSize(ev.target.value),
+                                  children: [
+                                    n.jsx("option", { value: "A4", children: "A4 (210×297)" }),
+                                    n.jsx("option", { value: "A3", children: "A3 (297×420 — பெரியது)" }),
+                                    n.jsx("option", { value: "legal", children: "Legal (216×356)" })
+                                  ]
+                                })
+                              ]
+                            }),
                             v === "R2" && n.jsxs("div", {
                               children: [
                                 n.jsx("span", { className: "text-3", style: { marginRight: 4 }, children: AT(f,"வெண்டர் ID:","Vendor ID:") }),
@@ -2798,7 +2815,7 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
                       }),
                       n.jsx(oe, {
                         title: AT(f,"R14 — வங்கி நேரடி BRS 200 (Bank Live BRS 200 — All Columns Print Ready)","R14 — Bank Live BRS 200 (All Columns Print Ready)"),
-                        sub: (orientation === "landscape" ? AT(f,AT(f,"A4 கிடைமட்டம் (Landscape)","A4 Landscape"),"A4 Landscape") : AT(f,AT(f,"A4 செங்குத்து (Portrait)","A4 Portrait"),"A4 Portrait")) + " | " + filteredR14.length + AT(f," வரிசைகள் | Spreadsheet: "," rows | Spreadsheet: ") + (bankData?.externalId || ""),
+                        sub: paperSize + " " + (orientation === "landscape" ? AT(f,"கிடைமட்டம் (Landscape)","Landscape") : AT(f,"செங்குத்து (Portrait)","Portrait")) + " | " + filteredR14.length + AT(f," வரிசைகள் | Spreadsheet: "," rows | Spreadsheet: ") + (bankData?.externalId || ""),
                         children: bankQuery.loading && !bankData ? n.jsx(Ze, { label: AT(f,"வங்கி நேரடி BRS 200 தரவுகள் ஏற்றப்படுகின்றன…","Loading Bank Live BRS 200 data…") }) :
                           bankQuery.error ? n.jsxs(Yl, { children: [AT(f,AT(f,"பிழை: ","Error: "),"Error: "), String(bankQuery.error)] }) :
                           n.jsx("div", {
@@ -2852,7 +2869,7 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
                                               row.contract.engName && n.jsxs("div", { className: "text-3 mono", children: ["Eng: ", row.contract.engName] })
                                             ]
                                           }),
-                                          n.jsx("td", { children: row.contract.workPlace || "—" }),
+                                          n.jsx("td", { className: "wrap", style: { maxWidth: 160 }, children: row.contract.workPlace || "—" }),
                                           n.jsx("td", { children: row.contract.workType || "—" }),
                                           n.jsx("td", { className: "wrap", style: { maxWidth: 100 }, children: row.contract.party || "—" }),
                                           n.jsx("td", { className: "num", children: row.contract.taxableValue ? Q(row.contract.taxableValue) : "—" }),
@@ -3014,7 +3031,7 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
                       n.jsxs("span", { children: [n.jsx("b", { children: AT(f,"அறிக்கை: ","Report: ") }), "[", m?.id, "] ", f === "ta" ? m?.ta : m?.en] }),
                       n.jsxs("span", { children: [n.jsx("b", { children: AT(f,"காலம் / தேதி: ","Period / Date: ") }), j || defaultMonth, " (", new Date().toLocaleDateString("en-IN"), ")"] }),
                       n.jsxs("span", { children: [n.jsx("b", { children: AT(f,"பயனர்: ","User: ") }), c.name, " (", c.role, ")"] }),
-                      n.jsxs("span", { children: ["A4 ", orientation === "landscape" ? AT(f,"Landscape (கிடைமட்டம்)","Landscape") : AT(f,"Portrait (செங்குத்து)","Portrait")] })
+                      n.jsxs("span", { children: [paperSize + " ", orientation === "landscape" ? AT(f,"Landscape (கிடைமட்டம்)","Landscape") : AT(f,"Portrait (செங்குத்து)","Portrait")] })
                     ]
                   })
                 ]
@@ -3052,9 +3069,9 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
                             children: [
                               n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "center" }, children: row.contract.sNo || i + 1 }),
                               n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", fontWeight: row.bank ? 700 : 400, color: row.bank ? "#0284c7" : "inherit" }, children: Pe(row.contract.receiptDate) }),
-                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 4px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.contract.workName || "—" }),
-                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px" }, children: row.contract.workPlace || "—" }),
-                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px" }, children: row.contract.party || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 4px", maxWidth: 320, whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }, children: row.contract.workName || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", maxWidth: 120, whiteSpace: "normal", overflowWrap: "anywhere" }, children: row.contract.workPlace || "—" }),
+                              n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", maxWidth: 90 }, children: row.contract.party || "—" }),
                               n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.taxableValue ? Q(row.contract.taxableValue) : "—" }),
                               n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.gst ? Q(row.contract.gst) : "—" }),
                               n.jsx("td", { style: { border: "1px solid #ccc", padding: "2px 3px", textAlign: "right" }, children: row.contract.invoiceValue ? Q(row.contract.invoiceValue) : "—" }),
@@ -3200,7 +3217,7 @@ E.useEffect(function(){if(v==="R14"){window.__arShareLines=totalsR14?["R14 — B
           .row-warn td { background: rgba(239, 68, 68, 0.05); }
           @media print {
             @page {
-              size: A4 ${orientation};
+              size: ${paperSize} ${orientation};
               margin: 8mm 6mm;
             }
             html, body {
@@ -4154,7 +4171,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301b";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301c";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

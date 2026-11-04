@@ -131,11 +131,11 @@ function b2bFy_(ym){
 function b2bRowsNew_(tab){
   var v=SpreadsheetApp.openById(B2_ID).getSheetByName(tab).getDataRange().getValues(), out=[], i;
   if(!v.length) return out;
-  var portal=String(v[0][3]||'').trim().toLowerCase()==='month';
+  var portal=String((v[1]&&v[1][3])||v[0][3]||'').trim().toLowerCase()==='month'; // portal header row2 (Arivoly Contractor) or row1
   var start=portal?2:1;
   for(i=start;i<v.length;i++){
     var gst,nm,inv,dt,ival,tax,mo;
-    if(portal){ mo=String(v[i][3]||'').trim(); gst=v[i][4]; nm=v[i][5]; inv=v[i][6]; dt=v[i][8]; ival=v[i][9]; tax=v[i][13]; }
+    if(portal){ mo=b2bMonth_(v[i][3]); gst=v[i][4]; nm=v[i][5]; inv=v[i][6]; dt=v[i][8]; ival=v[i][9]; tax=v[i][13]; }
     else { gst=v[i][0]; nm=v[i][1]; inv=v[i][2]; dt=v[i][3]; ival=v[i][4]; tax=v[i][5]; mo=b2bMonth_(dt); }
     inv=String(inv||'').trim();
     if(!inv) continue;

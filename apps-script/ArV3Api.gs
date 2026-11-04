@@ -1,6 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
- * v5.4 (version 18): +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
+ * v5.5 (version 19): 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -111,7 +111,7 @@ function bills2B_(sheetName){
 
 /* ── v5.3: 2B source = Sri Polinchi & Co contractor tabs (GSTIN+Party+Month) ── */
 function b2bSheets_(){
-  var s2=SpreadsheetApp.openById(B2_ID), want=['Malaiyappan Contractor GSTR 2B','Arivoly GSTR 2B','Arivoly Contractor GSTR 2B','GSTR2B'], out=[], i;
+  var s2=SpreadsheetApp.openById(B2_ID), want=['GSTR2B'], out=[], i;
   for(i=0;i<want.length;i++){ if(s2.getSheetByName(want[i])) out.push(want[i]); }
   return out;
 }
@@ -129,21 +129,42 @@ function b2bFy_(ym){
   if(m>=4){ a=y; b=(''+(y+1)).slice(-2); } else { a=y-1; b=(''+y).slice(-2); }
   return a+'-'+b;
 }
+function b2bHeaderRow_(v){
+  var r, c;
+  for(r=0;r<Math.min(3,v.length);r++){
+    for(c=0;c<v[r].length;c++){ if(String(v[r][c]||'').trim().toLowerCase()==='month') return r; }
+  }
+  return -1;
+}
+function b2bCols_(hdr){
+  function find(re){ for(var c=0;c<hdr.length;c++){ if(re.test(String(hdr[c]||'').trim().toLowerCase())) return c; } return -1; }
+  return { mo:find(/^month$/), gst:find(/gstin/), nm:find(/trade|legal/), inv:find(/invoice number/), dt:find(/invoice date/), ival:find(/invoice value/), tax:find(/taxable/) };
+}
 function b2bRowsNew_(tab){
   var v=SpreadsheetApp.openById(B2_ID).getSheetByName(tab).getDataRange().getValues(), out=[], i;
   if(!v.length) return out;
-  var portal=String((v[1]&&v[1][3])||v[0][3]||'').trim().toLowerCase()==='month'; // portal header row2 (Arivoly Contractor) or row1
-  var start=portal?2:1;
-  for(i=start;i<v.length;i++){
-    var gst,nm,inv,dt,ival,tax,mo;
-    if(portal){ mo=b2bMonth_(v[i][3]); gst=v[i][4]; nm=v[i][5]; inv=v[i][6]; dt=v[i][8]; ival=v[i][9]; tax=v[i][13]; }
-    else { gst=v[i][0]; nm=v[i][1]; inv=v[i][2]; dt=v[i][3]; ival=v[i][4]; tax=v[i][5]; mo=b2bMonth_(dt); }
-    inv=String(inv||'').trim();
-    if(!inv) continue;
-    var dts;
-    if(Object.prototype.toString.call(dt)==='[object Date]') dts=('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
-    else dts=String(dt||'').trim();
-    out.push({inv:inv, nm:String(nm||'').trim(), gst:String(gst||'').trim(), dt:dts, taxable:num(tax), total:num(ival)||+(num(tax)*1.18).toFixed(2), month:mo, fy:b2bFy_(mo)});
+  var hr=b2bHeaderRow_(v);
+  if(hr>=0){ // portal export — parse by header names (works for compact + full layouts)
+    var C=b2bCols_(v[hr]);
+    for(i=hr+1;i<v.length;i++){
+      var inv=String(v[i][C.inv]||'').trim();
+      if(!inv) continue;
+      var dt=v[i][C.dt], dts;
+      if(Object.prototype.toString.call(dt)==='[object Date]') dts=('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+      else dts=String(dt||'').trim();
+      out.push({inv:inv, nm:String(v[i][C.nm]||'').trim(), gst:String(v[i][C.gst]||'').trim(), dt:dts, taxable:num(v[i][C.tax]), total:num(v[i][C.ival])||+(num(v[i][C.tax])*1.18).toFixed(2), month:b2bMonth_(v[i][C.mo]), fy:''});
+    }
+    for(i=0;i<out.length;i++) out[i].fy=b2bFy_(out[i].month);
+    return out;
+  }
+  for(i=1;i<v.length;i++){
+    var inv2=String(v[i][2]||'').trim();
+    if(!inv2) continue;
+    var dt2=v[i][3];
+    var dts2;
+    if(Object.prototype.toString.call(dt2)==='[object Date]') dts2=('0'+dt2.getDate()).slice(-2)+'/'+('0'+(dt2.getMonth()+1)).slice(-2)+'/'+dt2.getFullYear();
+    else dts2=String(dt2||'').trim();
+    out.push({inv:inv2, nm:String(v[i][1]||'').trim(), gst:'', dt:dts2, taxable:num(v[i][5]), total:num(v[i][4])||+(num(v[i][5])*1.18).toFixed(2), month:b2bMonth_(dt2), fy:b2bFy_(b2bMonth_(dt2))});
   }
   return out;
 }

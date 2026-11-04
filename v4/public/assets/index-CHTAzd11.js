@@ -564,21 +564,35 @@ function EyTxnDetail(p){
 var EyV3Key="ARV3-2026-KX9Q42";
 function EyV3Url(){try{return localStorage.getItem("ar4.v3url")||""}catch(e){return ""}}
 function EyV3Call(act,pr,cb,tmo){
- var done=false;
+ var T=tmo||15000,done=false;
  function cb2(e,d){if(done)return;done=true;cb(e,d)}
  try{ if(typeof window!=="undefined"&&window.EyV3Api&&window.EyV3Api.stub)return window.EyV3Api.call(act,pr,cb2); }catch(e){}
  var u=EyV3Url();
  if(!u)return cb2("V3 API URL இன்னும் அமைக்கவில்லை — ⚙ V3 API-இல் Web App URL paste பண்ணுங்க");
- var fn="__arV3"+Date.now()+((Math.random()*1e6)|0),q=[],k;
+ var q=[],k;
  for(k in pr)if(pr[k]!==undefined&&pr[k]!==null)q.push(encodeURIComponent(k)+"="+encodeURIComponent(pr[k]));
- var s=document.createElement("script"),done=false;
- function cleanup(){done=true;try{delete window[fn]}catch(e){window[fn]=undefined}if(s&&s.parentNode)s.parentNode.removeChild(s)}
- var to=setTimeout(function(){if(!done){cleanup();cb2("நேரம் முடிந்தது — V3 API பதில் இல்லை")}},tmo||15000);
- window[fn]=function(d){if(done)return;cleanup();cb2(null,d)};
- s.onerror=function(){if(done)return;cleanup();cb2("V3 API அணுக முடியவில்லை — URL/deployment சரிபார்க்கவும்")};
- s.src=u+"?callback="+encodeURIComponent(fn)+"&k="+encodeURIComponent(EyV3Key)+"&action="+encodeURIComponent(act)+(q.length?"&"+q.join("&"):"");
- document.head.appendChild(s)}
-if(!(window.EyV3Api&&window.EyV3Api.stub))window.EyV3Api={call:EyV3Call,url:EyV3Url};
+ var tail="&k="+encodeURIComponent(EyV3Key)+"&action="+encodeURIComponent(act)+(q.length?"&"+q.join("&"):"");
+ var to=setTimeout(function(){cb2("நேரம் முடிந்தது — V3 API ("+act+") பதில் இல்லை")},T);
+ function parseTxt(t){
+  var s=String(t||"").trim();
+  var m=s.match(/^[A-Za-z_$][\w$]*\(([\s\S]*)\);?\s*$/);
+  try{var j=JSON.parse(m?m[1]:s);cb2(null,j)}catch(e){cb2("V3 பதில் புரியவில்லை: "+s.slice(0,90))}}
+ function jsonpGo(){
+  if(done)return;
+  var fn="__arV3"+Date.now()+((Math.random()*1e6)|0);
+  var s=document.createElement("script"),d2=false;
+  function cleanup(){d2=true;try{delete window[fn]}catch(e){window[fn]=undefined}if(s&&s.parentNode)s.parentNode.removeChild(s)}
+  window[fn]=function(d){if(d2)return;clearTimeout(to);cleanup();cb2(null,d)};
+  s.onerror=function(){if(d2)return;clearTimeout(to);cleanup();cb2("V3 API அணுக முடியவில்லை — URL/deployment சரிபார்க்கவும்")};
+  s.src=u+"?callback="+encodeURIComponent(fn)+tail;
+  document.head.appendChild(s)}
+ if(typeof fetch==="function"){
+  fetch(u+"?callback=cbfetch"+tail,{redirect:"follow"})
+   .then(function(r){return r.text()})
+   .then(function(t){if(done)return;clearTimeout(to);parseTxt(t)})
+   .catch(function(e2){if(done)return;if(e2&&e2.name==="AbortError")return;jsonpGo()});
+ } else jsonpGo();
+}
 function EyV3SetupCard(p){
  var on=p&&p.on;
  const{lang:f}=xe();
@@ -1302,7 +1316,7 @@ function EyDashHome({user:c}){
    rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
   for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
    rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
-  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301i"]],!1)};
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301j"]],!1)};
  var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
   ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
   ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
@@ -4306,7 +4320,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301i";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301j";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

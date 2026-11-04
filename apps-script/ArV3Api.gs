@@ -1,5 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
+ * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
  * Deploy: Deploy → New deployment → Web app → Execute as: Me → Anyone → copy URL
  * ERP-இல் Vendors பக்கத்தில "⚙ V3 API" → URL paste.
@@ -102,6 +103,69 @@ function bills2B_(sheetName){
     out.push({inv:inv, nm:String(v[i][1]||'').trim(), dt:String(v[i][2]||'').trim(), taxable:num(v[i][3]), total:num(v[i][8]), fy:String(v[i][10]||'').trim(), period:String(v[i][9]||'').trim()});
   }
   return {ok:true, rows:out};
+}
+
+/* ── v5.2: GSTR-2B Inbox pipeline (Vendors classify → txn → commission → bills) ── */
+function b2bRows_(tab){
+  var v=rows_(tab), out=[], i;
+  for(i=1;i<v.length;i++){
+    var inv=String(v[i][0]||'').trim();
+    if(!inv) continue;
+    out.push({inv:inv, nm:String(v[i][1]||'').trim(), dt:String(v[i][2]||'').trim(), taxable:num(v[i][3]), total:num(v[i][8]), fy:String(v[i][10]||'').trim(), period:String(v[i][9]||'').trim()});
+  }
+  return out;
+}
+function b2bClassTab_(){
+  var s=ss().getSheetByName('2B_Classify');
+  if(!s){ s=ss().insertSheet('2B_Classify'); s.appendRow(['key','nm','tab','fy','month','type','txnId','agentId','pct','status','at','user']); }
+  return s;
+}
+function b2bClass_(p){
+  var nm=String(p.nm||'').trim(), tab=String(p.tab||'').trim(), type=String(p.type||'').trim();
+  if(!nm||!tab||(type!=='Company'&&type!=='Private')) throw new Error('nm / tab / type (Company|Private) தேவை');
+  var all=b2bRows_(tab), mine=[], i;
+  for(i=0;i<all.length;i++){ if(all[i].nm.toLowerCase()===nm.toLowerCase()) mine.push(all[i]); }
+  if(!mine.length) throw new Error('2B tab-இல் supplier இல்லை: '+nm);
+  var exp=0; for(i=0;i<mine.length;i++) exp+=mine[i].taxable; exp=+exp.toFixed(2);
+  var fy=String(p.fy||mine[0].fy||''), mo=String(p.month||mine[0].period||'');
+  // vendor: match by name else auto-create (Supplier / Other code)
+  var v=rows_('Vendors'), code='', j;
+  for(j=1;j<v.length;j++){ if(String(v[j][1]||'').trim().toLowerCase()===nm.toLowerCase()){ code=String(v[j][0]).trim(); break; } }
+  if(!code){ code=vendorCode_('Pudukkottai','Other'); sh('Vendors').appendRow([code, nm, 'Pudukkottai', '', 'Supplier', '', '', String(new Date().getFullYear()), nowIso()]); }
+  var txnId='';
+  if(type==='Private'){
+    var r=txnAdd_({vendorCode:code, expected:exp, advance:0, gp:4, fy:fy, month:mo, agentId:'', ct:'2b', user:p.user||'admin'});
+    txnId=r.txnId;
+  }
+  var s=b2bClassTab_(), vr=s.getDataRange().getValues(), key=nm+'|'+tab, found=0;
+  for(j=1;j<vr.length;j++){ if(String(vr[j][0]).trim()===key){ found=j+1; break; } }
+  var row=[key, nm, tab, fy, mo, type, txnId, '', 0, (type==='Private'?'Pending':'Company'), nowIso(), String(p.user||'admin')];
+  if(found) s.getRange(found,1,1,row.length).setValues([row]); else s.appendRow(row);
+  audit_(p.user||'admin','B2B_CLASS',key,type+' · exp ₹'+exp+(txnId?' · txn '+txnId:''));
+  return {ok:true, key:key, vendorCode:code, txnId:txnId, expected:exp, bills:mine.length};
+}
+function b2bConfirm_(p){
+  var txnId=String(p.txnId||'').trim();
+  if(!txnId) throw new Error('txnId தேவை');
+  var s=b2bClassTab_(), vr=s.getDataRange().getValues(), i, crow=null, crow2=0;
+  for(i=1;i<vr.length;i++){ if(String(vr[i][6]).trim()===txnId){ crow=vr[i]; crow2=i+1; break; } }
+  if(!crow) throw new Error('2B_Classify-இல் இந்த txn இல்லை (Vendors → 2B Inbox-இல் classify செய்யவும்): '+txnId);
+  var nm=String(crow[1]).trim(), tab=String(crow[2]).trim();
+  var t=rows_('Transactions'), tr=null;
+  for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===txnId){ tr=t[i]; break; } }
+  if(!tr) throw new Error('Txn இல்லை: '+txnId);
+  var mine=b2bRows_(tab).filter(function(r){ return r.nm.toLowerCase()===nm.toLowerCase(); });
+  var nb=0;
+  for(i=0;i<mine.length;i++){ billAdd_({txnId:txnId, no:mine[i].inv, date:mine[i].dt, amt:mine[i].taxable, gp:18, user:p.user||'admin'}); nb++; }
+  var exp=num(tr[6]), pct=num(p.pct)||0.5, agentId=String(p.agentId||'').trim(), com=0;
+  if(agentId){
+    com=+(exp*pct/100).toFixed(2);
+    sh('AgentWallet').appendRow(['AW'+rid(10), agentId, nowIso(), 'Commission — '+tr[3], txnId, tr[3], exp, pct, pct, com, '2b-confirm', com]);
+  }
+  var rc=txnConfirm_({txnId:txnId, user:p.user||'admin', g2count:mine.length});
+  s.getRange(crow2,8,1,3).setValues([[agentId, pct, 'Confirmed']]);
+  audit_(p.user||'admin','B2B_CONFIRM',txnId,nm+' · bills '+nb+' · com ₹'+com+' · '+pct+'%');
+  return {ok:true, bills:nb, commission:com, pct:pct, agentId:agentId, billsTotal:rc.billsTotal};
 }
 
 function txnConfirm_(p){
@@ -292,6 +356,16 @@ function vlist_(tab){
     for(i=0;i<all.length;i++){ var nm=all[i].getName(); if(/^GSTR2B_/i.test(nm)) out.push(nm); }
     return {ok:true, rows:out};
   }
+  if(tab==='b2bclass'){
+    var c=ss().getSheetByName('2B_Classify');
+    if(!c) return {ok:true, rows:[]};
+    var cv=c.getDataRange().getValues(), co=[], k2;
+    for(k2=1;k2<cv.length;k2++){
+      if(!String(cv[k2][0]||'').trim()) continue;
+      co.push({key:String(cv[k2][0]||''), nm:String(cv[k2][1]||''), tab:String(cv[k2][2]||''), fy:String(cv[k2][3]||''), month:String(cv[k2][4]||''), type:String(cv[k2][5]||''), txnId:String(cv[k2][6]||''), agentId:String(cv[k2][7]||''), pct:num(cv[k2][8]), status:String(cv[k2][9]||''), at:String(cv[k2][10]||''), user:String(cv[k2][11]||'')});
+    }
+    return {ok:true, rows:co};
+  }
   throw new Error('தெரியா tab: '+tab);
 }
 
@@ -312,6 +386,8 @@ function doGet(e){
       case 'txnAdd': r=txnAdd_(p); break;
       case 'billAdd': r=billAdd_(p); break;
       case 'bills2B': r=bills2B_(p.sheet); break;
+      case 'b2bClass': r=b2bClass_(p); break;
+      case 'b2bConfirm': r=b2bConfirm_(p); break;
       case 'txnConfirm': r=txnConfirm_(p); break;
       case 'userAdd': r=userAdd_(p); break;
       case 'userPass': r=userPass_(p); break;

@@ -1,5 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
+ * v5.4 (version 17): +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -110,7 +111,7 @@ function bills2B_(sheetName){
 
 /* ── v5.3: 2B source = Sri Polinchi & Co contractor tabs (GSTIN+Party+Month) ── */
 function b2bSheets_(){
-  var s2=SpreadsheetApp.openById(B2_ID), want=['Malaiyappan Contractor GSTR 2B','Arivoly GSTR 2B','Arivoly Contractor GSTR 2B'], out=[], i;
+  var s2=SpreadsheetApp.openById(B2_ID), want=['Malaiyappan Contractor GSTR 2B','Arivoly GSTR 2B','Arivoly Contractor GSTR 2B','GSTR2B'], out=[], i;
   for(i=0;i<want.length;i++){ if(s2.getSheetByName(want[i])) out.push(want[i]); }
   return out;
 }
@@ -211,6 +212,49 @@ function b2bConfirm_(p){
   return {ok:true, bills:nb, commission:com, pct:pct, agentId:agentId, billsTotal:rc.billsTotal};
 }
 
+/* ── v5.4: Advance (முன்பணம்) — multi-vendor ledger + agent scope ── */
+function advSheet_(){
+  var s=ss().getSheetByName('Advances');
+  if(!s){ s=ss().insertSheet('Advances'); s.appendRow(['advId','date','agentId','agentName','vendorCode','vendorName','amount','note','by','at']); }
+  return s;
+}
+function advAllowed_(agentId){
+  // vendors under this agent = AgentOverrides + vendors added by this agent (AuditLogs VENDOR_ADD)
+  var out={}, i;
+  try{ var ov=rows_('AgentOverrides');
+    for(i=1;i<ov.length;i++){ if(String(ov[i][1]||'').trim()===agentId){ var vc=String(ov[i][2]||'').trim(); if(vc) out[vc]=1; } } }catch(e){}
+  var un='';
+  try{ var ag=rows_('Agents');
+    for(i=1;i<ag.length;i++){ if(String(ag[i][0]||'').trim()===agentId){ un=String(ag[i][2]||'').trim(); break; } } }catch(e){}
+  if(un){ try{ var a=rows_('AuditLogs');
+    for(i=1;i<a.length;i++){ if(String(a[i][3]||'').trim()==='VENDOR_ADD' && String(a[i][2]||'').trim().toLowerCase()===un.toLowerCase()){ var vc2=String(a[i][4]||'').trim(); if(vc2) out[vc2]=1; } } }catch(e){} }
+  return Object.keys(out);
+}
+function advAdd_(p){
+  var agentId=String(p.agentId||'').trim(), agName='', ent=(typeof p.entries==='string')?JSON.parse(p.entries):(p.entries||[]), i, j;
+  if(!agentId) throw new Error('Agent தேர்ந்து எடுக்கவும்');
+  if(!ent.length) throw new Error('குறைந்தது ஒரு vendor + தொகை சேர்க்கவும்');
+  var ag=rows_('Agents');
+  for(i=1;i<ag.length;i++){ if(String(ag[i][0]||'').trim()===agentId){ agName=String(ag[i][1]||'').trim(); break; } }
+  var allowed={}, al=advAllowed_(agentId);
+  for(i=0;i<al.length;i++) allowed[al[i]]=1;
+  var ven=rows_('Vendors'), date=String(p.date||'').trim()||nowIso().slice(0,10);
+  var shA=advSheet_(), added=[], total=0;
+  for(i=0;i<ent.length;i++){
+    var vc=String((ent[i]||{}).vendorCode||'').trim(), amt=num((ent[i]||{}).amount);
+    if(!vc||!amt) continue;
+    var vn='';
+    for(j=1;j<ven.length;j++){ if(String(ven[j][0]||'').trim()===vc){ vn=String(ven[j][1]||'').trim(); break; } }
+    if(!vn) throw new Error('Vendor இல்லை: '+vc);
+    if(!allowed[vc]) throw new Error('இந்த vendor இந்த ஏஜெண்டுக்கு உட்பட்டது அல்ல: '+vn);
+    var id='ADV'+rid(8);
+    shA.appendRow([id, date, agentId, agName, vc, vn, amt, String(p.note||'').slice(0,120), String(p.user||'admin'), nowIso()]);
+    added.push({advId:id, vendorCode:vc, vendorName:vn, amount:amt}); total+=amt;
+  }
+  if(!added.length) throw new Error('சரியான vendor / தொகை இல்லை');
+  audit_(p.user||'admin','ADVANCE_ADD',added[0].advId,added.length+' vendor · ₹'+total+' · '+agentId);
+  return {ok:true, count:added.length, total:+total.toFixed(2), rows:added};
+}
 function txnConfirm_(p){
   var t=rows_('Transactions'), i, row=0;
   for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===String(p.txnId).trim()){ row=i+1; break; } }
@@ -373,7 +417,7 @@ function login_(p){
   }
   return {ok:false, error:'பயனர் இல்லை'};
 }
-function vlist_(tab){
+function vlist_(tab, p){
   var src=({txns:'Transactions',overrides:'AgentOverrides',wallet:'AgentWallet'})[tab]||tab;
   function obj(keys){ var v=rows_(src), out=[], i, j, o; for(i=1;i<v.length;i++){ var any=false; o={};
     for(j=0;j<keys.length;j++){ o[keys[j]]=(v[i][j]==null?'':v[i][j]); if(o[keys[j]]!=='')any=true; }
@@ -400,6 +444,24 @@ function vlist_(tab){
     return {ok:true, rows:out};
   }
   if(tab==='b2btabs') return {ok:true, rows:b2bSheets_()}; // v5.3 Sri Polinchi contractor tabs
+  if(tab==='advances') return {ok:true, rows:obj(['advId','date','agentId','agentName','vendorCode','vendorName','amount','note','by','at'])};
+  if(tab==='advallowed'){
+    var al=advAllowed_(String((p&&p.agentId)||'').trim()), ven=rows_('Vendors'), out4=[], i4, j4, nm4;
+    for(i4=0;i4<al.length;i4++){ nm4=''; for(j4=1;j4<ven.length;j4++){ if(String(ven[j4][0]).trim()===al[i4]){ nm4=String(ven[j4][1]).trim(); break; } } out4.push({vendorCode:al[i4], vendorName:nm4}); }
+    return {ok:true, rows:out4};
+  }
+  if(tab==='advsummary'){
+    var ag=rows_('Agents'), per={}, order=[], i5, aid;
+    for(i5=1;i5<ag.length;i5++){ aid=String(ag[i5][0]||'').trim(); if(!aid) continue;
+      per[aid]={agentId:aid, agentName:String(ag[i5][1]||'').trim(), username:String(ag[i5][2]||'').trim(), vendors:0, advCount:0, advTotal:0}; order.push(aid); }
+    for(i5=0;i5<order.length;i5++){ per[order[i5]].vendors=advAllowed_(order[i5]).length; }
+    var adv=rows_('Advances');
+    for(i5=1;i5<adv.length;i5++){ aid=String(adv[i5][2]||'').trim(); if(!aid)continue;
+      if(!per[aid]){ per[aid]={agentId:aid, agentName:String(adv[i5][3]||'').trim(), username:'', vendors:0, advCount:0, advTotal:0}; order.push(aid); }
+      per[aid].advCount++; per[aid].advTotal+=num(adv[i5][6]); }
+    var out5=[]; for(i5=0;i5<order.length;i5++){ var o5=per[order[i5]]; o5.advTotal=+o5.advTotal.toFixed(2); out5.push(o5); }
+    return {ok:true, rows:out5};
+  }
   if(tab==='b2bclass'){
     var c=ss().getSheetByName('2B_Classify');
     if(!c) return {ok:true, rows:[]};
@@ -422,7 +484,7 @@ function doGet(e){
     switch(p.action){
       case 'ping': r={ok:true, time:nowIso()}; break;
       case 'login': r=login_(p); break;
-      case 'list': r=vlist_(p.tab); break;
+      case 'list': r=vlist_(p.tab, p); break;
       case 'vendorAdd': r=vendorAdd_(p); break;
       case 'vendorRemove': r=vendorRemove_(p); break;
       case 'vendorEdit': r=vendorEdit_(p); break;
@@ -432,6 +494,7 @@ function doGet(e){
       case 'bills2B': r=bills2B_(p.sheet); break;
       case 'b2bClass': r=b2bClass_(p); break;
       case 'b2bConfirm': r=b2bConfirm_(p); break;
+      case 'advAdd': r=advAdd_(p); break;
       case 'txnConfirm': r=txnConfirm_(p); break;
       case 'userAdd': r=userAdd_(p); break;
       case 'userPass': r=userPass_(p); break;

@@ -1,11 +1,13 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
+ * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
  * Deploy: Deploy → New deployment → Web app → Execute as: Me → Anyone → copy URL
  * ERP-இல் Vendors பக்கத்தில "⚙ V3 API" → URL paste.
  */
 var V3_ID = '1zzbV4F_Iju2szqT0SGLgKAipXChAp8L-iHc63I4jLeQ';
+var B2_ID = '1Qwdkod9Q8nANXPfz-2Ah6ZVQp0DAsIfaygBT57Tw1jw'; // Sri Polinchi & Co — 2B contractor tabs
 var API_KEY = 'ARV3-2026-KX9Q42'; // விரும்பினால் மாற்றலாம் — ERP-இல் இதே key இருக்கணும்
 
 var TYPE_CODE = {Hardware:'HW', Paint:'GN', Civil:'CV', Plumbing:'PL', Electrical:'EL', Tiles:'TL', Steel:'ST', Other:'OT'};
@@ -95,6 +97,7 @@ function billAdd_(p){
 }
 
 function bills2B_(sheetName){
+  if(b2bSheets_().indexOf(sheetName)>=0) return {ok:true, rows:b2bRowsNew_(sheetName)}; // v5.3 Sri Polinchi contractor tabs
   if(!/^GSTR2B_/i.test(sheetName)) throw new Error('2B month tab மட்டும்: '+sheetName);
   var v=rows_(sheetName), out=[], i;
   for(i=1;i<v.length;i++){
@@ -105,8 +108,46 @@ function bills2B_(sheetName){
   return {ok:true, rows:out};
 }
 
-/* ── v5.2: GSTR-2B Inbox pipeline (Vendors classify → txn → commission → bills) ── */
+/* ── v5.3: 2B source = Sri Polinchi & Co contractor tabs (GSTIN+Party+Month) ── */
+function b2bSheets_(){
+  var s2=SpreadsheetApp.openById(B2_ID), want=['Malaiyappan Contractor GSTR 2B','Arivoly GSTR 2B','Arivoly Contractor GSTR 2B'], out=[], i;
+  for(i=0;i<want.length;i++){ if(s2.getSheetByName(want[i])) out.push(want[i]); }
+  return out;
+}
+function b2bMonth_(dt){
+  if(!dt) return '';
+  if(Object.prototype.toString.call(dt)==='[object Date]') return dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2);
+  var s=String(dt).trim(), m=s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+  if(m){ var y=m[3].length===2?('20'+m[3]):m[3]; return y+'-'+('0'+m[2]).slice(-2); }
+  m=s.match(/^(\d{4})-(\d{2})/); if(m) return m[1]+'-'+m[2];
+  return '';
+}
+function b2bFy_(ym){
+  var p=String(ym||'').split('-'); if(p.length<2) return '';
+  var y=+p[0], m=+p[1], a, b;
+  if(m>=4){ a=y; b=(''+(y+1)).slice(-2); } else { a=y-1; b=(''+y).slice(-2); }
+  return a+'-'+b;
+}
+function b2bRowsNew_(tab){
+  var v=SpreadsheetApp.openById(B2_ID).getSheetByName(tab).getDataRange().getValues(), out=[], i;
+  if(!v.length) return out;
+  var portal=String(v[0][3]||'').trim().toLowerCase()==='month';
+  var start=portal?2:1;
+  for(i=start;i<v.length;i++){
+    var gst,nm,inv,dt,ival,tax,mo;
+    if(portal){ mo=String(v[i][3]||'').trim(); gst=v[i][4]; nm=v[i][5]; inv=v[i][6]; dt=v[i][8]; ival=v[i][9]; tax=v[i][13]; }
+    else { gst=v[i][0]; nm=v[i][1]; inv=v[i][2]; dt=v[i][3]; ival=v[i][4]; tax=v[i][5]; mo=b2bMonth_(dt); }
+    inv=String(inv||'').trim();
+    if(!inv) continue;
+    var dts;
+    if(Object.prototype.toString.call(dt)==='[object Date]') dts=('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
+    else dts=String(dt||'').trim();
+    out.push({inv:inv, nm:String(nm||'').trim(), gst:String(gst||'').trim(), dt:dts, taxable:num(tax), total:num(ival)||+(num(tax)*1.18).toFixed(2), month:mo, fy:b2bFy_(mo)});
+  }
+  return out;
+}
 function b2bRows_(tab){
+  if(b2bSheets_().indexOf(tab)>=0) return b2bRowsNew_(tab); // v5.3
   var v=rows_(tab), out=[], i;
   for(i=1;i<v.length;i++){
     var inv=String(v[i][0]||'').trim();
@@ -122,16 +163,18 @@ function b2bClassTab_(){
 }
 function b2bClass_(p){
   var nm=String(p.nm||'').trim(), tab=String(p.tab||'').trim(), type=String(p.type||'').trim();
+  var gst=String(p.gst||'').trim().toUpperCase(), mo=String(p.month||'').trim(), fy=b2bFy_(mo);
   if(!nm||!tab||(type!=='Company'&&type!=='Private')) throw new Error('nm / tab / type (Company|Private) தேவை');
   var all=b2bRows_(tab), mine=[], i;
-  for(i=0;i<all.length;i++){ if(all[i].nm.toLowerCase()===nm.toLowerCase()) mine.push(all[i]); }
-  if(!mine.length) throw new Error('2B tab-இல் supplier இல்லை: '+nm);
+  for(i=0;i<all.length;i++){ if(all[i].nm.toLowerCase()===nm.toLowerCase() && (!mo||String(all[i].month||'')===mo)) mine.push(all[i]); }
+  if(!mine.length) throw new Error('2B tab-இல் supplier இல்லை: '+nm+(mo?' · '+mo:''));
   var exp=0; for(i=0;i<mine.length;i++) exp+=mine[i].taxable; exp=+exp.toFixed(2);
-  var fy=String(p.fy||mine[0].fy||''), mo=String(p.month||mine[0].period||'');
-  // vendor: match by name else auto-create (Supplier / Other code)
+  if(!gst){ for(i=0;i<mine.length;i++){ if(mine[i].gst){ gst=mine[i].gst.toUpperCase(); break; } } }
+  // vendor: match by GSTIN first, then name; else auto-create with GST+name (v5.3)
   var v=rows_('Vendors'), code='', j;
-  for(j=1;j<v.length;j++){ if(String(v[j][1]||'').trim().toLowerCase()===nm.toLowerCase()){ code=String(v[j][0]).trim(); break; } }
-  if(!code){ code=vendorCode_('Pudukkottai','Other'); sh('Vendors').appendRow([code, nm, 'Pudukkottai', '', 'Supplier', '', '', String(new Date().getFullYear()), nowIso()]); }
+  if(gst){ for(j=1;j<v.length;j++){ if(String(v[j][5]||'').trim().toUpperCase()===gst){ code=String(v[j][0]).trim(); break; } } }
+  if(!code){ for(j=1;j<v.length;j++){ if(String(v[j][1]||'').trim().toLowerCase()===nm.toLowerCase()){ code=String(v[j][0]).trim(); break; } } }
+  if(!code){ code=vendorCode_('Pudukkottai','Other'); sh('Vendors').appendRow([code, nm, 'Pudukkottai', '', 'Supplier', gst, '', String(new Date().getFullYear()), nowIso()]); }
   var txnId='';
   if(type==='Private'){
     var r=txnAdd_({vendorCode:code, expected:exp, advance:0, gp:4, fy:fy, month:mo, agentId:'', ct:'2b', user:p.user||'admin'});
@@ -141,7 +184,7 @@ function b2bClass_(p){
   for(j=1;j<vr.length;j++){ if(String(vr[j][0]).trim()===key){ found=j+1; break; } }
   var row=[key, nm, tab, fy, mo, type, txnId, '', 0, (type==='Private'?'Pending':'Company'), nowIso(), String(p.user||'admin')];
   if(found) s.getRange(found,1,1,row.length).setValues([row]); else s.appendRow(row);
-  audit_(p.user||'admin','B2B_CLASS',key,type+' · exp ₹'+exp+(txnId?' · txn '+txnId:''));
+  audit_(p.user||'admin','B2B_CLASS',key,type+' · exp ₹'+exp+(txnId?' · txn '+txnId:'')+(code?' · '+code:''));
   return {ok:true, key:key, vendorCode:code, txnId:txnId, expected:exp, bills:mine.length};
 }
 function b2bConfirm_(p){
@@ -150,11 +193,11 @@ function b2bConfirm_(p){
   var s=b2bClassTab_(), vr=s.getDataRange().getValues(), i, crow=null, crow2=0;
   for(i=1;i<vr.length;i++){ if(String(vr[i][6]).trim()===txnId){ crow=vr[i]; crow2=i+1; break; } }
   if(!crow) throw new Error('2B_Classify-இல் இந்த txn இல்லை (Vendors → 2B Inbox-இல் classify செய்யவும்): '+txnId);
-  var nm=String(crow[1]).trim(), tab=String(crow[2]).trim();
+  var nm=String(crow[1]).trim(), tab=String(crow[2]).trim(), mo=String(crow[4]||'').trim();
   var t=rows_('Transactions'), tr=null;
   for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===txnId){ tr=t[i]; break; } }
   if(!tr) throw new Error('Txn இல்லை: '+txnId);
-  var mine=b2bRows_(tab).filter(function(r){ return r.nm.toLowerCase()===nm.toLowerCase(); });
+  var mine=b2bRows_(tab).filter(function(r){ return r.nm.toLowerCase()===nm.toLowerCase() && (!mo||String(r.month||'')===mo); });
   var nb=0;
   for(i=0;i<mine.length;i++){ billAdd_({txnId:txnId, no:mine[i].inv, date:mine[i].dt, amt:mine[i].taxable, gp:18, user:p.user||'admin'}); nb++; }
   var exp=num(tr[6]), pct=num(p.pct)||0.5, agentId=String(p.agentId||'').trim(), com=0;
@@ -356,6 +399,7 @@ function vlist_(tab){
     for(i=0;i<all.length;i++){ var nm=all[i].getName(); if(/^GSTR2B_/i.test(nm)) out.push(nm); }
     return {ok:true, rows:out};
   }
+  if(tab==='b2btabs') return {ok:true, rows:b2bSheets_()}; // v5.3 Sri Polinchi contractor tabs
   if(tab==='b2bclass'){
     var c=ss().getSheetByName('2B_Classify');
     if(!c) return {ok:true, rows:[]};

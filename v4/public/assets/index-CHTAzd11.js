@@ -200,7 +200,7 @@ function EyV3B2bInbox(){
  var L=function(a,b){return f==="ta"?b:a};
  var perm=EyV3Role();
  var hide=(perm&&perm.role==="vendor");
- var[tabs,Stabs]=E.useState(null),[tab2,Stab2]=E.useState(""),[rows2,Srows2]=E.useState(null),[cls,Scls]=E.useState([]);
+ var[tabs,Stabs]=E.useState(null),[tab2,Stab2]=E.useState(""),[rows2,Srows2]=E.useState(null),[cls,Scls]=E.useState([]),[mos,Smos]=E.useState([]),[mo2,Smoo]=E.useState("");
  var[ags,Sags]=E.useState(null),[cag,Scag]=E.useState("");
  var[typ,Styp]=E.useState({}),[pct,Spct]=E.useState({});
  var[st,Sst]=E.useState(""),[busy,Sbusy]=E.useState(false),[ph,Sph]=E.useState("loadTabs");
@@ -210,14 +210,16 @@ function EyV3B2bInbox(){
   Stab2(name);Srows2(null);Sph("loadBills");Sst("● "+L("Loading bills of ","பில்கள் ஏற்றுகிறது ")+name+" …");
   EyV3Call("bills2B",{sheet:name},function(e3,d3){
    if(e3||!d3||!d3.ok){Sph("err");return Sst("✗ "+((e3)||(d3&&d3.error)||"")+" — ↻ "+L("Retry","மீண்டும்"))}
+   var ms={};(d3.rows||[]).forEach(function(r){var m3=(r.month||"").trim();if(m3)ms[m3]=1});
+   var ml=Object.keys(ms).sort().reverse();Smos(ml);Smoo(ml[0]||"");
    Srows2(d3.rows||[]);Sst("");fetchClass()},30000)};
  var loadTabs=function(){
   Stabs(null);Srows2(null);Sph("loadTabs");Sst("● "+L("Loading month tabs…","மாத tabs ஏற்றுகிறது…"));
-  EyV3Call("list",{tab:"2btabs"},function(e2,d2){
+  EyV3Call("list",{tab:"b2btabs"},function(e2,d2){
    if(e2){Sph("err");return Sst("✗ "+e2+" — ↻ "+L("Retry","மீண்டும்"))}
    if(!d2||!d2.ok){Sph("err");return Sst("✗ "+((d2&&d2.error)||"தவறு")+" — ↻ "+L("Retry","மீண்டும்"))}
    var tl=(d2.rows)||[];Stabs(tl);
-   if(!tl.length){Sph("none");return Sst(L("No GSTR2B_ month tabs yet — add month tabs in Google Sheet","GSTR2B_ மாத tabs இல்லை — Google Sheet-இல் மாத tab சேர்க்கவும்"))}
+   if(!tl.length){Sph("none");return Sst(L("No contractor 2B tabs in Sri Polinchi sheet","Sri Polinchi sheet-இல் contractor 2B tabs இல்லை"))}
    load(tl[0])},30000)};
  E.useEffect(function(){
   loadTabs();
@@ -225,7 +227,7 @@ function EyV3B2bInbox(){
  },[]);
  if(hide)return null;
  var grp={};
- if(rows2)rows2.forEach(function(r){ var k=(r.nm||"").trim()||"(name empty)"; var g=grp[k]||(grp[k]={nm:k,n:0,tax:0,tot:0}); g.n++;g.tax+=Number(r.taxable)||0;g.tot+=Number(r.total)||0 });
+ if(rows2)rows2.forEach(function(r){ if(mo2&&(r.month||"").trim()!==mo2)return; var k=(r.nm||"").trim()||"(name empty)"; var g=grp[k]||(grp[k]={nm:k,gst:"",n:0,tax:0,tot:0}); g.n++;g.tax+=Number(r.taxable)||0;g.tot+=Number(r.total)||0; if(!g.gst)(r.gst||"").trim()&&(g.gst=r.gst.trim()) });
  var keys=Object.keys(grp).sort(function(a,b){return grp[b].tax-grp[a].tax});
  var cmap={};cls.forEach(function(c){ if(c.tab===tab2)cmap[c.nm]=c });
  var setK=function(obj,setk,key,val){ var x=Object.assign({},obj); x[key]=val; setk(x) };
@@ -238,7 +240,7 @@ function EyV3B2bInbox(){
    if(p2==="custom"){ var v2=window.prompt(L("Custom commission %","Custom கமிஷன் %"),"0.5"); if(!v2)return; p2=v2; }
   }
   Sbusy(true);Sst("… "+nm);
-  EyV3Call("b2bClass",{nm:nm,tab:tab2,type:ty,agentId:"",pct:(ty==="Private"?p2:0),user:"admin"},function(e6,d6){
+  EyV3Call("b2bClass",{nm:nm,tab:tab2,type:ty,gst:(grp[nm]&&grp[nm].gst)||"",month:mo2,agentId:"",pct:(ty==="Private"?p2:0),user:"admin"},function(e6,d6){
    Sbusy(false);
    if(e6)return Sst("✗ "+e6);
    if(!d6||!d6.ok)return Sst("✗ "+((d6&&d6.error)||"தவறு"));
@@ -249,6 +251,7 @@ return n.jsx(oe,{title:"📥 "+L("GSTR-2B Inbox — classify per supplier","GSTR
   n.jsxs("div",{children:[
    n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8},children:[
     tabs?n.jsx("select",{className:"ui-input",style:{maxWidth:240},value:tab2,onChange:function(e2){load(e2.target.value)},children:tabs.map(function(t3){return n.jsx("option",{value:t3,children:t3},t3)})}):null,
+    mos.length?n.jsx("select",{className:"ui-input",style:{maxWidth:130},value:mo2,onChange:function(e2){Smoo(e2.target.value)},children:mos.map(function(m3){return n.jsx("option",{value:m3,children:m3},m3)})}):null,
     n.jsxs("select",{className:"ui-input",style:{maxWidth:210},value:cag,onChange:function(e2){Scag(e2.target.value)},children:[
      n.jsx("option",{value:"",children:L("Agent (for Private)…","ஏஜெண்ட் (Private-க்கு)…")}),
      (ags||[]).map(function(a2){return n.jsx("option",{value:a2.agentId,children:a2.fullName+" ("+a2.agentId+")"},a2.agentId)})]}),
@@ -263,6 +266,7 @@ return n.jsx(oe,{title:"📥 "+L("GSTR-2B Inbox — classify per supplier","GSTR
    n.jsx("div",{style:{overflowX:"auto"},children:n.jsxs("table",{className:"gtbl",children:[
     n.jsx("thead",{children:n.jsxs("tr",{children:[
      n.jsx("th",{children:L("Supplier","சப்ளையர்")}),
+     n.jsx("th",{children:L("GSTIN","GSTIN")}),
      n.jsx("th",{children:L("Bills","பில்கள்")}),
      n.jsx("th",{children:L("Taxable ₹","வரிக்குரிய ₹")}),
      n.jsx("th",{children:L("Total ₹","மொத்தம் ₹")}),
@@ -274,6 +278,7 @@ return n.jsx(oe,{title:"📥 "+L("GSTR-2B Inbox — classify per supplier","GSTR
      var g=grp[k2],c=cmap[k2],ty=typ[k2]||(c?c.type:""),done=c&&(c.status==="Confirmed"||c.status==="Company");
      return n.jsxs("tr",{children:[
       n.jsx("td",{style:{fontWeight:600},children:k2}),
+      n.jsx("td",{className:"mono",style:{fontSize:11},children:g.gst||"—"}),
       n.jsx("td",{className:"mono",children:String(g.n)}),
       n.jsx("td",{className:"mono",children:"₹"+EyVbInr(g.tax)}),
       n.jsx("td",{className:"mono",children:"₹"+EyVbInr(g.tot)}),
@@ -306,7 +311,7 @@ function EyCompanyBillsPage({user:c}){
  var load=function(name){Stab2(name);Srows2(null);
   EyV3Call("bills2B",{sheet:name},function(e3,d3){if(e3||!d3||!d3.ok)return Sst("✗ "+((e3)||(d3&&d3.error)||""));Srows2(d3.rows||[])});
   EyV3Call("list",{tab:"b2bclass"},function(e4,d4){if(!e4&&d4&&d4.ok)Scls(d4.rows||[])})};
- E.useEffect(function(){EyV3Call("list",{tab:"2btabs"},function(e2,d2){
+ E.useEffect(function(){EyV3Call("list",{tab:"b2btabs"},function(e2,d2){
   if(e2)return Sst("✗ "+e2);
   var tl=(d2&&d2.rows)||[];Stabs(tl);
   EyV3Call("list",{tab:"b2bclass"},function(e4,d4){if(!e4&&d4&&d4.ok)Scls(d4.rows||[])});
@@ -327,7 +332,7 @@ function EyCompanyBillsPage({user:c}){
    n.jsx("thead",{children:n.jsxs("tr",{children:[n.jsx("th",{children:L("Invoice","இன்வாய்ஸ்")}),n.jsx("th",{children:L("Supplier","சப்ளையர்")}),n.jsx("th",{children:L("Date","தேதி")}),n.jsx("th",{children:L("Taxable ₹","வரிக்குரிய ₹")}),n.jsx("th",{children:L("Total ₹","மொத்தம் ₹")}),n.jsx("th",{children:L("Period","காலம்")})]})}),
    n.jsx("tbody",{children:list.map(function(r,i2){return n.jsxs("tr",{children:[
     n.jsx("td",{className:"mono",children:r.inv}),n.jsx("td",{children:r.nm}),n.jsx("td",{children:r.dt}),
-    n.jsx("td",{className:"num",children:"₹"+EyVbInr(r.taxable)}),n.jsx("td",{className:"num",children:"₹"+EyVbInr(r.total)}),n.jsx("td",{children:r.period})]},"cb"+i2)})})
+    n.jsx("td",{className:"num",children:"₹"+EyVbInr(r.taxable)}),n.jsx("td",{className:"num",children:"₹"+EyVbInr(r.total)}),n.jsx("td",{className:"mono",children:r.month})]},"cb"+i2)})})
   ]})})
  ]});
 }
@@ -1338,7 +1343,7 @@ function EyDashHome({user:c}){
    rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
   for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
    rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
-  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301k"]],!1)};
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301l"]],!1)};
  var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
   ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
   ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
@@ -4342,7 +4347,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301k";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301l";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

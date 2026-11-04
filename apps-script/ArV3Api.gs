@@ -1,6 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
- * v5.4 (version 17): +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
+ * v5.4 (version 18): +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -455,7 +455,7 @@ function vlist_(tab, p){
     for(i5=1;i5<ag.length;i5++){ aid=String(ag[i5][0]||'').trim(); if(!aid) continue;
       per[aid]={agentId:aid, agentName:String(ag[i5][1]||'').trim(), username:String(ag[i5][2]||'').trim(), vendors:0, advCount:0, advTotal:0}; order.push(aid); }
     for(i5=0;i5<order.length;i5++){ per[order[i5]].vendors=advAllowed_(order[i5]).length; }
-    var adv=rows_('Advances');
+    var advSh=ss().getSheetByName('Advances'), adv=advSh?advSh.getDataRange().getValues():[];
     for(i5=1;i5<adv.length;i5++){ aid=String(adv[i5][2]||'').trim(); if(!aid)continue;
       if(!per[aid]){ per[aid]={agentId:aid, agentName:String(adv[i5][3]||'').trim(), username:'', vendors:0, advCount:0, advTotal:0}; order.push(aid); }
       per[aid].advCount++; per[aid].advTotal+=num(adv[i5][6]); }

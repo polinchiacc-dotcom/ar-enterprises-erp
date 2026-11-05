@@ -1,6 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
- * v5.6 (version 20): +b2bSummary (pre-aggregated supplier×month — fast Inbox load) 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
+ * v5.6 (version 21): +b2bSummary (pre-aggregated supplier×month — fast Inbox load) 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -284,7 +284,7 @@ function b2bSummary_(){
     for(i=0;i<rows.length;i++){
       var r=rows[i], k=r.month+"|"+r.nm, g=agg[k];
       if(!g) g=agg[k]={month:r.month, nm:r.nm, gst:r.gst, n:0, tax:0, tot:0};
-      g.n++; g.tax+=r.taxable; g.tot+=r.tot;
+      g.n++; g.tax+=r.taxable; g.tot+=r.total;
     }
     for(var k2 in agg){ out.push(agg[k2]); months[agg[k2].month]=1; }
   }

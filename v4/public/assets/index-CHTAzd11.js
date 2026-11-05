@@ -373,7 +373,7 @@ return n.jsx(oe,{title:"📥 "+L("GSTR-2B Inbox — classify per supplier","GSTR
        n.jsx("option",{value:"Private",children:L("Private Bill","பிரைவேட் பில்")})]}):null,
       (!done)?n.jsxs("div",{style:{display:"flex",gap:4,alignItems:"center",padding:"3px 6px",background:"var(--surface-2,#f4f6fb)",borderRadius:8},children:[
        n.jsxs("select",{className:"ui-input",style:{maxWidth:70,padding:"2px 4px"},value:pct[g.nm]||"1",onChange:function(e2){setK(pct,Spct,g.nm,e2.target.value)},children:[
-        n.jsx("option",{value:"1",children:"1%"}),n.jsx("option",{value:"2",children:"2%"}),n.jsx("option",{value:"3",children:"3%"}),n.jsx("option",{value:"4",children:"4%"}),n.jsx("option",{value:"5",children:"5%"}),n.jsx("option",{value:"6",children:"6%"}),n.jsx("option",{value:"7",children:"7%"}),n.jsx("option",{value:"8",children:"8%"}),n.jsx("option",{value:"9",children:"9%"}),n.jsx("option",{value:"10",children:"10%"})]}),
+        n.jsx("option",{value:"0",children:"0%"}),n.jsx("option",{value:"1",children:"1%"}),n.jsx("option",{value:"2",children:"2%"}),n.jsx("option",{value:"3",children:"3%"}),n.jsx("option",{value:"4",children:"4%"}),n.jsx("option",{value:"5",children:"5%"}),n.jsx("option",{value:"6",children:"6%"}),n.jsx("option",{value:"7",children:"7%"}),n.jsx("option",{value:"8",children:"8%"}),n.jsx("option",{value:"9",children:"9%"}),n.jsx("option",{value:"10",children:"10%"})]}),
        n.jsx("span",{style:{fontSize:11,fontWeight:700,color:"#6a4ee0",whiteSpace:"nowrap"},children:"= ₹"+EyVbInr(+((Number(g.tax)||0)*(parseFloat(pct[g.nm]||"1")/100)).toFixed(2))})
       ]}):null,
       (ty&&!done)?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:busy,onClick:function(){doClass(g.nm,g.gst)},children:ty==="Private"?L("Create Txn","Txn உருவாக்கு"):L("Save","சேமி")}):null
@@ -1453,7 +1453,7 @@ function EyDashHome({user:c}){
    rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
   for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
    rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
-  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301v"]],!1)};
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301w"]],!1)};
  var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
   ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
   ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
@@ -4457,7 +4457,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301v";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301w";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

@@ -293,38 +293,35 @@ function EyV3B2bInbox(){
  var L=function(a,b){return f==="ta"?b:a};
  var perm=EyV3Role();
  var hide=(perm&&perm.role==="vendor");
- var[tabs,Stabs]=E.useState(null),[tab2,Stab2]=E.useState(""),[rows2,Srows2]=E.useState(null),[cls,Scls]=E.useState([]),[mos,Smos]=E.useState([]),[mo2,Smoo]=E.useState("");
+ var[mos,Smos]=E.useState([]),[mo2,Smoo]=E.useState("");
+ var[sum,Ssum]=E.useState(null),[cls,Scls]=E.useState([]);
  var[ags,Sags]=E.useState(null),[cag,Scag]=E.useState("");
  var[typ,Styp]=E.useState({}),[pct,Spct]=E.useState({});
- var[st,Sst]=E.useState(""),[busy,Sbusy]=E.useState(false),[ph,Sph]=E.useState("loadTabs");
+ var[st,Sst]=E.useState(""),[busy,Sbusy]=E.useState(false),[ph,Sph]=E.useState("load");
  var fetchClass=function(){
   EyV3Call("list",{tab:"b2bclass"},function(e4,d4){ if(!e4&&d4&&d4.ok)Scls(d4.rows||[]) },30000)};
- var load=function(name){
-  Stab2(name);Srows2(null);Sph("loadBills");Sst("● "+L("Loading bills of ","பில்கள் ஏற்றுகிறது ")+name+" …");
-  EyV3Call("bills2B",{sheet:name},function(e3,d3){
-   if(e3||!d3||!d3.ok){Sph("err");return Sst("✗ "+((e3)||(d3&&d3.error)||"")+" — ↻ "+L("Retry","மீண்டும்"))}
-   var ms={};(d3.rows||[]).forEach(function(r){var m3=(r.month||"").trim();if(m3)ms[m3]=1});
-   var ml=Object.keys(ms).sort().reverse();Smos(ml);Smoo(ml[0]||"");
-   Srows2(d3.rows||[]);Sst("");fetchClass()},30000)};
- var loadTabs=function(){
-  Stabs(null);Srows2(null);Sph("loadTabs");Sst("● "+L("Loading month tabs…","மாத tabs ஏற்றுகிறது…"));
-  EyV3Call("list",{tab:"b2btabs"},function(e2,d2){
+ var apply=function(d){
+  var ml=d.months||[];Smos(ml);Smoo(function(x){return x&&ml.indexOf(x)>=0?x:(ml[0]||"")});
+  Ssum(d.rows||[]);Sph("ok");Sst("");fetchClass()};
+ var loadSum=function(force){
+  Sph("load");Ssum(null);Sst("● "+L("Loading 2B summary…","2B சுருக்கம் ஏற்றுகிறது…"));
+  var c3=null;try{c3=JSON.parse(sessionStorage.getItem("ar4.b2bsum")||"null")}catch(e){}
+  if(!force&&c3&&c3.rows&&Date.now()-(c3.ts||0)<600000)return apply(c3);
+  EyV3Call("b2bSummary",{},function(e2,d2){
    if(e2){Sph("err");return Sst("✗ "+e2+" — ↻ "+L("Retry","மீண்டும்"))}
    if(!d2||!d2.ok){Sph("err");return Sst("✗ "+((d2&&d2.error)||"தவறு")+" — ↻ "+L("Retry","மீண்டும்"))}
-   var tl=(d2.rows)||[];Stabs(tl);
-   if(!tl.length){Sph("none");return Sst(L("No contractor 2B tabs in Sri Polinchi sheet","Sri Polinchi sheet-இல் contractor 2B tabs இல்லை"))}
-   load(tl[0])},30000)};
+   var d3={rows:d2.rows||[],months:d2.months||[],ts:Date.now()};
+   try{sessionStorage.setItem("ar4.b2bsum",JSON.stringify(d3))}catch(e){}
+   apply(d3)},30000)};
  E.useEffect(function(){
-  loadTabs();
+  loadSum(false);
   EyV3Call("list",{tab:"agents"},function(e5,d5){ if(!e5&&d5&&d5.ok)Sags(d5.rows||[]) },30000);
  },[]);
  if(hide)return null;
- var grp={};
- if(rows2)rows2.forEach(function(r){ if(mo2&&(r.month||"").trim()!==mo2)return; var k=(r.nm||"").trim()||"(name empty)"; var g=grp[k]||(grp[k]={nm:k,gst:"",n:0,tax:0,tot:0}); g.n++;g.tax+=Number(r.taxable)||0;g.tot+=Number(r.total)||0; if(!g.gst)(r.gst||"").trim()&&(g.gst=r.gst.trim()) });
- var keys=Object.keys(grp).sort(function(a,b){return grp[b].tax-grp[a].tax});
- var cmap={};cls.forEach(function(c){ if(c.tab===tab2)cmap[c.nm]=c });
+ var cmap={};cls.forEach(function(c){cmap[(c.nm||"")+"|"+(c.month||"")]=c});
  var setK=function(obj,setk,key,val){ var x=Object.assign({},obj); x[key]=val; setk(x) };
- var doClass=function(nm){
+ var cards=(sum||[]).filter(function(r){return !mo2||(r.month||"")===mo2}).sort(function(a,b){return (b.tax||0)-(a.tax||0)});
+ var doClass=function(nm,gst){
   var ty=typ[nm]||"";
   if(!ty)return Sst(L("Pick Company or Private first","முதலில் Company அல்லது Private தேர்ந்து"));
   var p2=pct[nm]||"0.5";
@@ -333,50 +330,50 @@ function EyV3B2bInbox(){
    if(p2==="custom"){ var v2=window.prompt(L("Custom commission %","Custom கமிஷன் %"),"0.5"); if(!v2)return; p2=v2; }
   }
   Sbusy(true);Sst("… "+nm);
-  EyV3Call("b2bClass",{nm:nm,tab:tab2,type:ty,gst:(grp[nm]&&grp[nm].gst)||"",month:mo2,agentId:"",pct:(ty==="Private"?p2:0),user:"admin"},function(e6,d6){
+  EyV3Call("b2bClass",{nm:nm,tab:"GSTR2B",gst:gst||"",month:mo2,type:ty,agentId:"",pct:(ty==="Private"?p2:0),user:"admin"},function(e6,d6){
    Sbusy(false);
    if(e6)return Sst("✗ "+e6);
    if(!d6||!d6.ok)return Sst("✗ "+((d6&&d6.error)||"தவறு"));
    Sst("✓ "+nm+" → "+ty+(d6.txnId?(" · TXN "+d6.txnId):""));
-   load(tab2)});
+   fetchClass()});
  };
 return n.jsx(oe,{title:"📥 "+L("GSTR-2B Inbox — classify per supplier","GSTR-2B இன்பாக்ஸ் — supplier வாரியாக வகைப்படுத்த"),sub:L("Month 2B bills → Company (view only) / Private (auto txn → commission → bills)","மாத 2B பில்கள் → Company (பார்வை மட்டும்) / Private (txn தானே → கமிஷன் → பில்கள்)"),children:
   n.jsxs("div",{children:[
    n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8},children:[
-    tabs&&tabs.length>1?n.jsx("select",{className:"ui-input",style:{maxWidth:240},value:tab2,onChange:function(e2){load(e2.target.value)},children:tabs.map(function(t3){return n.jsx("option",{value:t3,children:t3},t3)})}):null,
     mos.length?n.jsx("select",{className:"ui-input",style:{maxWidth:130},value:mo2,onChange:function(e2){Smoo(e2.target.value)},children:mos.map(function(m3){return n.jsx("option",{value:m3,children:m3},m3)})}):null,
     n.jsxs("select",{className:"ui-input",style:{maxWidth:210},value:cag,onChange:function(e2){Scag(e2.target.value)},children:[
      n.jsx("option",{value:"",children:L("Agent (for Private)…","ஏஜெண்ட் (Private-க்கு)…")}),
      (ags||[]).map(function(a2){return n.jsx("option",{value:a2.agentId,children:a2.fullName+" ("+a2.agentId+")"},a2.agentId)})]}),
-    n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:loadTabs,children:"↻ "+L("Reload","மீண்டும்")}),
+    n.jsx("button",{className:"ui-btn ui-btn-sm",onClick:function(){loadSum(true)},children:"↻ "+L("Reload","மீண்டும்")}),
     st?n.jsx("span",{style:{fontSize:12,color:st.indexOf("✗")===0?"#b3261e":"var(--tx-2)"},children:st}):null
    ]}),
-   !rows2?n.jsxs("div",{className:"ui-empty",children:[
-    (ph==="err")?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",style:{marginRight:8},onClick:loadTabs,children:"↻ "+L("Retry","மீண்டும் முயற்சி")}):null,
-    (ph==="err")?L("Failed to load — check ⚙ V3 API setup / network","ஏற்ற முடியவில்லை — ⚙ V3 API அமைப்பு / நெட்வொர்க் சரிபார்க்கவும்"):L("Loading…","ஏற்றுகிறது…")
+   (ph==="err")?n.jsxs("div",{className:"ui-empty",children:[
+    n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",style:{marginRight:8},onClick:function(){loadSum(true)},children:"↻ "+L("Retry","மீண்டும் முயற்சி")}),
+    L("Failed to load — check ⚙ V3 API setup / network","ஏற்ற முடியவில்லை — ⚙ V3 API அமைப்பு / நெட்வொர்க் சரிபார்க்கவும்")
    ]}):
-   !keys.length?n.jsx("div",{className:"ui-empty",children:L("No bills in this month tab","இந்த மாத tab-இல் பில்கள் இல்லை")}):
-   n.jsx("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:12},children:keys.map(function(k2){
- var g=grp[k2],c=cmap[k2],ty=typ[k2]||(c?c.type:""),done=c&&(c.status==="Confirmed"||c.status==="Company");
- return n.jsxs("div",{style:{border:"1px solid var(--bd,#d8dee9)",borderRadius:12,padding:12,background:"var(--card-bg,#fff)",display:"flex",flexDirection:"column",gap:8},children:[
-  n.jsxs("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8},children:[
-   n.jsx("div",{style:{fontWeight:700,fontSize:14,lineHeight:1.3},children:k2}),
-   c&&c.status==="Pending"?n.jsx("span",{style:{fontSize:11,color:"#8a6d00",whiteSpace:"nowrap"},children:"⏳ TXN "+c.txnId}):(done?n.jsx("span",{style:{fontSize:11,fontWeight:700,whiteSpace:"nowrap",color:c.status==="Confirmed"?"#0a7d43":"#8a6d00"},children:(c.status==="Confirmed"?"✓ "+L("Confirmed","உறுதி"):"🏢 "+L("Company","கம்பெனி"))}):null)]}),
-  g.gst?n.jsx("div",{className:"mono",style:{fontSize:11,color:"var(--tx-2)"},children:g.gst}):null,
-  n.jsxs("div",{style:{display:"flex",gap:14,flexWrap:"wrap"},children:[
-   n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Bills","பில்கள்")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:String(g.n)})]}),
-   n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Taxable ₹","வரிக்குரிய ₹")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:"₹"+EyVbInr(g.tax)})]}),
-   n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Total ₹","மொத்தம் ₹")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:"₹"+EyVbInr(g.tot)})]})]}),
-  n.jsxs("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginTop:"auto"},children:[
-   n.jsxs("select",{className:"ui-input",style:{maxWidth:130},disabled:!!done,value:ty,onChange:function(e2){setK(typ,Styp,k2,e2.target.value)},children:[
-    n.jsx("option",{value:"",children:"—"}),
-    n.jsx("option",{value:"Company",children:L("Company Bill","கம்பெனி பில்")}),
-    n.jsx("option",{value:"Private",children:L("Private Bill","பிரைவேட் பில்")})]}),
-   (ty==="Private"&&!done)?n.jsxs("select",{className:"ui-input",style:{maxWidth:100},value:pct[k2]||"0.5",onChange:function(e2){setK(pct,Spct,k2,e2.target.value)},children:[
-    n.jsx("option",{value:"0.5",children:"0.5%"}),n.jsx("option",{value:"1",children:"1%"}),n.jsx("option",{value:"2",children:"2%"}),n.jsx("option",{value:"4",children:"4%"}),n.jsx("option",{value:"8",children:"8%"}),n.jsx("option",{value:"custom",children:"✎"})]}):null,
-   (ty&&!done)?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:busy,onClick:function(){doClass(k2)},children:ty==="Private"?L("Create Txn","Txn உருவாக்கு"):L("Save","சேமி")}):null
-  ]})
- ]},"b2bc"+k2)})})
+   (!sum)?n.jsx("div",{className:"ui-empty",children:L("Loading…","ஏற்றுகிறது…")}):
+   (!cards.length)?n.jsx("div",{className:"ui-empty",children:L("No bills in this month","இந்த மாதத்தில் பில்கள் இல்லை")}):
+   n.jsx("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:12},children:cards.map(function(g){
+    var c=cmap[(g.nm||"")+"|"+(g.month||"")],ty=typ[g.nm]||(c?c.type:""),done=c&&(c.status==="Confirmed"||c.status==="Company");
+    return n.jsxs("div",{style:{border:"1px solid var(--bd,#d8dee9)",borderRadius:12,padding:12,background:"var(--card-bg,#fff)",display:"flex",flexDirection:"column",gap:8},children:[
+     n.jsxs("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8},children:[
+      n.jsx("div",{style:{fontWeight:700,fontSize:14,lineHeight:1.3},children:g.nm}),
+      c&&c.status==="Pending"?n.jsx("span",{style:{fontSize:11,color:"#8a6d00",whiteSpace:"nowrap"},children:"⏳ TXN "+c.txnId}):(done?n.jsx("span",{style:{fontSize:11,fontWeight:700,whiteSpace:"nowrap",color:c.status==="Confirmed"?"#0a7d43":"#8a6d00"},children:(c.status==="Confirmed"?"✓ "+L("Confirmed","உறுதி"):"🏢 "+L("Company","கம்பெனி"))}):null)]}),
+     g.gst?n.jsx("div",{className:"mono",style:{fontSize:11,color:"var(--tx-2)"},children:g.gst}):null,
+     n.jsxs("div",{style:{display:"flex",gap:14,flexWrap:"wrap"},children:[
+      n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Bills","பில்கள்")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:String(g.n)})]}),
+      n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Taxable ₹","வரிக்குரிய ₹")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:"₹"+EyVbInr(g.tax)})]}),
+      n.jsxs("div",{children:[n.jsx("div",{style:{fontSize:10,color:"var(--tx-2)"},children:L("Total ₹","மொத்தம் ₹")}),n.jsx("div",{className:"mono",style:{fontWeight:700,fontSize:15},children:"₹"+EyVbInr(g.tot)})]})]}),
+     n.jsxs("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginTop:"auto"},children:[
+      n.jsxs("select",{className:"ui-input",style:{maxWidth:130},disabled:!!done,value:ty,onChange:function(e2){setK(typ,Styp,g.nm,e2.target.value)},children:[
+       n.jsx("option",{value:"",children:"—"}),
+       n.jsx("option",{value:"Company",children:L("Company Bill","கம்பெனி பில்")}),
+       n.jsx("option",{value:"Private",children:L("Private Bill","பிரைவேட் பில்")})]}),
+      (ty==="Private"&&!done)?n.jsxs("select",{className:"ui-input",style:{maxWidth:100},value:pct[g.nm]||"0.5",onChange:function(e2){setK(pct,Spct,g.nm,e2.target.value)},children:[
+       n.jsx("option",{value:"0.5",children:"0.5%"}),n.jsx("option",{value:"1",children:"1%"}),n.jsx("option",{value:"2",children:"2%"}),n.jsx("option",{value:"4",children:"4%"}),n.jsx("option",{value:"8",children:"8%"}),n.jsx("option",{value:"custom",children:"✎"})]}):null,
+      (ty&&!done)?n.jsx("button",{className:"ui-btn ui-btn-primary ui-btn-sm",disabled:busy,onClick:function(){doClass(g.nm,g.gst)},children:ty==="Private"?L("Create Txn","Txn உருவாக்கு"):L("Save","சேமி")}):null
+     ]})
+    ]},"b2bc"+g.month+g.nm)})})
   ]})});
 }
 
@@ -402,13 +399,13 @@ function EyCompanyBillsPage({user:c}){
   var tl=(d2&&d2.rows)||[];Stabs(tl);
   EyV3Call("list",{tab:"b2bclass"},function(e4,d4){if(!e4&&d4&&d4.ok)Scls(d4.rows||[])});
   if(tl.length)load(tl[0])})},[]);
- var comp={};cls.forEach(function(x){if(x.type==="Company"&&(!tab2||x.tab===tab2))comp[x.nm]=x});
- var list=(rows2||[]).filter(function(r){return comp[(r.nm||"").trim()]});
+ var c2m={};cls.forEach(function(x){if(x.type==="Company"&&(!tab2||x.tab===tab2)){var a3=c2m[x.nm]||(c2m[x.nm]=[]);a3.push(x.month||"")}});
+ var list=(rows2||[]).filter(function(r){var a3=c2m[(r.nm||"").trim()];if(!a3)return false;return a3.indexOf("")>=0||a3.indexOf((r.month||"").trim())>=0});
  var tax=0,tot=0,i;for(i=0;i<list.length;i++){tax+=Number(list[i].taxable)||0;tot+=Number(list[i].total)||0}
  return n.jsxs("div",{children:[
   EyVbHead(L("Company Bills","கம்பெனி பில்கள்"),null,L("GSTR-2B bills classified Company — read-only register. Classify in Vendors → GSTR-2B Inbox.","GSTR-2B பில்களில் Company என வகைப்படுத்தியவை — பார்வை ஏட்டு. Vendors → GSTR-2B Inbox-இல் வகைப்படுத்தவும்.")),
   n.jsxs("div",{style:{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:10},children:[
-   tabs?n.jsx("select",{className:"ui-input",style:{maxWidth:240},value:tab2,onChange:function(e2){load(e2.target.value)},children:tabs.map(function(t3){return n.jsx("option",{value:t3,children:t3},t3)})}):null,
+   tabs&&tabs.length>1?n.jsx("select",{className:"ui-input",style:{maxWidth:240},value:tab2,onChange:function(e2){load(e2.target.value)},children:tabs.map(function(t3){return n.jsx("option",{value:t3,children:t3},t3)})}):null,
    st?n.jsx("span",{style:{fontSize:12,color:"#b3261e"},children:st}):null,
    n.jsxs("span",{className:"text-3",style:{fontSize:12},children:[list.length+" "+L("company bills","கம்பெனி பில்கள்")+" · ₹"+EyVbInr(tax)+" / ₹"+EyVbInr(tot)]})
   ]}),
@@ -1444,7 +1441,7 @@ function EyDashHome({user:c}){
    rows.push([L("Unmatched","பொருந்தாதவை"),String(s2.unmatched)])}
   for(i2=0;i2<mrows.length;i2++){var m3=mrows[i2];
    rows.push([EyV3M3(m3.mo)+" "+m3.fy,"₹"+EyVbInr(m3.exp)+" → ₹"+EyVbInr(m3.amt)+" · 8% ₹"+EyVbInr(m3.exp*0.08)])}
-  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301s"]],!1)};
+  EyVbPrint(L("Dashboard","முகப்பு பலகை"),today,[L("Metric","சுட்டி"),L("Value","மதிப்பு")],rows,[[L("AR Enterprises ERP","AR எண்டர்பிரைசஸ் ERP"),"Build 202610301t"]],!1)};
  var links=[["🏪",L("Vendors","வணிகர்கள்"),"/vendors",ven+" "+L("vendors","வணிகர்கள்")],
   ["⇄",L("Transactions","பரிவர்த்தனைகள்"),"/transactions",txn.length+" ("+open+" "+L("open","திறந்த")+")"],
   ["🧾",L("Bills","பில்கள்"),"/bills",bil.length+" — ₹"+EyVbInr(bAmt)],
@@ -4448,7 +4445,7 @@ window.__arTri={open:openDrawer,refresh:function(){try{sessionStorage.removeItem
 })();
 /* ================= /AR Audit Triangle X-Ray v2 ================= */
 
-;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301s";
+;try{var __bd=document.createElement("div");__bd.id="arBuildChip";__bd.textContent="Build 202610301t";
 __bd.style.cssText="position:fixed;left:6px;bottom:4px;font:10px/14px system-ui,sans-serif;color:#94a3b8;opacity:.75;z-index:9998;pointer-events:none;letter-spacing:.4px";
 document.body.appendChild(__bd)}catch(e){}
 try{if(!document.getElementById("arGstTplCss")){var __st=document.createElement("style");__st.id="arGstTplCss";

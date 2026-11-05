@@ -1,6 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
- * v5.5 (version 19): 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
+ * v5.6 (version 20): +b2bSummary (pre-aggregated supplier×month — fast Inbox load) 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -276,6 +276,20 @@ function advAdd_(p){
   audit_(p.user||'admin','ADVANCE_ADD',added[0].advId,added.length+' vendor · ₹'+total+' · '+agentId);
   return {ok:true, count:added.length, total:+total.toFixed(2), rows:added};
 }
+function b2bSummary_(){
+  // pre-aggregated: {month, nm, gst, n, tax, tot} per supplier-month + month list — tiny payload vs 600KB bills2B
+  var tabs=b2bSheets_(), out=[], months={}, t, i;
+  for(t=0;t<tabs.length;t++){
+    var rows=b2bRowsNew_(tabs[t]), agg={};
+    for(i=0;i<rows.length;i++){
+      var r=rows[i], k=r.month+"|"+r.nm, g=agg[k];
+      if(!g) g=agg[k]={month:r.month, nm:r.nm, gst:r.gst, n:0, tax:0, tot:0};
+      g.n++; g.tax+=r.taxable; g.tot+=r.tot;
+    }
+    for(var k2 in agg){ out.push(agg[k2]); months[agg[k2].month]=1; }
+  }
+  return {ok:true, rows:out, months:Object.keys(months).sort().reverse()};
+}
 function txnConfirm_(p){
   var t=rows_('Transactions'), i, row=0;
   for(i=1;i<t.length;i++){ if(String(t[i][0]).trim()===String(p.txnId).trim()){ row=i+1; break; } }
@@ -516,6 +530,7 @@ function doGet(e){
       case 'b2bClass': r=b2bClass_(p); break;
       case 'b2bConfirm': r=b2bConfirm_(p); break;
       case 'advAdd': r=advAdd_(p); break;
+      case 'b2bSummary': r=b2bSummary_(); break;
       case 'txnConfirm': r=txnConfirm_(p); break;
       case 'userAdd': r=userAdd_(p); break;
       case 'userPass': r=userPass_(p); break;

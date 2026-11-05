@@ -1,6 +1,6 @@
 /**
  * ArV3Api.gs — V3 Operations API (paste as NEW file in the gateway Apps Script project)
- * v5.6 (version 21): +b2bSummary (pre-aggregated supplier×month — fast Inbox load) 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
+ * v5.7 (version 22): month stored as TEXT (apostrophe) — Sheets auto-Date bug; classify month normalized on read; +b2bCompanyBills; b2bConfirm upserts AgentOverrides (commission slab) +b2bSummary (pre-aggregated supplier×month — fast Inbox load) 2B source = Sri Polinchi 'GSTR2B' tab ONLY (header-driven portal parse); contractor tabs removed +GSTR2B consolidated tab in b2bSheets_; Advance (முன்பணம்) multi-vendor ledger — advAdd + list advances/advallowed/advsummary (agent scope: own vendors only)
  * v5.3 (version 14): 2B source = Sri Polinchi & Co (B2_ID) contractor tabs — GSTIN+Party+Month, GST-first vendor match, month filter, list b2btabs
  * v5.2 (version 13): +b2bClass / b2bConfirm (GSTR-2B Inbox → Vendors classify → txn → commission → bills), vlist b2bclass
  * Writes to V3 workbook (AR_ERP_Pudukkottai). Read-only pages use gviz directly.
@@ -51,7 +51,7 @@ function txnAdd_(p){
   var gst=+(exp*gp/100).toFixed(2);
   var bal=+(gst-adv).toFixed(2);
   var id='TXN'+rid(10);
-  var row=[id, vr[2], vr[0], vr[1], String(p.fy||''), String(p.month||''), exp, adv, gp, gst, 0, exp, bal, 'Open'];
+  var row=[id, vr[2], vr[0], vr[1], String(p.fy||''), "'"+String(p.month||''), exp, adv, gp, gst, 0, exp, bal, 'Open'];
   sh('Transactions').appendRow(row);
   try{ sh('Monthly_Transactions').appendRow(row); }catch(e){}
   // commission (V3 model): agent + override % → AgentWallet
@@ -204,7 +204,7 @@ function b2bClass_(p){
   }
   var s=b2bClassTab_(), vr=s.getDataRange().getValues(), key=nm+'|'+tab, found=0;
   for(j=1;j<vr.length;j++){ if(String(vr[j][0]).trim()===key){ found=j+1; break; } }
-  var row=[key, nm, tab, fy, mo, type, txnId, '', 0, (type==='Private'?'Pending':'Company'), nowIso(), String(p.user||'admin')];
+  var row=[key, nm, tab, fy, "'"+mo, type, txnId, '', 0, (type==='Private'?'Pending':'Company'), nowIso(), String(p.user||'admin')]; // apostrophe = keep as text (Sheets auto-converts 2026-09 → Date)
   if(found) s.getRange(found,1,1,row.length).setValues([row]); else s.appendRow(row);
   audit_(p.user||'admin','B2B_CLASS',key,type+' · exp ₹'+exp+(txnId?' · txn '+txnId:'')+(code?' · '+code:''));
   return {ok:true, key:key, vendorCode:code, txnId:txnId, expected:exp, bills:mine.length};
@@ -229,6 +229,16 @@ function b2bConfirm_(p){
   }
   var rc=txnConfirm_({txnId:txnId, user:p.user||'admin', g2count:mine.length});
   s.getRange(crow2,8,1,3).setValues([[agentId, pct, 'Confirmed']]);
+  // commission structure: per-vendor % override for this agent (Agent Commission Slab)
+  try{
+    var vc3=String(tr[2]||'').trim(), vn3=String(tr[3]||'').trim();
+    if(vc3){
+      var ov=rows_('AgentOverrides'), fo=0, k3;
+      for(k3=1;k3<ov.length;k3++){ if(String(ov[k3][1]||'').trim()===agentId && String(ov[k3][2]||'').trim()===vc3){ fo=k3+1; break; } }
+      if(fo) sh('AgentOverrides').getRange(fo,5,1,3).setValues([[pct, String(p.user||'admin'), nowIso()]]);
+      else sh('AgentOverrides').appendRow(['OV'+rid(8), agentId, vc3, vn3, pct, String(p.user||'admin'), nowIso()]);
+    }
+  }catch(e3){}
   audit_(p.user||'admin','B2B_CONFIRM',txnId,nm+' · bills '+nb+' · com ₹'+com+' · '+pct+'%');
   return {ok:true, bills:nb, commission:com, pct:pct, agentId:agentId, billsTotal:rc.billsTotal};
 }
@@ -275,6 +285,31 @@ function advAdd_(p){
   if(!added.length) throw new Error('சரியான vendor / தொகை இல்லை');
   audit_(p.user||'admin','ADVANCE_ADD',added[0].advId,added.length+' vendor · ₹'+total+' · '+agentId);
   return {ok:true, count:added.length, total:+total.toFixed(2), rows:added};
+}
+function b2bCompanyBills_(){
+  // Company-classified (per month) bills only — fast, tiny
+  var c=ss().getSheetByName('2B_Classify');
+  if(!c) return {ok:true, rows:[], sup:[]};
+  var cv=c.getDataRange().getValues(), i, want={};
+  for(i=1;i<cv.length;i++){
+    if(String(cv[i][5]||'').trim()!=='Company') continue;
+    var nm=String(cv[i][1]||'').trim(), mo=b2bMonth_(cv[i][4])||String(cv[i][4]||'').trim();
+    if(nm) (want[nm.toLowerCase()]=want[nm.toLowerCase()]||[]).push(mo);
+  }
+  var out=[], sup={}, tabs=b2bSheets_(), t;
+  for(t=0;t<tabs.length;t++){
+    var rows=b2bRowsNew_(tabs[t]);
+    for(i=0;i<rows.length;i++){
+      var r=rows[i], wl=want[(r.nm||'').toLowerCase()];
+      if(!wl) continue;
+      if(wl.indexOf('')<0 && wl.indexOf(r.month)<0) continue;
+      out.push(r);
+      var g=sup[r.nm+'|'+r.month];
+      if(!g) g=sup[r.nm+'|'+r.month]={nm:r.nm, gst:r.gst, month:r.month, n:0, tax:0, tot:0};
+      g.n++; g.tax+=r.taxable; g.tot+=r.total;
+    }
+  }
+  return {ok:true, rows:out, sup:Object.keys(sup).map(function(k){return sup[k]})};
 }
 function b2bSummary_(){
   // pre-aggregated: {month, nm, gst, n, tax, tot} per supplier-month + month list — tiny payload vs 600KB bills2B
@@ -503,7 +538,7 @@ function vlist_(tab, p){
     var cv=c.getDataRange().getValues(), co=[], k2;
     for(k2=1;k2<cv.length;k2++){
       if(!String(cv[k2][0]||'').trim()) continue;
-      co.push({key:String(cv[k2][0]||''), nm:String(cv[k2][1]||''), tab:String(cv[k2][2]||''), fy:String(cv[k2][3]||''), month:String(cv[k2][4]||''), type:String(cv[k2][5]||''), txnId:String(cv[k2][6]||''), agentId:String(cv[k2][7]||''), pct:num(cv[k2][8]), status:String(cv[k2][9]||''), at:String(cv[k2][10]||''), user:String(cv[k2][11]||'')});
+      var mm2=b2bMonth_(cv[k2][4]); co.push({key:String(cv[k2][0]||''), nm:String(cv[k2][1]||''), tab:String(cv[k2][2]||''), fy:String(cv[k2][3]||''), month:mm2||String(cv[k2][4]||''), type:String(cv[k2][5]||''), txnId:String(cv[k2][6]||''), agentId:String(cv[k2][7]||''), pct:num(cv[k2][8]), status:String(cv[k2][9]||''), at:String(cv[k2][10]||''), user:String(cv[k2][11]||'')});
     }
     return {ok:true, rows:co};
   }
@@ -531,6 +566,7 @@ function doGet(e){
       case 'b2bConfirm': r=b2bConfirm_(p); break;
       case 'advAdd': r=advAdd_(p); break;
       case 'b2bSummary': r=b2bSummary_(); break;
+      case 'b2bCompanyBills': r=b2bCompanyBills_(); break;
       case 'txnConfirm': r=txnConfirm_(p); break;
       case 'userAdd': r=userAdd_(p); break;
       case 'userPass': r=userPass_(p); break;

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "mkdir -p dist/assets && cp index.html dist/ && cp -r public/assets/* dist/assets/ && CHIP=$(grep -o '202610301[a-z]*' index.html | head -1) && mv dist/assets/index-CHTAzd11.js dist/assets/index-$CHIP.js && sed -i \"s/index-CHTAzd11.js/index-$CHIP.js/g\" dist/index.html && echo \\\"built $CHIP\\\"",
+    "build": "mkdir -p dist/assets && cp index.html dist/ && cp -r public/assets/* dist/assets/ && CHIP=$(grep -o 'v=20[0-9]\\{7\\}[a-z]*' index.html | head -1 | cut -d= -f2) && mv dist/assets/index-CHTAzd11.js dist/assets/index-$CHIP.js && sed -i \"s/index-CHTAzd11.js/index-$CHIP.js/g\" dist/index.html && echo \\\"built $CHIP\\\"",
     "preview": "vite preview"
   },
   "dependencies": {
